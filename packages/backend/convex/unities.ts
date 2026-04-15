@@ -9,7 +9,7 @@ export const createUnity = mutation({
     gymId: v.union(v.id("gyms"), v.null())
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx as never);
+    await requireAdmin(ctx);
     const now = Date.now();
 
     return ctx.db.insert("unities", {
@@ -27,7 +27,7 @@ export const updateUnity = mutation({
     gymId: v.optional(v.union(v.id("gyms"), v.null()))
   },
   handler: async (ctx, { unityId, ...patch }) => {
-    await requireAdmin(ctx as never);
+    await requireAdmin(ctx);
 
     const unity = await ctx.db.get(unityId);
     if (!unity) {

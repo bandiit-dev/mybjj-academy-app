@@ -14,7 +14,6 @@ const beltValidator = v.union(
 const userTypeValidator = v.union(v.literal("Normal"), v.literal("Admin"));
 
 const classTypeValidator = v.union(v.literal("GI"), v.literal("NOGI"));
-
 const classLevelValidator = v.union(v.literal("Beginner"), v.literal("Advanced"));
 
 const weekDayValidator = v.union(
@@ -26,6 +25,15 @@ const weekDayValidator = v.union(
   v.literal("Friday"),
   v.literal("Saturday")
 );
+
+const classSessionStatusValidator = v.union(
+  v.literal("Scheduled"),
+  v.literal("Cancelled"),
+  v.literal("Completed")
+);
+
+const enrollmentStatusValidator = v.union(v.literal("Confirmed"), v.literal("Cancelled"));
+const attendanceStatusValidator = v.union(v.literal("Present"), v.literal("Absent"));
 
 export default defineSchema({
   gyms: defineTable({
@@ -105,13 +113,59 @@ export default defineSchema({
   classes: defineTable({
     teacherIds: v.array(v.id("teachers")),
     gymIds: v.array(v.id("gyms")),
+    unityIds: v.array(v.id("unities")),
     duration: v.string(),
     startHour: v.string(),
-    studentPresenceIds: v.array(v.id("students")),
     level: classLevelValidator,
     classType: classTypeValidator,
     weekDays: v.array(weekDayValidator),
     createdAt: v.number(),
     updatedAt: v.number()
   })
+    .index("by_classType", ["classType"])
+    .index("by_level", ["level"]),
+
+  classSessions: defineTable({
+    classId: v.id("classes"),
+    sessionDate: v.string(),
+    startsAt: v.number(),
+    endsAt: v.number(),
+    teacherIds: v.array(v.id("teachers")),
+    gymIds: v.array(v.id("gyms")),
+    unityIds: v.array(v.id("unities")),
+    status: classSessionStatusValidator,
+    notes: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_classId", ["classId"])
+    .index("by_sessionDate", ["sessionDate"])
+    .index("by_status", ["status"])
+    .index("by_sessionDate_status", ["sessionDate", "status"]),
+
+  enrollments: defineTable({
+    classSessionId: v.id("classSessions"),
+    studentId: v.id("students"),
+    status: enrollmentStatusValidator,
+    confirmedAt: v.optional(v.number()),
+    cancelledAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_classSessionId", ["classSessionId"])
+    .index("by_studentId", ["studentId"])
+    .index("by_classSessionId_studentId", ["classSessionId", "studentId"]),
+
+  attendance: defineTable({
+    classSessionId: v.id("classSessions"),
+    studentId: v.id("students"),
+    status: attendanceStatusValidator,
+    markedByTeacherId: v.id("teachers"),
+    markedAt: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_classSessionId", ["classSessionId"])
+    .index("by_studentId", ["studentId"])
+    .index("by_classSessionId_studentId", ["classSessionId", "studentId"])
 });

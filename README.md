@@ -217,3 +217,21 @@ No notification workflows are wired yet; this is only a reusable integration poi
 - “Basic profile” self-update scope for teachers/students is: `name`, `email`, `phone`, `picture`
 - Convex domain modules are separated by entity for maintainability
 - Minimal UI scaffolds are preferred over heavy starter templates
+
+## Attendance Model Update (Sessions)
+
+The class attendance model now uses dated sessions and two dedicated records:
+
+- `classSessions`: real class occurrences on a specific date
+- `enrollments`: student attendance intent (`Confirmed` / `Cancelled`)
+- `attendance`: actual outcome marked by teacher/admin (`Present` / `Absent`)
+
+### Breaking Change
+
+- `classes.studentPresenceIds` was removed.
+- `classes` now only represent recurring templates and include `unityIds`.
+
+### Migration Assumption
+
+This repository is currently in bootstrap phase with no production data migration required.
+Existing code paths were updated directly to the new model.

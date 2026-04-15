@@ -8,7 +8,10 @@
  * @module
  */
 
+import type * as attendance from "../attendance.js";
+import type * as classSessions from "../classSessions.js";
 import type * as classes from "../classes.js";
+import type * as enrollments from "../enrollments.js";
 import type * as gyms from "../gyms.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_validators from "../lib/validators.js";
@@ -24,7 +27,10 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  attendance: typeof attendance;
+  classSessions: typeof classSessions;
   classes: typeof classes;
+  enrollments: typeof enrollments;
   gyms: typeof gyms;
   "lib/auth": typeof lib_auth;
   "lib/validators": typeof lib_validators;

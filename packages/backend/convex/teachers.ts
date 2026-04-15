@@ -39,7 +39,7 @@ export const createTeacher = mutation({
     userType: userTypeValidator
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx as never);
+    await requireAdmin(ctx);
     assertDegree(args.degree);
     const now = Date.now();
 
@@ -69,7 +69,7 @@ export const updateTeacher = mutation({
     userType: v.optional(userTypeValidator)
   },
   handler: async (ctx, { teacherId, ...patch }) => {
-    const authResult = await requireTeacherOrAdmin(ctx as never, teacherId as unknown as string);
+    const authResult = await requireTeacherOrAdmin(ctx, teacherId);
 
     if (patch.degree !== undefined) {
       assertDegree(patch.degree);
@@ -115,7 +115,7 @@ export const getAllTeachers = query({
 export const getCurrentTeacher = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await getAuthUserIdentity(ctx as never);
-    return getCurrentTeacherByClerkId(ctx as never, identity.subject);
+    const identity = await getAuthUserIdentity(ctx);
+    return getCurrentTeacherByClerkId(ctx, identity.subject);
   }
 });

@@ -1,8 +1,9 @@
-import { useQuery } from "convex/react";
 import { ActivityIndicator, SafeAreaView, ScrollView, Text, View } from "react-native";
 
+import { useUpcomingSessions } from "../src/features/classes/hooks/useUpcomingSessions";
+
 export default function HomeScreen() {
-  const gyms = useQuery("gyms:getAllGyms" as any);
+  const upcomingSessions = useUpcomingSessions(10);
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
@@ -11,15 +12,15 @@ export default function HomeScreen() {
         <Text style={{ color: "#4b5563" }}>Base Expo app connected to Convex.</Text>
 
         <View style={{ marginTop: 12 }}>
-          <Text style={{ fontSize: 18, fontWeight: "600" }}>Gyms (Convex query example)</Text>
-          {gyms === undefined ? (
+          <Text style={{ fontSize: 18, fontWeight: "600" }}>Upcoming Sessions</Text>
+          {upcomingSessions === undefined ? (
             <ActivityIndicator style={{ marginTop: 12 }} />
-          ) : gyms.length === 0 ? (
-            <Text style={{ marginTop: 8 }}>No gyms yet.</Text>
+          ) : upcomingSessions.length === 0 ? (
+            <Text style={{ marginTop: 8 }}>No upcoming sessions.</Text>
           ) : (
-            gyms.map((gym: any) => (
+            upcomingSessions.map((session) => (
               <View
-                key={gym._id}
+                key={session._id}
                 style={{
                   marginTop: 8,
                   borderWidth: 1,
@@ -28,8 +29,11 @@ export default function HomeScreen() {
                   padding: 12
                 }}
               >
-                <Text style={{ fontWeight: "600" }}>{gym.name}</Text>
-                <Text>{gym.email}</Text>
+                <Text style={{ fontWeight: "600" }}>{session.sessionDate}</Text>
+                <Text>
+                  {new Date(session.startsAt).toLocaleTimeString()} - {new Date(session.endsAt).toLocaleTimeString()}
+                </Text>
+                <Text>Status: {session.status}</Text>
               </View>
             ))
           )}

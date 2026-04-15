@@ -1,6 +1,6 @@
-import { mutationGeneric as mutation, queryGeneric as query } from "convex/server";
 import { v } from "convex/values";
 
+import { mutation, query } from "./_generated/server";
 import { requireAdmin } from "./lib/auth";
 import { assertWeekDays } from "./lib/validators";
 
@@ -20,15 +20,15 @@ export const createClass = mutation({
   args: {
     teacherIds: v.array(v.id("teachers")),
     gymIds: v.array(v.id("gyms")),
+    unityIds: v.array(v.id("unities")),
     duration: v.string(),
     startHour: v.string(),
-    studentPresenceIds: v.array(v.id("students")),
     level: classLevelValidator,
     classType: classTypeValidator,
     weekDays: v.array(weekDayValidator)
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx as never);
+    await requireAdmin(ctx);
     assertWeekDays(args.weekDays);
     const now = Date.now();
 
@@ -45,15 +45,15 @@ export const updateClass = mutation({
     classId: v.id("classes"),
     teacherIds: v.optional(v.array(v.id("teachers"))),
     gymIds: v.optional(v.array(v.id("gyms"))),
+    unityIds: v.optional(v.array(v.id("unities"))),
     duration: v.optional(v.string()),
     startHour: v.optional(v.string()),
-    studentPresenceIds: v.optional(v.array(v.id("students"))),
     level: v.optional(classLevelValidator),
     classType: v.optional(classTypeValidator),
     weekDays: v.optional(v.array(weekDayValidator))
   },
   handler: async (ctx, { classId, ...patch }) => {
-    await requireAdmin(ctx as never);
+    await requireAdmin(ctx);
 
     const classDoc = await ctx.db.get(classId);
     if (!classDoc) {

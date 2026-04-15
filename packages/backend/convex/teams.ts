@@ -12,7 +12,7 @@ export const createTeam = mutation({
     founded: v.string()
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx as never);
+    await requireAdmin(ctx);
     const now = Date.now();
 
     return ctx.db.insert("teams", {
@@ -33,7 +33,7 @@ export const updateTeam = mutation({
     founded: v.optional(v.string())
   },
   handler: async (ctx, { teamId, ...patch }) => {
-    await requireAdmin(ctx as never);
+    await requireAdmin(ctx);
 
     const team = await ctx.db.get(teamId);
     if (!team) {

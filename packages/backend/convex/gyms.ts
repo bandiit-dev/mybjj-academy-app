@@ -20,7 +20,7 @@ export const createGym = mutation({
     teacherIds: v.array(v.id("teachers"))
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx as never);
+    await requireAdmin(ctx);
     const now = Date.now();
 
     return ctx.db.insert("gyms", {
@@ -51,7 +51,7 @@ export const updateGym = mutation({
     teacherIds: v.optional(v.array(v.id("teachers")))
   },
   handler: async (ctx, { gymId, ...patch }) => {
-    await requireAdmin(ctx as never);
+    await requireAdmin(ctx);
 
     const gym = await ctx.db.get(gymId);
     if (!gym) {

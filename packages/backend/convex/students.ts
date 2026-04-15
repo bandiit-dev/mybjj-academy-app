@@ -35,7 +35,7 @@ export const createStudent = mutation({
     userType: userTypeValidator
   },
   handler: async (ctx, args) => {
-    const principal = await getCurrentPrincipal(ctx as never);
+    const principal = await getCurrentPrincipal(ctx);
 
     // Policy choice: authenticated users can create only their own student profile.
     if (!principal.isAdmin && args.clerkUserId !== principal.identity.subject) {
@@ -69,7 +69,7 @@ export const updateStudent = mutation({
     userType: v.optional(userTypeValidator)
   },
   handler: async (ctx, { studentId, ...patch }) => {
-    const authResult = await requireStudentOrAdmin(ctx as never, studentId as unknown as string);
+    const authResult = await requireStudentOrAdmin(ctx, studentId);
 
     if (patch.degree !== undefined) {
       assertDegree(patch.degree);
@@ -113,7 +113,7 @@ export const getAllStudents = query({
 export const getCurrentStudent = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await getAuthUserIdentity(ctx as never);
-    return getCurrentStudentByClerkId(ctx as never, identity.subject);
+    const identity = await getAuthUserIdentity(ctx);
+    return getCurrentStudentByClerkId(ctx, identity.subject);
   }
 });

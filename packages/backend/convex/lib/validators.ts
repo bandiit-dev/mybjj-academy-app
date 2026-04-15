@@ -12,6 +12,12 @@ export const WEEK_DAYS = [
   "Saturday"
 ] as const;
 
+export const SESSION_STATUSES = ["Scheduled", "Cancelled", "Completed"] as const;
+export const ENROLLMENT_STATUSES = ["Confirmed", "Cancelled"] as const;
+export const ATTENDANCE_STATUSES = ["Present", "Absent"] as const;
+
+const SESSION_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
 export function assertDegree(degree: number): void {
   if (!Number.isInteger(degree) || degree < 1 || degree > 7) {
     throw new Error("Invalid degree. It must be an integer between 1 and 7.");
@@ -26,12 +32,27 @@ export function assertWeekDays(weekDays: readonly string[]): void {
   }
 }
 
-export function assertEnumValue<T extends readonly string[]>(
-  label: string,
-  value: string,
-  allowedValues: T
-): void {
-  if (!allowedValues.includes(value as T[number])) {
-    throw new Error(`Invalid ${label}: ${value}`);
+export function assertSessionDate(sessionDate: string): void {
+  if (!SESSION_DATE_REGEX.test(sessionDate)) {
+    throw new Error("Invalid sessionDate format. Expected YYYY-MM-DD.");
   }
+
+  const date = new Date(`${sessionDate}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("Invalid sessionDate value.");
+  }
+}
+
+export function assertTimeRange(startsAt: number, endsAt: number): void {
+  if (!Number.isFinite(startsAt) || !Number.isFinite(endsAt)) {
+    throw new Error("startsAt and endsAt must be valid timestamps.");
+  }
+
+  if (startsAt >= endsAt) {
+    throw new Error("Invalid time range. startsAt must be less than endsAt.");
+  }
+}
+
+export function toIsoDate(date = new Date()): string {
+  return date.toISOString().slice(0, 10);
 }
