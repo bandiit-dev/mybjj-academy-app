@@ -1,0 +1,121 @@
+import { mutationGeneric as mutation, queryGeneric as query } from "convex/server";
+import { v } from "convex/values";
+
+import {
+  getAuthUserIdentity,
+  getCurrentTeacherByClerkId,
+  requireAdmin,
+  requireTeacherOrAdmin
+} from "./lib/auth";
+import { assertDegree } from "./lib/validators";
+
+const beltValidator = v.union(
+  v.literal("White"),
+  v.literal("Blue"),
+  v.literal("Purple"),
+  v.literal("Brown"),
+  v.literal("Black"),
+  v.literal("Coral"),
+  v.literal("Red")
+);
+
+const classTypeValidator = v.union(v.literal("GI"), v.literal("NOGI"));
+const userTypeValidator = v.union(v.literal("Normal"), v.literal("Admin"));
+
+export const createTeacher = mutation({
+  args: {
+    clerkUserId: v.string(),
+    name: v.string(),
+    email: v.string(),
+    phone: v.string(),
+    belt: beltValidator,
+    degree: v.number(),
+    gymIds: v.array(v.id("gyms")),
+    unityIds: v.array(v.id("unities")),
+    role: v.string(),
+    picture: v.string(),
+    classType: classTypeValidator,
+    classIds: v.array(v.id("classes")),
+    userType: userTypeValidator
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx as never);
+    assertDegree(args.degree);
+    const now = Date.now();
+
+    return ctx.db.insert("teachers", {
+      ...args,
+      createdAt: now,
+      updatedAt: now
+    });
+  }
+});
+
+export const updateTeacher = mutation({
+  args: {
+    teacherId: v.id("teachers"),
+    clerkUserId: v.optional(v.string()),
+    name: v.optional(v.string()),
+    email: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    belt: v.optional(beltValidator),
+    degree: v.optional(v.number()),
+    gymIds: v.optional(v.array(v.id("gyms"))),
+    unityIds: v.optional(v.array(v.id("unities"))),
+    role: v.optional(v.string()),
+    picture: v.optional(v.string()),
+    classType: v.optional(classTypeValidator),
+    classIds: v.optional(v.array(v.id("classes"))),
+    userType: v.optional(userTypeValidator)
+  },
+  handler: async (ctx, { teacherId, ...patch }) => {
+    const authResult = await requireTeacherOrAdmin(ctx as never, teacherId as unknown as string);
+
+    if (patch.degree !== undefined) {
+      assertDegree(patch.degree);
+    }
+
+    const isAdmin = authResult.isAdmin;
+
+    if (!isAdmin) {
+      const selfPatch: Record<string, unknown> = {};
+
+      if (patch.name !== undefined) selfPatch.name = patch.name;
+      if (patch.email !== undefined) selfPatch.email = patch.email;
+      if (patch.phone !== undefined) selfPatch.phone = patch.phone;
+      if (patch.picture !== undefined) selfPatch.picture = patch.picture;
+
+      await ctx.db.patch(teacherId, {
+        ...selfPatch,
+        updatedAt: Date.now()
+      });
+
+      return teacherId;
+    }
+
+    await ctx.db.patch(teacherId, {
+      ...patch,
+      updatedAt: Date.now()
+    });
+
+    return teacherId;
+  }
+});
+
+export const getTeacherById = query({
+  args: { teacherId: v.id("teachers") },
+  handler: async (ctx, { teacherId }) => ctx.db.get(teacherId)
+});
+
+export const getAllTeachers = query({
+  args: {},
+  handler: async (ctx) => ctx.db.query("teachers").collect()
+});
+
+export const getCurrentTeacher = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await getAuthUserIdentity(ctx as never);
+    return getCurrentTeacherByClerkId(ctx as never, identity.subject);
+  }
+});

@@ -1,0 +1,20 @@
+{
+  "name": "@mybjj/backend",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "convex dev",
+    "build": "echo 'Convex functions are built by Convex runtime'",
+    "codegen": "convex codegen",
+    "lint": "echo 'No lint configured for backend'",
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "convex": "^1.16.0",
+    "resend": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.2"
+  }
+}

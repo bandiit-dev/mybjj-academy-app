@@ -1,0 +1,29 @@
+# dependencies
+node_modules
+.pnpm-store
+
+# build output
+dist
+build
+.next
+.expo
+.expo-shared
+coverage
+
+# logs
+*.log
+
+# env
+.env
+.env.local
+.env.*.local
+
+# convex
+.convex
+
+# macOS
+.DS_Store
+
+*.tsbuildinfo
+
+.turbo

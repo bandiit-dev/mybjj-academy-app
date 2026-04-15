@@ -1,0 +1,7 @@
+{
+  "extends": "../typescript-config/base.json",
+  "compilerOptions": {
+    "allowJs": true
+  },
+  "include": ["convex/**/*.ts", "src/**/*.ts"]
+}
