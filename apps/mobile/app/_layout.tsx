@@ -1,11 +1,13 @@
-import { Stack } from "expo-router";
+import "../global.css";
+
+import { Slot } from "expo-router";
 
 import { AppProviders } from "../src/providers/AppProviders";
 
 export default function RootLayout() {
   return (
     <AppProviders>
-      <Stack screenOptions={{ headerTitle: "MyBJJAcademy" }} />
+      <Slot />
     </AppProviders>
   );
 }

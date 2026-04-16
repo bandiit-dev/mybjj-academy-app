@@ -1,16 +1,15 @@
-import { ClerkProvider } from "@clerk/clerk-expo";
 import { ConvexReactClient } from "convex/react";
 import { ConvexProvider } from "convex/react";
-import { PropsWithChildren, useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 
 import { env } from "../utils/env";
 
-export function AppProviders({ children }: PropsWithChildren) {
+type AppProvidersProps = {
+  children: ReactNode;
+};
+
+export function AppProviders({ children }: AppProvidersProps) {
   const convex = useMemo(() => new ConvexReactClient(env.convexUrl), []);
 
-  return (
-    <ClerkProvider publishableKey={env.clerkPublishableKey}>
-      <ConvexProvider client={convex}>{children}</ConvexProvider>
-    </ClerkProvider>
-  );
+  return <ConvexProvider client={convex}>{children as any}</ConvexProvider>;
 }
