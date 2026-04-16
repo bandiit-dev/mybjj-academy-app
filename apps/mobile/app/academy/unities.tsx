@@ -1,5 +1,6 @@
 import { Text } from "react-native";
 
+import { AppTopBar } from "../../src/components/mobile/AppTopBar";
 import { UnityCard } from "../../src/components/feature/UnityCard";
 import { EmptyState, LoadingState } from "../../src/components/ui/State";
 import { Screen } from "../../src/components/ui/Screen";
@@ -10,11 +11,14 @@ export default function UnitiesScreen() {
 
   return (
     <Screen>
-      <Text className="text-2xl font-bold text-foreground">Unities</Text>
-      {unities === undefined ? <LoadingState label="Loading unities..." /> : null}
+      <AppTopBar title="Unidades" />
+      <Text className="text-xs font-bold tracking-widest text-[#6B7280]">LOCALIZAÇÕES</Text>
+
+      {unities === undefined ? <LoadingState label="Carregando unidades..." /> : null}
       {unities && unities.length === 0 ? (
-        <EmptyState title="No unities" description="Locations will appear here once configured." />
+        <EmptyState title="Sem unidades" description="As unidades aparecerão aqui quando configuradas." />
       ) : null}
+
       {unities?.map((unity) => (
         <UnityCard key={unity._id} unity={unity} />
       ))}

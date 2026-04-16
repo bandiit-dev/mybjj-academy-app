@@ -1,11 +1,10 @@
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Pressable, Text, TextInput, View } from "react-native";
 
-import { PrimaryButton, SecondaryButton } from "../../src/components/ui/Buttons";
-import { Screen } from "../../src/components/ui/Screen";
-import { TextField } from "../../src/components/ui/TextField";
+import { AppTopBar } from "../../src/components/mobile/AppTopBar";
 import { LoadingState } from "../../src/components/ui/State";
+import { Screen } from "../../src/components/ui/Screen";
 import { useCurrentProfile } from "../../src/features/profile/hooks/useCurrentProfile";
 import { useUpdateProfile } from "../../src/features/profile/hooks/useUpdateProfile";
 
@@ -16,14 +15,23 @@ export default function ProfileScreen() {
 
   const profile = teacher ?? student;
 
-  const [name, setName] = useState(profile?.name ?? "");
-  const [email, setEmail] = useState(profile?.email ?? "");
-  const [phone, setPhone] = useState(profile?.phone ?? "");
-  const [picture, setPicture] = useState(profile?.picture ?? "");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [picture, setPicture] = useState("");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!profile) return;
+    setName(profile.name);
+    setEmail(profile.email);
+    setPhone(profile.phone);
+    setPicture(profile.picture);
+  }, [profile]);
 
   async function onSave() {
     if (!profile) return;
+
     setSaving(true);
     try {
       if (teacher) {
@@ -39,25 +47,47 @@ export default function ProfileScreen() {
   if (isLoading) {
     return (
       <Screen>
-        <LoadingState label="Loading profile..." />
+        <LoadingState label="Carregando perfil..." />
       </Screen>
     );
   }
 
   return (
     <Screen>
-      <Text className="text-2xl font-bold text-foreground">My Profile</Text>
-      <Text className="text-sm text-mutedForeground">Role: {role}</Text>
+      <AppTopBar title="Meu Perfil" />
 
-      <TextField label="Name" value={name} onChangeText={setName} />
-      <TextField label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" />
-      <TextField label="Phone" value={phone} onChangeText={setPhone} />
-      <TextField label="Picture URL" value={picture} onChangeText={setPicture} autoCapitalize="none" />
-      {profile ? <Text className="text-sm text-mutedForeground">Belt: {profile.belt}</Text> : null}
-      {profile ? <Text className="text-sm text-mutedForeground">Degree: {profile.degree}</Text> : null}
+      <View className="gap-2 rounded-2xl bg-[#E5E7EB] p-4">
+        <Text className="text-sm text-[#4B5563]">Tipo de usuário: {role}</Text>
+        {profile ? <Text className="text-sm text-[#4B5563]">Faixa: {profile.belt}</Text> : null}
+        {profile ? <Text className="text-sm text-[#4B5563]">Grau: {profile.degree}</Text> : null}
+      </View>
 
-      <PrimaryButton label={saving ? "Saving..." : "Save profile"} onPress={onSave} disabled={saving} />
-      <SecondaryButton label="Settings" onPress={() => router.push("/settings")} />
+      <View className="gap-3">
+        <TextInput value={name} onChangeText={setName} placeholder="Nome" className="h-12 rounded-xl border border-[#D1D5DB] bg-white px-4 text-[#111827]" />
+        <TextInput
+          value={email}
+          onChangeText={setEmail}
+          placeholder="Email"
+          autoCapitalize="none"
+          className="h-12 rounded-xl border border-[#D1D5DB] bg-white px-4 text-[#111827]"
+        />
+        <TextInput value={phone} onChangeText={setPhone} placeholder="Telefone" className="h-12 rounded-xl border border-[#D1D5DB] bg-white px-4 text-[#111827]" />
+        <TextInput
+          value={picture}
+          onChangeText={setPicture}
+          placeholder="URL da foto"
+          autoCapitalize="none"
+          className="h-12 rounded-xl border border-[#D1D5DB] bg-white px-4 text-[#111827]"
+        />
+      </View>
+
+      <Pressable onPress={onSave} disabled={saving} className="h-12 items-center justify-center rounded-xl bg-[#111827]">
+        <Text className="text-base font-semibold text-white">{saving ? "Salvando..." : "Salvar perfil"}</Text>
+      </Pressable>
+
+      <Pressable onPress={() => router.push("/settings")} className="h-12 items-center justify-center rounded-xl border border-[#D1D5DB] bg-white">
+        <Text className="text-base font-semibold text-[#374151]">Configurações</Text>
+      </Pressable>
     </Screen>
   );
 }

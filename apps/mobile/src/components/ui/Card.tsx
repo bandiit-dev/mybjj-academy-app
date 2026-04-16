@@ -1,6 +1,10 @@
 import { PropsWithChildren } from "react";
 import { View } from "react-native";
 
-export function Card({ children }: PropsWithChildren) {
-  return <View className="rounded-lg border border-border bg-card p-4">{children}</View>;
+type CardProps = PropsWithChildren<{
+  className?: string;
+}>;
+
+export function Card({ children, className }: CardProps) {
+  return <View className={`rounded-2xl border border-[#D1D5DB] bg-white p-4 ${className ?? ""}`}>{children}</View>;
 }

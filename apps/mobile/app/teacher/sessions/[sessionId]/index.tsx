@@ -1,8 +1,8 @@
 import { useLocalSearchParams } from "expo-router";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { TeacherRouteGuard } from "../../../../src/components/feature/TeacherRouteGuard";
-import { PrimaryButton, SecondaryButton } from "../../../../src/components/ui/Buttons";
+import { AppTopBar } from "../../../../src/components/mobile/AppTopBar";
 import { EmptyState, LoadingState } from "../../../../src/components/ui/State";
 import { Screen } from "../../../../src/components/ui/Screen";
 import { useSessionDetail } from "../../../../src/features/classes/hooks/useSessionDetail";
@@ -24,7 +24,7 @@ export default function TeacherSessionAttendanceScreen() {
     return (
       <TeacherRouteGuard>
         <Screen>
-          <LoadingState label="Loading attendance..." />
+          <LoadingState label="Carregando chamada..." />
         </Screen>
       </TeacherRouteGuard>
     );
@@ -34,7 +34,7 @@ export default function TeacherSessionAttendanceScreen() {
     return (
       <TeacherRouteGuard>
         <Screen>
-          <EmptyState title="Session not found" description="The session may have been removed." />
+          <EmptyState title="Sessão não encontrada" description="A sessão pode ter sido removida." />
         </Screen>
       </TeacherRouteGuard>
     );
@@ -45,22 +45,22 @@ export default function TeacherSessionAttendanceScreen() {
   return (
     <TeacherRouteGuard>
       <Screen>
-        <Text className="text-2xl font-bold text-foreground">Attendance Management</Text>
-        <Text className="text-sm text-mutedForeground">{detail.session.sessionDate}</Text>
+        <AppTopBar title="Gestão de Presença" />
+        <Text className="text-sm text-[#4B5563]">{detail.session.sessionDate}</Text>
 
         {roster.length === 0 ? (
-          <EmptyState title="No enrolled students" description="Students need confirmed enrollment first." />
+          <EmptyState title="Sem alunos confirmados" description="Os alunos precisam confirmar presença primeiro." />
         ) : (
           roster.map((entry) => (
-            <View key={entry.enrollment._id} className="gap-2 rounded-lg border border-border bg-card p-4">
-              <Text className="text-base font-semibold text-foreground">{entry.student?.name ?? "Student"}</Text>
-              <Text className="text-sm text-mutedForeground">Enrollment: {entry.enrollment.status}</Text>
-              <Text className="text-sm text-mutedForeground">
-                Attendance: {attendanceByStudent.get(entry.enrollment.studentId) ?? "Not marked"}
+            <View key={entry.enrollment._id} className="gap-3 rounded-2xl bg-[#E5E7EB] p-4">
+              <Text className="text-base font-semibold text-[#111827]">{entry.student?.name ?? "Aluno"}</Text>
+              <Text className="text-sm text-[#4B5563]">Status confirmação: {entry.enrollment.status}</Text>
+              <Text className="text-sm text-[#4B5563]">
+                Presença: {attendanceByStudent.get(entry.enrollment.studentId) ?? "Não marcada"}
               </Text>
+
               <View className="flex-row gap-2">
-                <PrimaryButton
-                  label="Present"
+                <Pressable
                   onPress={() =>
                     markAttendance({
                       classSessionId: id,
@@ -68,9 +68,12 @@ export default function TeacherSessionAttendanceScreen() {
                       status: "Present"
                     })
                   }
-                />
-                <SecondaryButton
-                  label="Absent"
+                  className="h-11 flex-1 items-center justify-center rounded-xl bg-[#111827]"
+                >
+                  <Text className="font-semibold text-white">Presente</Text>
+                </Pressable>
+
+                <Pressable
                   onPress={() =>
                     markAttendance({
                       classSessionId: id,
@@ -78,7 +81,10 @@ export default function TeacherSessionAttendanceScreen() {
                       status: "Absent"
                     })
                   }
-                />
+                  className="h-11 flex-1 items-center justify-center rounded-xl border border-[#D1D5DB] bg-white"
+                >
+                  <Text className="font-semibold text-[#374151]">Ausente</Text>
+                </Pressable>
               </View>
             </View>
           ))
