@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
+import { Geist } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 
 import { ConvexClientProvider } from "@/providers/convex-client-provider";
+import "./styles.css";
+
+const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 
 export const metadata: Metadata = {
   title: "MyBJJAcademy Admin",
@@ -11,8 +15,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider>
-      <html lang="en">
-        <body>
+      <html lang="pt-BR">
+        <body className={geist.variable}>
           <ConvexClientProvider>{children}</ConvexClientProvider>
         </body>
       </html>
