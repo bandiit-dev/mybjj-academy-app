@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Slot, usePathname, useRouter } from "expo-router";
-import { Pressable, SafeAreaView, Text, View } from "react-native";
+import { Redirect, Slot, usePathname, useRouter } from "expo-router";
+import { Pressable, SafeAreaView, Text, View, ActivityIndicator } from "react-native";
+import { useConvexAuth } from "convex/react";
 
 type TabItem = {
   label: string;
@@ -18,6 +19,19 @@ const tabs: TabItem[] = [
 export default function TabsLayout() {
   const router = useRouter();
   const pathname = usePathname();
+  const { isLoading, isAuthenticated } = useConvexAuth();
+
+  if (isLoading) {
+    return (
+      <SafeAreaView className="flex-1 items-center justify-center bg-[#F3F4F6]">
+        <ActivityIndicator />
+      </SafeAreaView>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Redirect href="/(auth)/sign-in" />;
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-[#F3F4F6]">

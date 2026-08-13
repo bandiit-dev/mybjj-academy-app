@@ -1,19 +1,23 @@
 import { useRouter } from "expo-router";
 import { useEffect } from "react";
 import { Text, View } from "react-native";
+import { useConvexAuth } from "convex/react";
 
 import { Screen } from "../../src/components/ui/Screen";
 
 export default function SplashScreen() {
   const router = useRouter();
+  const { isLoading, isAuthenticated } = useConvexAuth();
 
   useEffect(() => {
+    if (isLoading) return;
+
     const timer = setTimeout(() => {
-      router.replace("/(auth)/sign-in");
+      router.replace(isAuthenticated ? "/(tabs)/home" : "/(auth)/sign-in");
     }, 1200);
 
     return () => clearTimeout(timer);
-  }, [router]);
+  }, [isLoading, isAuthenticated, router]);
 
   return (
     <Screen scroll={false} padded={false}>

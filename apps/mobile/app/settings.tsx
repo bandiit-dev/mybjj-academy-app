@@ -1,5 +1,6 @@
 import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
+import { useClerk } from "@clerk/expo";
 
 import { AppTopBar } from "../src/components/mobile/AppTopBar";
 import { Card } from "../src/components/ui/Card";
@@ -7,8 +8,10 @@ import { Screen } from "../src/components/ui/Screen";
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { signOut } = useClerk();
 
-  function onSignOut() {
+  async function onSignOut() {
+    await signOut();
     router.replace("/(auth)/sign-in");
   }
 

@@ -2,9 +2,9 @@
 
 Expo React Native base app wired with:
 
-- Clerk provider scaffold
-- Convex client provider
-- Simple home screen querying `gyms:getAllGyms`
+- Clerk provider + sign-in screen (email/password + Google OAuth flow)
+- Convex client provider integrated with Clerk auth
+- Base screens for classes, academy, profile, and teacher attendance flows
 
 ## Run
 

@@ -7,6 +7,7 @@
     "dev": "convex dev",
     "build": "echo 'Convex functions are built by Convex runtime'",
     "codegen": "convex codegen",
+    "seed:demo": "convex run seeds:seedDemoData",
     "lint": "echo 'No lint configured for backend'",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },

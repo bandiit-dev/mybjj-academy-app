@@ -7,6 +7,9 @@ const monorepoRoot = path.resolve(projectRoot, "../..");
 
 const config = getDefaultConfig(projectRoot);
 
+const reactPath = path.dirname(require.resolve("react/package.json", { paths: [projectRoot] }));
+const reactNativePath = path.dirname(require.resolve("react-native/package.json", { paths: [projectRoot] }));
+
 config.watchFolders = [monorepoRoot];
 
 config.resolver.nodeModulesPaths = [
@@ -14,12 +17,11 @@ config.resolver.nodeModulesPaths = [
   path.resolve(monorepoRoot, "node_modules")
 ];
 
-
 config.resolver.extraNodeModules = {
-  react: path.resolve(projectRoot, "node_modules/react"),
-  "react/jsx-runtime": path.resolve(projectRoot, "node_modules/react/jsx-runtime"),
-  "react/jsx-dev-runtime": path.resolve(projectRoot, "node_modules/react/jsx-dev-runtime"),
-  "react-native": path.resolve(projectRoot, "node_modules/react-native")
+  react: reactPath,
+  "react/jsx-runtime": path.join(reactPath, "jsx-runtime.js"),
+  "react/jsx-dev-runtime": path.join(reactPath, "jsx-dev-runtime.js"),
+  "react-native": reactNativePath
 };
 
 module.exports = withNativeWind(config, {

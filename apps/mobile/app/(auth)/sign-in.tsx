@@ -1,19 +1,76 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
+import { useSSO, useSignIn } from "@clerk/expo";
 
 import { Screen } from "../../src/components/ui/Screen";
 
 export default function SignInScreen() {
   const router = useRouter();
+  const { signIn, fetchStatus } = useSignIn();
+  const { startSSOFlow } = useSSO();
+  const isLoaded = Boolean(signIn);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [errorText, setErrorText] = useState<string | null>(null);
 
-  async function continueToApp() {
+  async function continueWithEmail() {
+    if (!signIn) return;
     setIsLoading(true);
+    setErrorText(null);
+
     try {
+      const createResult = await signIn.create({
+        identifier: email.trim(),
+      });
+
+      if (createResult.error) {
+        throw createResult.error;
+      }
+
+      const passwordResult = await signIn.password({ password });
+      if (passwordResult.error) {
+        throw passwordResult.error;
+      }
+
+      const finalizeResult = await signIn.finalize();
+      if (finalizeResult.error) {
+        throw finalizeResult.error;
+      }
+
       router.replace("/(tabs)/home");
+    } catch (error: any) {
+      const message =
+        error?.errors?.[0]?.longMessage ??
+        error?.errors?.[0]?.message ??
+        error?.message ??
+        "Unable to sign in";
+      setErrorText(String(message));
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function continueWithGoogle() {
+    if (!isLoaded) return;
+    setIsLoading(true);
+    setErrorText(null);
+
+    try {
+      const result = await startSSOFlow({ strategy: "oauth_google" });
+
+      if (result.createdSessionId) {
+        await result.setActive?.({ session: result.createdSessionId });
+        router.replace("/(tabs)/home");
+        return;
+      }
+
+      setErrorText("Google sign-in did not complete. Please try again.");
+    } catch (error: any) {
+      const message = error?.message ?? "Google sign-in failed";
+      setErrorText(String(message));
     } finally {
       setIsLoading(false);
     }
@@ -50,24 +107,27 @@ export default function SignInScreen() {
           />
 
           <Pressable
-            onPress={continueToApp}
-            disabled={isLoading}
+            onPress={continueWithEmail}
+            disabled={isLoading || !isLoaded || fetchStatus === "fetching"}
             className="mt-1 h-12 items-center justify-center rounded-xl bg-[#111827]"
           >
             {isLoading ? <ActivityIndicator color="#FFFFFF" /> : <Text className="text-base font-semibold text-white">Login com email</Text>}
           </Pressable>
 
-          <Pressable onPress={continueToApp} className="h-12 items-center justify-center rounded-xl border border-[#D1D5DB] bg-white">
+          <Pressable
+            onPress={continueWithGoogle}
+            disabled={isLoading || !isLoaded || fetchStatus === "fetching"}
+            className="h-12 items-center justify-center rounded-xl border border-[#D1D5DB] bg-white"
+          >
             <Text className="text-base font-semibold text-[#111827]">Login com Google</Text>
           </Pressable>
+
+          {errorText ? <Text className="text-sm text-red-600">{errorText}</Text> : null}
         </View>
 
         <View className="mt-6 items-center gap-3">
           <Text className="text-sm text-[#6B7280]">Esqueceu a senha?</Text>
           <Text className="text-sm text-[#6B7280]">Criar conta</Text>
-          <Text className="px-6 text-center text-xs text-[#9CA3AF]">
-            Layout pronto para Clerk. Basta conectar o fluxo com `useSignIn` e OAuth quando você quiser ativar.
-          </Text>
         </View>
       </View>
     </Screen>

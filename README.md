@@ -154,6 +154,43 @@ Behavior:
 - Student update: self basic profile update or admin update for any student
 - No delete endpoints yet
 
+## Demo Seed (Test Data + Test Profiles)
+
+Convex includes an idempotent seed mutation at:
+
+- `packages/backend/convex/seeds.ts` (`seedDemoData`)
+
+This mutation creates:
+
+- 1 team
+- 1 gym + 1 unity
+- 2 teachers (one admin)
+- 1 student
+- 1 class template
+- 2 class sessions
+- enrollment + attendance sample records
+
+It is protected by `SEED_SECRET`.
+
+### Seed Env
+
+Add in `packages/backend/.env.local`:
+
+- `SEED_SECRET=your_local_seed_secret`
+
+### Seed Command
+
+From repo root:
+
+```bash
+pnpm --filter @mybjj/backend exec convex run seeds:seedDemoData '{"secret":"your_local_seed_secret","adminClerkUserId":"user_xxx_admin","teacherClerkUserId":"user_xxx_teacher","studentClerkUserId":"user_xxx_student"}'
+```
+
+Notes:
+
+- Use real Clerk User IDs so login maps to existing Convex `teacher` / `student` records.
+- If you omit IDs, defaults like `user_test_admin` are used.
+
 ## Clerk and Passwords
 
 Clerk is the source of truth for authentication.
@@ -163,6 +200,22 @@ Clerk is the source of truth for authentication.
 - Convex functions derive current identity from Clerk auth subject (`identity.subject`)
 
 This keeps credential handling entirely in Clerk and avoids storing sensitive password material in application tables.
+
+## Account Handling (Current Project)
+
+Current behavior is split between Clerk and Convex:
+
+1. Clerk owns credentials and sessions.
+2. Convex stores only profile/domain records (`teachers`, `students`) linked by `clerkUserId`.
+3. Authorization in Convex checks current Clerk identity (`identity.subject`) and compares it with `clerkUserId`.
+4. Admin capabilities come from `userType === "Admin"` on the matched teacher/student profile.
+
+Practical user lifecycle:
+
+1. Create user in Clerk (admin panel or invite flow).
+2. Create matching teacher/student profile in Convex with the same Clerk user ID.
+3. User signs in on mobile/admin through Clerk.
+4. App queries `getCurrentTeacher` / `getCurrentStudent` to resolve app role and access.
 
 ## Environment Variables
 
