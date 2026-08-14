@@ -181,6 +181,41 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .units-table th:first-child{width:25%}.units-table th:nth-child(2){width:15%}.units-table th:nth-child(3){width:15%}.units-table th:nth-child(4){width:15%}.units-table th:nth-child(5){width:22%}.units-table th:last-child{width:84px;text-align:center}
 .units-table td { height:64px; padding:10px 16px; border-top:1px solid var(--border); color:#27272a; font-size:13px; vertical-align:middle; }
 .unit-identity { display:flex; align-items:center; gap:12px; }.unit-symbol { width:32px; height:32px; flex:none; display:grid; place-items:center; border-radius:50%; color:white; background:var(--ink); font-size:11px; font-weight:700; }.unit-identity div { display:flex; min-width:0; flex-direction:column; gap:3px; }.unit-identity strong { overflow:hidden; color:var(--ink); font-size:14px; text-overflow:ellipsis; white-space:nowrap; }.unit-identity small { color:var(--muted); font-size:11px; }.unit-email { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.button.primary, .button.secondary { text-decoration:none; }
+.management-content { display:flex; flex-direction:column; gap:20px; padding:32px; }
+.management-card { display:grid; grid-template-columns:1fr 1fr; overflow:hidden; border:1px solid var(--border); border-radius:16px; background:white; }
+.management-section { min-width:0; padding:24px 32px; }
+.management-section+.management-section { border-left:1px solid var(--border); }
+.management-section h2 { margin:0 0 24px; font-size:17px; }
+.management-fields { display:flex; flex-direction:column; gap:18px; }
+.management-field { min-width:0; display:flex; flex-direction:column; gap:7px; color:#27272a; font-size:13px; font-weight:500; }
+.management-field b { color:#dc2626; }
+.management-field input, .management-field select, .management-field textarea { width:100%; min-width:0; border:1px solid var(--border); border-radius:8px; background:white; color:var(--ink); font:inherit; font-weight:400; }
+.management-field input, .management-field select { height:44px; padding:0 12px; }
+.management-field textarea { min-height:112px; padding:12px; resize:vertical; }
+.management-field input::placeholder, .management-field textarea::placeholder { color:#a1a1aa; }
+.management-field small { color:var(--muted); font-size:11px; font-weight:400; }
+.field-pair { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.cep-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:end; }
+.cep-row>.button { height:44px; }
+.form-grid { display:grid; gap:18px 24px; }
+.form-grid.four { grid-template-columns:repeat(4,1fr); }
+.form-grid.three { grid-template-columns:repeat(3,1fr); }
+.form-grid.address { grid-template-columns:1.1fr 2fr 1fr; }
+.management-card:has(.form-grid) { grid-template-columns:1fr; }
+.management-card:has(.form-grid) .management-section+.management-section { border-top:1px solid var(--border); border-left:0; }
+.file-drop { min-height:132px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:18px; border:1px dashed #d4d4d8; border-radius:8px; cursor:pointer; text-align:center; }
+.file-drop input { position:absolute; width:1px; height:1px; opacity:0; }
+.file-drop strong { font-size:13px; }
+.file-drop span { color:var(--muted); font-size:11px; }
+.file-drop.compact { min-height:92px; }
+.management-actions { display:flex; justify-content:flex-end; gap:12px; }
+.management-actions .button { min-height:44px; padding-inline:20px; }
+.form-save { min-width:150px; }
+.form-back { white-space:nowrap; }
 @media (max-width:1100px) { .metrics-grid { grid-template-columns:repeat(2,1fr); } .dashboard-grid { grid-template-columns:1fr; } .attendance-panel { width:100%; } }
+@media (max-width:1050px) { .form-grid.four { grid-template-columns:repeat(2,1fr); } .form-grid.address { grid-template-columns:1fr 1fr; } }
 @media (max-width:800px) { .sidebar { position:fixed; left:0; transform:translateX(-100%); transition:transform .2s ease; } .sidebar-open { transform:translateX(0); } .sidebar-backdrop { position:fixed; inset:0; display:block; border:0; background:rgba(0,0,0,.45); z-index:15; } .menu-button { display:block; } .topbar { align-items:flex-start; padding:14px 20px; } .topbar-actions { flex-wrap:wrap; justify-content:flex-end; } .dashboard-content, .students-content, .academy-content, .classes-content, .professors-content, .units-content { padding:20px; } }
 @media (max-width:560px) { .topbar { flex-direction:column; } .topbar-actions { width:100%; justify-content:flex-start; } .topbar-actions .divider { display:none; } .metrics-grid { grid-template-columns:1fr; } .dashboard-content, .students-content, .academy-content, .classes-content, .professors-content, .units-content { padding:16px; } .academy-card { padding:18px; }.academy-card>header { align-items:flex-start; flex-direction:column; }.academy-stats,.color-row { grid-template-columns:1fr; } .panel { padding:18px; } .schedule-item { align-items:flex-start; } .session-main { align-items:flex-start; gap:10px; } .session-copy strong { white-space:normal; } .session-end { margin-left:auto; } .unit-badge { display:none; } .activity-panel li { grid-template-columns:6px 1fr; align-items:start; } .activity-panel time { grid-column:2; } .filters-bar, .search-field, .filter-select { width:100%; } .filter-select select { flex:1; max-width:none; } .students-pagination { align-items:flex-start; flex-direction:column; } .students-pagination nav { max-width:100%; overflow-x:auto; } }
+@media (max-width:800px) { .management-content { padding:20px; } .management-card { grid-template-columns:1fr; } .management-section+.management-section { border-top:1px solid var(--border); border-left:0; } .form-grid.three { grid-template-columns:1fr; } }
+@media (max-width:560px) { .management-content { padding:16px; } .management-section { padding:20px 18px; } .form-grid.four, .form-grid.address, .field-pair { grid-template-columns:1fr; } .management-actions { flex-direction:column-reverse; } .management-actions .button { width:100%; } }

@@ -87,7 +87,7 @@ export function StudentsPage() {
     setSelected(null);
   }
 
-  const addAction = <><button className="button primary" type="button" onClick={() => placeholder("O fluxo de cadastro ainda não possui uma rota no admin.")}><Image src="/figma-dashboard/plus.svg" alt="" width={14} height={14} aria-hidden />Adicionar Aluno</button><span className="divider" /></>;
+  const addAction = <><a className="button primary" href="/alunos/novo"><Image src="/figma-dashboard/plus.svg" alt="" width={14} height={14} aria-hidden />Adicionar Aluno</a><span className="divider" /></>;
 
   return <AdminShell title="Gestão de Alunos" breadcrumb="Alunos" actions={addAction}>
     <main className="students-content">

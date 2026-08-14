@@ -83,7 +83,7 @@ export function AcademySettingsPage() {
   return <AdminShell title="Configurações da Academia" breadcrumb="Academia" actions={saveAction}>
     <main className="academy-content">
       {notice && <div className="students-notice" role="status"><span>{notice}</span><button type="button" aria-label="Fechar aviso" onClick={() => setNotice(null)}>×</button></div>}
-      <SectionCard title="Informações da Academia" action={<button className="card-action" type="button" onClick={() => editing ? (setAcademy(savedAcademy), setErrors({}), setEditing(false)) : setEditing(true)}>{editing ? "Cancelar" : "Editar"}</button>}>
+      <SectionCard title="Informações da Academia" action={<a className="card-action" href="/academia/editar">Editar</a>}>
         <div className="academy-fields"><Field label="Nome da Academia" value={academy.name} editing={editing} error={errors.name} onChange={value=>update("name",value)}/><Field label="CNPJ" value={academy.cnpj} editing={editing} error={errors.cnpj} onChange={value=>update("cnpj",value)}/><Field label="E-mail de Contato" value={academy.contactEmail} editing={editing} error={errors.contactEmail} type="email" onChange={value=>update("contactEmail",value)}/><Field label="Telefone" value={academy.phone} editing={editing} error={errors.phone} onChange={value=>update("phone",value)}/><Field label="Data de Fundação" value={academy.foundationDate} editing={editing} error={errors.foundationDate} type="date" onChange={value=>update("foundationDate",value)}/></div>
       </SectionCard>
       <SectionCard title="Unidades e Endereços" action={<button className="card-action" type="button" onClick={()=>placeholder("O cadastro de unidades aguarda uma rota ou modal integrado ao Convex.")}>Adicionar Unidade</button>}>

@@ -38,7 +38,7 @@ export function ProfessorsPage(){
   useEffect(()=>{if(!selected)return;const close=(event:KeyboardEvent)=>{if(event.key==="Escape")setSelected(null)};window.addEventListener("keydown",close);return()=>window.removeEventListener("keydown",close)},[selected]);
   function clearFilters(){setSearch("");setBelt("all");setUnit("all");setRole("all")}
   function removeProfessor(){if(!selected)return;setProfessors(current=>current.filter(item=>item.id!==selected.id));setNotice(`${selected.name} foi removido apenas dos dados locais.`);setSelected(null)}
-  const action=<><button className="button primary professor-add" type="button" onClick={()=>setNotice("O cadastro aguarda uma rota ou modal conectado a createTeacher.")}><Image src="/figma-dashboard/plus.svg" alt="" width={14} height={14} aria-hidden/>Adicionar Professor</button><span className="divider"/></>;
+  const action=<><a className="button primary professor-add" href="/professores/novo"><Image src="/figma-dashboard/plus.svg" alt="" width={14} height={14} aria-hidden/>Adicionar Professor</a><span className="divider"/></>;
   return <AdminShell title="Professores" breadcrumb="Professores" actions={action}><main className="professors-content">
     {notice&&<div className="students-notice" role="status"><span>{notice}</span><button type="button" aria-label="Fechar aviso" onClick={()=>setNotice(null)}>×</button></div>}
     <section className="filters-bar" aria-label="Filtros de professores"><label className="search-field professor-search"><span className="sr-only">Buscar professores</span><ProfessorIcon name="search.svg"/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por nome ou e-mail..."/></label>

@@ -40,7 +40,7 @@ export function ClassesPage() {
   useEffect(()=>{if(!selected)return;const close=(event:KeyboardEvent)=>{if(event.key==="Escape")setSelected(null)};window.addEventListener("keydown",close);return()=>window.removeEventListener("keydown",close)},[selected]);
   function clearFilters(){setSearch("");setType("all");setLevel("all-filter");setTeacher("all");setUnit("all")}
   function removeClass(){if(!selected)return;setClasses(current=>current.filter(item=>item.id!==selected.id));setNotice(`${selected.name} foi removida apenas dos dados locais.`);setSelected(null)}
-  const action=<><button className="button primary" type="button" onClick={()=>setNotice("O fluxo de criação aguarda uma rota ou modal conectado a createClass.")}><ClassIcon name="plus.svg"/>Criar Aula</button><span className="divider"/></>;
+  const action=<><a className="button primary" href="/aulas/nova"><ClassIcon name="plus.svg"/>Criar Aula</a><span className="divider"/></>;
   return <AdminShell title="Gestão de Aulas" breadcrumb="Aulas" actions={action}><main className="classes-content">
     {notice&&<div className="students-notice" role="status"><span>{notice}</span><button type="button" aria-label="Fechar aviso" onClick={()=>setNotice(null)}>×</button></div>}
     <section className="filters-bar" aria-label="Filtros de aulas"><label className="search-field classes-search"><span className="sr-only">Buscar aula</span><ClassIcon name="search.svg"/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar aula..."/></label>
