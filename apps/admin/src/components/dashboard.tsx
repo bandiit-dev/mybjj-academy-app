@@ -100,13 +100,13 @@ function AttendanceChart() {
   </section>;
 }
 
-export function AdminShell({ title, children, showActions = false }: { title: string; children?: React.ReactNode; showActions?: boolean }) {
+export function AdminShell({ title, breadcrumb = title, children, actions, showActions = false }: { title: string; breadcrumb?: string; children?: React.ReactNode; actions?: React.ReactNode; showActions?: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false);
   return <div className="app-shell">
     <Sidebar open={menuOpen} close={() => setMenuOpen(false)} />
     <div className="main-column">
-      <header className="topbar"><div className="topbar-title"><button className="menu-button" type="button" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}>☰</button><div><p>Painel&nbsp; / &nbsp;{title}</p><h1>{title}</h1></div></div>
-        <div className="topbar-actions">{showActions && <><button className="button secondary" type="button"><Icon name="user-plus.svg" size={12} />Adicionar Aluno</button><button className="button primary" type="button"><Icon name="plus.svg" size={12} />Criar Aula</button><span className="divider"/></>}<button className="icon-button" aria-label="Notificações" type="button"><Icon name="bell.svg" size={14} /></button></div>
+      <header className="topbar"><div className="topbar-title"><button className="menu-button" type="button" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}>☰</button><div><p>Painel&nbsp; / &nbsp;{breadcrumb}</p><h1>{title}</h1></div></div>
+        <div className="topbar-actions">{actions}{showActions && <><button className="button secondary" type="button"><Icon name="user-plus.svg" size={12} />Adicionar Aluno</button><button className="button primary" type="button"><Icon name="plus.svg" size={12} />Criar Aula</button><span className="divider"/></>}<button className="icon-button" aria-label="Notificações" type="button"><Icon name="bell.svg" size={14} /></button></div>
       </header>
       {children}
     </div>

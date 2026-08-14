@@ -1,5 +1,5 @@
-import { BlankAdminPage } from "@/components/dashboard";
+import { StudentsPage } from "@/components/students-page";
 
 export default function AlunosPage() {
-  return <BlankAdminPage title="Alunos" />;
+  return <StudentsPage />;
 }
