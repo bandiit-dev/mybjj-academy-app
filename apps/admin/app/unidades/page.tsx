@@ -1,5 +1,5 @@
-import { BlankAdminPage } from "@/components/dashboard";
+import { UnitsPage } from "@/components/units-page";
 
 export default function UnidadesPage() {
-  return <BlankAdminPage title="Unidades" />;
+  return <UnitsPage />;
 }

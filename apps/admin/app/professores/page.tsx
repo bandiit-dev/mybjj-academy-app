@@ -1,5 +1,5 @@
-import { BlankAdminPage } from "@/components/dashboard";
+import { ProfessorsPage } from "@/components/professors-page";
 
 export default function ProfessoresPage() {
-  return <BlankAdminPage title="Professores" />;
+  return <ProfessorsPage />;
 }
