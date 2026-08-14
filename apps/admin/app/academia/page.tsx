@@ -1,5 +1,5 @@
-import { BlankAdminPage } from "@/components/dashboard";
+import { AcademySettingsPage } from "@/components/academy-settings-page";
 
 export default function AcademiaPage() {
-  return <BlankAdminPage title="Academia" />;
+  return <AcademySettingsPage />;
 }

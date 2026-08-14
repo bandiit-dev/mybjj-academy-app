@@ -20,7 +20,6 @@ const navItems: NavItem[] = [
   { label: "Unidades", icon: "map-pin.svg", href: "/unidades" },
   { label: "Academia", icon: "shield.svg", href: "/academia" },
   { label: "Equipe", icon: "users-round.svg", href: "/equipe" },
-  { label: "Configurações", icon: "settings.svg", href: "/configuracoes" },
 ];
 
 // Mock dashboard content from the approved Figma screen. Replace with aggregate Convex queries.
