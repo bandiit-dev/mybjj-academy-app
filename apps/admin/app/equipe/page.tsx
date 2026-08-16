@@ -1,5 +1,5 @@
-import { BlankAdminPage } from "@/components/dashboard";
+import { TeamsPage } from "@/components/teams-page";
 
 export default function EquipePage() {
-  return <BlankAdminPage title="Equipe" />;
+  return <TeamsPage />;
 }

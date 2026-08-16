@@ -213,6 +213,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .management-actions .button { min-height:44px; padding-inline:20px; }
 .form-save { min-width:150px; }
 .form-back { white-space:nowrap; }
+.weekday-field { display:flex; flex-wrap:wrap; gap:10px; margin:0; padding:14px; border:1px solid var(--border); border-radius:8px; }
+.weekday-field legend { padding:0 4px; font-size:13px; font-weight:500; }
+.weekday-field label { display:flex; align-items:center; gap:5px; color:var(--muted); font-size:12px; }
+.row-actions button:disabled { cursor:not-allowed; opacity:.35; }
+.empty-copy { margin:0; color:var(--muted); font-size:13px; }
 @media (max-width:1100px) { .metrics-grid { grid-template-columns:repeat(2,1fr); } .dashboard-grid { grid-template-columns:1fr; } .attendance-panel { width:100%; } }
 @media (max-width:1050px) { .form-grid.four { grid-template-columns:repeat(2,1fr); } .form-grid.address { grid-template-columns:1fr 1fr; } }
 @media (max-width:800px) { .sidebar { position:fixed; left:0; transform:translateX(-100%); transition:transform .2s ease; } .sidebar-open { transform:translateX(0); } .sidebar-backdrop { position:fixed; inset:0; display:block; border:0; background:rgba(0,0,0,.45); z-index:15; } .menu-button { display:block; } .topbar { align-items:flex-start; padding:14px 20px; } .topbar-actions { flex-wrap:wrap; justify-content:flex-end; } .dashboard-content, .students-content, .academy-content, .classes-content, .professors-content, .units-content { padding:20px; } }
