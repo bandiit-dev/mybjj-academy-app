@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 
 import { mutation, query } from "./_generated/server";
-import { requireAdmin } from "./lib/auth";
+import { getAccessibleGymIds, requireAdmin } from "./lib/auth";
 import { assertWeekDays } from "./lib/validators";
 
 const classTypeValidator = v.union(v.literal("GI"), v.literal("NOGI"));
@@ -80,5 +80,9 @@ export const getClassById = query({
 
 export const getAllClasses = query({
   args: {},
-  handler: async (ctx) => ctx.db.query("classes").collect()
+  handler: async (ctx) => {
+    const { gymIds } = await getAccessibleGymIds(ctx);
+    const classes = await ctx.db.query("classes").collect();
+    return classes.filter((classDoc) => classDoc.gymIds.some((gymId) => gymIds.has(gymId)));
+  }
 });

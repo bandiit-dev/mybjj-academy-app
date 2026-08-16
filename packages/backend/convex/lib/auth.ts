@@ -51,6 +51,19 @@ export async function getCurrentPrincipal(ctx: AuthCtx) {
   };
 }
 
+export async function getAccessibleGymIds(ctx: AuthCtx) {
+  const principal = await getCurrentPrincipal(ctx);
+  const gymIds = new Set<Id<"gyms">>();
+  principal.teacher?.gymIds.forEach((gymId) => gymIds.add(gymId));
+  principal.student?.gymIds.forEach((gymId) => gymIds.add(gymId));
+
+  if (gymIds.size === 0) {
+    throw new Error("Forbidden: authenticated user is not linked to an academy");
+  }
+
+  return { principal, gymIds };
+}
+
 export async function requireAdmin(ctx: AuthCtx) {
   const principal = await getCurrentPrincipal(ctx);
 

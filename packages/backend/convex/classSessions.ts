@@ -4,6 +4,7 @@ import type { Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import {
   getAuthUserIdentity,
+  getAccessibleGymIds,
   getCurrentPrincipal,
   requireSessionTeacherOrAdmin,
   requireTeacherOrAdminPrincipal
@@ -160,7 +161,7 @@ export const getUpcomingClassSessions = query({
     limit: v.optional(v.number())
   },
   handler: async (ctx, { limit }) => {
-    await getAuthUserIdentity(ctx);
+    const { gymIds } = await getAccessibleGymIds(ctx);
 
     const today = toIsoDate();
     const scheduled = await ctx.db
@@ -169,7 +170,7 @@ export const getUpcomingClassSessions = query({
       .collect();
 
     return scheduled
-      .filter((session) => includeSessionDate(session.sessionDate, today))
+      .filter((session) => includeSessionDate(session.sessionDate, today) && session.gymIds.some((gymId) => gymIds.has(gymId)))
       .sort((a, b) => (a.sessionDate === b.sessionDate ? a.startsAt - b.startsAt : a.sessionDate.localeCompare(b.sessionDate)))
       .slice(0, limit ?? 50);
   }
@@ -181,20 +182,22 @@ export const getSessionsByDate = query({
     status: v.optional(classSessionStatusValidator)
   },
   handler: async (ctx, { sessionDate, status }) => {
-    await getAuthUserIdentity(ctx);
+    const { gymIds } = await getAccessibleGymIds(ctx);
     assertSessionDate(sessionDate);
 
     if (status) {
-      return ctx.db
+      const sessions = await ctx.db
         .query("classSessions")
         .withIndex("by_sessionDate_status", (q) => q.eq("sessionDate", sessionDate).eq("status", status))
         .collect();
+      return sessions.filter((session) => session.gymIds.some((gymId) => gymIds.has(gymId)));
     }
 
-    return ctx.db
+    const sessions = await ctx.db
       .query("classSessions")
       .withIndex("by_sessionDate", (q) => q.eq("sessionDate", sessionDate))
       .collect();
+    return sessions.filter((session) => session.gymIds.some((gymId) => gymIds.has(gymId)));
   }
 });
 

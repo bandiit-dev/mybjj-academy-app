@@ -1,7 +1,7 @@
 import { mutationGeneric as mutation, queryGeneric as query } from "convex/server";
 import { v } from "convex/values";
 
-import { requireAdmin } from "./lib/auth";
+import { getAccessibleGymIds, requireAdmin } from "./lib/auth";
 
 export const createTeam = mutation({
   args: {
@@ -56,5 +56,11 @@ export const getTeamById = query({
 
 export const getAllTeams = query({
   args: {},
-  handler: async (ctx) => ctx.db.query("teams").collect()
+  handler: async (ctx) => {
+    const { gymIds } = await getAccessibleGymIds(ctx);
+    const gyms = await Promise.all([...gymIds].map((gymId) => ctx.db.get(gymId)));
+    const teamIds = new Set(gyms.flatMap((gym) => gym?.teamId ? [gym.teamId] : []));
+    const teams = await Promise.all([...teamIds].map((teamId) => ctx.db.get(teamId)));
+    return teams.filter((team) => team !== null);
+  }
 });

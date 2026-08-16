@@ -1,8 +1,10 @@
 import { mutationGeneric as mutation, queryGeneric as query } from "convex/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 
 import {
   getAuthUserIdentity,
+  getAccessibleGymIds,
   getCurrentPrincipal,
   getCurrentStudentByClerkId,
   requireStudentOrAdmin
@@ -107,7 +109,11 @@ export const getStudentById = query({
 
 export const getAllStudents = query({
   args: {},
-  handler: async (ctx) => ctx.db.query("students").collect()
+  handler: async (ctx) => {
+    const { gymIds } = await getAccessibleGymIds(ctx);
+    const students = await ctx.db.query("students").collect();
+    return students.filter((student) => student.gymIds.some((gymId: Id<"gyms">) => gymIds.has(gymId)));
+  }
 });
 
 export const getCurrentStudent = query({

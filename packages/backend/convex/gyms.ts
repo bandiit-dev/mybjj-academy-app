@@ -1,7 +1,7 @@
 import { mutationGeneric as mutation, queryGeneric as query } from "convex/server";
 import { v } from "convex/values";
 
-import { requireAdmin } from "./lib/auth";
+import { getAccessibleGymIds, requireAdmin } from "./lib/auth";
 
 export const createGym = mutation({
   args: {
@@ -74,5 +74,9 @@ export const getGymById = query({
 
 export const getAllGyms = query({
   args: {},
-  handler: async (ctx) => ctx.db.query("gyms").collect()
+  handler: async (ctx) => {
+    const { gymIds } = await getAccessibleGymIds(ctx);
+    const gyms = await Promise.all([...gymIds].map((gymId) => ctx.db.get(gymId)));
+    return gyms.filter((gym) => gym !== null);
+  }
 });
