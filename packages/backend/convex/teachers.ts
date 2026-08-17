@@ -95,6 +95,11 @@ export const updateTeacher = mutation({
       return teacherId;
     }
 
+    const adminGymIds = new Set([...(authResult.teacher?.gymIds ?? []), ...(authResult.student?.gymIds ?? [])]);
+    if (!authResult.targetTeacher.gymIds.some((gymId: Id<"gyms">) => adminGymIds.has(gymId))) {
+      throw new Error("Forbidden: teacher belongs to another academy");
+    }
+
     await ctx.db.patch(teacherId, {
       ...patch,
       updatedAt: Date.now()
@@ -106,7 +111,11 @@ export const updateTeacher = mutation({
 
 export const getTeacherById = query({
   args: { teacherId: v.id("teachers") },
-  handler: async (ctx, { teacherId }) => ctx.db.get(teacherId)
+  handler: async (ctx, { teacherId }) => {
+    const { gymIds } = await getAccessibleGymIds(ctx);
+    const teacher = await ctx.db.get(teacherId);
+    return teacher?.gymIds.some((gymId: Id<"gyms">) => gymIds.has(gymId)) ? teacher : null;
+  }
 });
 
 export const getAllTeachers = query({

@@ -53,11 +53,16 @@ export const updateClass = mutation({
     weekDays: v.optional(v.array(weekDayValidator))
   },
   handler: async (ctx, { classId, ...patch }) => {
-    await requireAdmin(ctx);
+    const principal = await requireAdmin(ctx);
 
     const classDoc = await ctx.db.get(classId);
     if (!classDoc) {
       throw new Error("Class not found");
+    }
+
+    const adminGymIds = new Set([...(principal.teacher?.gymIds ?? []), ...(principal.student?.gymIds ?? [])]);
+    if (!classDoc.gymIds.some((gymId) => adminGymIds.has(gymId))) {
+      throw new Error("Forbidden: class belongs to another academy");
     }
 
     if (patch.weekDays) {
@@ -75,7 +80,11 @@ export const updateClass = mutation({
 
 export const getClassById = query({
   args: { classId: v.id("classes") },
-  handler: async (ctx, { classId }) => ctx.db.get(classId)
+  handler: async (ctx, { classId }) => {
+    const { gymIds } = await getAccessibleGymIds(ctx);
+    const classDoc = await ctx.db.get(classId);
+    return classDoc?.gymIds.some((gymId) => gymIds.has(gymId)) ? classDoc : null;
+  }
 });
 
 export const getAllClasses = query({

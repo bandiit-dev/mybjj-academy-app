@@ -29,11 +29,16 @@ export const updateUnity = mutation({
     gymId: v.optional(v.union(v.id("gyms"), v.null()))
   },
   handler: async (ctx, { unityId, ...patch }) => {
-    await requireAdmin(ctx);
+    const principal = await requireAdmin(ctx);
 
     const unity = await ctx.db.get(unityId);
     if (!unity) {
       throw new Error("Unity not found");
+    }
+
+    const adminGymIds = new Set([...(principal.teacher?.gymIds ?? []), ...(principal.student?.gymIds ?? [])]);
+    if (unity.gymId === null || !adminGymIds.has(unity.gymId)) {
+      throw new Error("Forbidden: unit belongs to another academy");
     }
 
     await ctx.db.patch(unityId, {
@@ -47,7 +52,11 @@ export const updateUnity = mutation({
 
 export const getUnityById = query({
   args: { unityId: v.id("unities") },
-  handler: async (ctx, { unityId }) => ctx.db.get(unityId)
+  handler: async (ctx, { unityId }) => {
+    const { gymIds } = await getAccessibleGymIds(ctx);
+    const unity = await ctx.db.get(unityId);
+    return unity?.gymId !== null && unity?.gymId !== undefined && gymIds.has(unity.gymId) ? unity : null;
+  }
 });
 
 export const getAllUnities = query({
