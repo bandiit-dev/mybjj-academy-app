@@ -19,8 +19,8 @@ export const ATTENDANCE_STATUSES = ["Present", "Absent"] as const;
 const SESSION_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 export function assertDegree(degree: number): void {
-  if (!Number.isInteger(degree) || degree < 1 || degree > 7) {
-    throw new Error("Invalid degree. It must be an integer between 1 and 7.");
+  if (!Number.isInteger(degree) || degree < 0 || degree > 7) {
+    throw new Error("Invalid degree. It must be an integer between 0 and 7.");
   }
 }
 

@@ -5,6 +5,7 @@ import { getAccessibleGymIds, requireAdmin } from "./lib/auth";
 
 export const createUnity = mutation({
   args: {
+    name: v.string(),
     address: v.string(),
     gymId: v.union(v.id("gyms"), v.null())
   },
@@ -23,6 +24,7 @@ export const createUnity = mutation({
 export const updateUnity = mutation({
   args: {
     unityId: v.id("unities"),
+    name: v.optional(v.string()),
     address: v.optional(v.string()),
     gymId: v.optional(v.union(v.id("gyms"), v.null()))
   },

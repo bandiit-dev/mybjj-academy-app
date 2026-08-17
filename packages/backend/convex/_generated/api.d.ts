@@ -16,6 +16,7 @@ import type * as gyms from "../gyms.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_validators from "../lib/validators.js";
 import type * as onboarding from "../onboarding.js";
+import type * as provisioning from "../provisioning.js";
 import type * as seeds from "../seeds.js";
 import type * as students from "../students.js";
 import type * as teachers from "../teachers.js";
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
   "lib/validators": typeof lib_validators;
   onboarding: typeof onboarding;
+  provisioning: typeof provisioning;
   seeds: typeof seeds;
   students: typeof students;
   teachers: typeof teachers;

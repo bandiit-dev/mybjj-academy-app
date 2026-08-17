@@ -4,6 +4,8 @@ import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/s
 import { getAuthUserIdentity, getCurrentStudentByClerkId, getCurrentTeacherByClerkId } from "./lib/auth";
 import { assertDegree } from "./lib/validators";
 
+const beltValidator = v.union(v.literal("White"), v.literal("Blue"), v.literal("Purple"), v.literal("Brown"), v.literal("Black"), v.literal("Coral"), v.literal("Red"));
+
 type AuthCtx = Pick<QueryCtx, "auth" | "db"> | Pick<MutationCtx, "auth" | "db">;
 
 async function findProfilesByEmail(ctx: AuthCtx, email: string | undefined) {
@@ -84,11 +86,14 @@ export const bootstrapAcademyAdmin = mutation({
   args: {
     adminName: v.string(),
     adminPhone: v.string(),
+    adminBelt: beltValidator,
+    adminDegree: v.number(),
     gymName: v.string(),
     cnpj: v.string(),
     gymPhone: v.string(),
     contactEmail: v.string(),
     founded: v.string(),
+    unityName: v.string(),
     unityAddress: v.string()
   },
   handler: async (ctx, args) => {
@@ -109,7 +114,7 @@ export const bootstrapAcademyAdmin = mutation({
     const existingGym = await ctx.db.query("gyms").withIndex("by_cnpj", (q) => q.eq("cnpj", args.cnpj.trim())).first();
     if (existingGym) throw new Error("A gym already exists with this CNPJ");
 
-    assertDegree(1);
+    assertDegree(args.adminDegree);
     const now = Date.now();
     const gymId = await ctx.db.insert("gyms", {
       name: args.gymName.trim(), cnpj: args.cnpj.trim(), phone: args.gymPhone.trim(),
@@ -117,11 +122,11 @@ export const bootstrapAcademyAdmin = mutation({
       teamId: null, branding: {}, teacherIds: [], createdAt: now, updatedAt: now
     });
     const unityId = await ctx.db.insert("unities", {
-      address: args.unityAddress.trim(), gymId, createdAt: now, updatedAt: now
+      name: args.unityName.trim(), address: args.unityAddress.trim(), gymId, createdAt: now, updatedAt: now
     });
     const teacherId = await ctx.db.insert("teachers", {
       clerkUserId: identity.subject, name: args.adminName.trim(), email, phone: args.adminPhone.trim(),
-      belt: "White", degree: 1, gymIds: [gymId], unityIds: [unityId], role: "Proprietário",
+      belt: args.adminBelt, degree: args.adminDegree, gymIds: [gymId], unityIds: [unityId], role: "Proprietário",
       picture: typeof identity.pictureUrl === "string" ? identity.pictureUrl : "", classType: "GI",
       classIds: [], userType: "Admin", createdAt: now, updatedAt: now
     });

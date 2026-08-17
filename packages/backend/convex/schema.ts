@@ -57,6 +57,7 @@ export default defineSchema({
     .index("by_email", ["email"]),
 
   unities: defineTable({
+    name: v.optional(v.string()),
     address: v.string(),
     gymId: v.union(v.id("gyms"), v.null()),
     createdAt: v.number(),
