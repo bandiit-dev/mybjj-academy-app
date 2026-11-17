@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import { ptBR } from "@clerk/localizations/pt-BR";
 
 import { ConvexClientProvider } from "@/providers/convex-client-provider";
 import "./styles.css";
@@ -14,7 +15,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider signInUrl="/" signUpUrl="/" signInFallbackRedirectUrl="/" signInForceRedirectUrl="/" signUpFallbackRedirectUrl="/" signUpForceRedirectUrl="/">
+    <ClerkProvider localization={ptBR} signInUrl="/" signUpUrl="/" signInFallbackRedirectUrl="/" signInForceRedirectUrl="/" signUpFallbackRedirectUrl="/" signUpForceRedirectUrl="/">
       <html lang="pt-BR">
         <body className={geist.variable}>
           <ConvexClientProvider>{children}</ConvexClientProvider>
