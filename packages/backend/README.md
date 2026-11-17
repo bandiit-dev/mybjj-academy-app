@@ -85,3 +85,12 @@ The portal currently hides team management: `/equipe` redirects to `/academia`.
 Academy creation and editing use an optional free-text `teamName` field instead.
 Academy queries prefill the existing linked team's name when `teamName` has not
 yet been saved; saving an empty value explicitly clears the displayed name.
+
+## Dashboard monthly presence
+
+`enrollments.getMonthlyPresence` accepts a `YYYY-MM` month and counts confirmed
+student/session enrollments for classes dated within that month, including future
+classes in the month. It excludes cancelled classes, cancelled enrollments,
+deleted students and records outside the admin's academies. One student counts
+once per class session; `studentCount` counts distinct enrolled students. This is
+an enrollment-based summary, separate from teacher-marked attendance records.

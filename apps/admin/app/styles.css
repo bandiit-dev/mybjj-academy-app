@@ -38,7 +38,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .menu-button { display:none; width:44px; height:44px; border:1px solid var(--border); border-radius:8px; background:white; cursor:pointer; }
 .dashboard-content { display:flex; flex-direction:column; gap:24px; padding:32px; }
 .blank-page { min-height:calc(100vh - 76px); background:var(--paper); }
-.metrics-grid { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:16px; }
+.metrics-grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:16px; }
 .metric-card, .panel { border:1px solid var(--border); background:white; }
 .metric-card { min-width:0; padding:20px; border-radius:12px; }
 .metric-heading, .metric-value, .panel header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
@@ -311,3 +311,34 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .professors-table .belt-line { flex:0 0 32px; }
 .professors-table .row-actions a { flex:0 0 32px; }
 .professors-table td { overflow-wrap:anywhere; }
+
+.dashboard-students-panel { min-width:0; }
+.dashboard-students-panel header a { color:var(--ink); }
+.dashboard-students-table { width:100%; min-width:440px; margin-top:20px; border-collapse:collapse; text-align:left; }
+.dashboard-students-table th { padding:12px; color:var(--muted); background:#f4f4f5; font-size:11px; font-weight:600; }
+.dashboard-students-table td { padding:14px 12px; border-bottom:1px solid var(--border); font-size:13px; }
+.dashboard-students-table th:first-child { width:60%; }
+.dashboard-students-table .student-identity a { min-width:0; }
+.dashboard-students-table .student-identity strong { white-space:normal; overflow-wrap:anywhere; }
+
+.dashboard-list-column { min-width:0; display:flex; flex-direction:column; gap:24px; }
+.dashboard-classes-panel { min-width:0; }
+.dashboard-classes-panel header a { color:var(--ink); }
+.dashboard-classes-table { width:100%; min-width:680px; margin-top:20px; border-collapse:collapse; text-align:left; }
+.dashboard-classes-table th { padding:12px; color:var(--muted); background:#f4f4f5; font-size:11px; font-weight:600; }
+.dashboard-classes-table td { padding:14px 12px; border-bottom:1px solid var(--border); font-size:13px; }
+.dashboard-classes-table td a { color:var(--ink); text-decoration:none; }
+.dashboard-classes-table td a:hover { text-decoration:underline; }
+.dashboard-classes-table td small { display:block; margin-top:4px; color:var(--muted); font-size:11px; }
+
+.summary-active-count { color:#166534; }
+.summary-inactive-count { color:#991b1b; }
+.monthly-presence { display:flex; flex-direction:column; align-items:stretch; gap:18px; padding:20px; border:1px solid var(--border); border-radius:12px; background:#fafafa; }
+.monthly-presence-heading { display:flex; flex-direction:column; gap:6px; }
+.monthly-presence h3 { margin:0; font-size:14px; font-weight:600; }
+.monthly-presence .monthly-presence-month { margin:0; color:var(--muted); font-size:12px; text-transform:capitalize; }
+.monthly-presence-metric { display:flex; flex-direction:column; gap:6px; }
+.monthly-presence-total { display:block; font-size:44px; font-weight:700; line-height:1.1; letter-spacing:-1px; font-variant-numeric:tabular-nums; }
+.monthly-presence-metric>span { color:var(--muted); font-size:12px; }
+.monthly-presence-students { align-self:flex-start; margin:0; padding:6px 10px; border:1px solid var(--border); border-radius:6px; background:white; font-size:12px; }
+.monthly-presence small { color:var(--muted); font-size:11px; line-height:1.5; }

@@ -2,10 +2,12 @@ import { v } from "convex/values";
 
 import { mutation, query } from "./_generated/server";
 import {
+  getAccessibleGymIds,
   getCurrentPrincipal,
   getCurrentStudentByClerkId,
   requireSessionTeacherOrAdmin
 } from "./lib/auth";
+import { addPlanMonths } from "./lib/studentPlans";
 import { toIsoDate } from "./lib/validators";
 
 const enrollmentStatusValidator = v.union(v.literal("Confirmed"), v.literal("Cancelled"));
@@ -188,5 +190,38 @@ export const getSessionRoster = query({
       enrollment,
       student: students[index]
     }));
+  }
+});
+
+export const getMonthlyPresence = query({
+  args: { month: v.string() },
+  handler: async (ctx, {month}) => {
+    const {principal, gymIds} = await getAccessibleGymIds(ctx);
+    if (!principal.isAdmin) throw new Error("Forbidden: admin role required");
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error("Invalid month. Expected YYYY-MM.");
+    const start = `${month}-01`;
+    const end = addPlanMonths(start, 1);
+    const sessions = (await ctx.db.query("classSessions")
+      .withIndex("by_sessionDate", q=>q.gte("sessionDate",start).lt("sessionDate",end)).collect())
+      .filter(session=>session.status!=="Cancelled" && session.gymIds.some(id=>gymIds.has(id)));
+    const groups = await Promise.all(sessions.map(async session=>({session,
+      enrollments: await ctx.db.query("enrollments").withIndex("by_classSessionId", q=>q.eq("classSessionId",session._id)).collect()
+    })));
+    const studentIds = [...new Set(groups.flatMap(group=>group.enrollments.filter(enrollment=>enrollment.status==="Confirmed").map(enrollment=>enrollment.studentId)))];
+    const students = new Map(await Promise.all(studentIds.map(async id=>[id,await ctx.db.get(id)] as const)));
+    const enrolledStudents = new Set<string>();
+    let totalEnrollments = 0;
+    for (const {session, enrollments} of groups) {
+      const counted = new Set<string>();
+      for (const enrollment of enrollments) {
+        if (enrollment.status!=="Confirmed" || counted.has(enrollment.studentId)) continue;
+        const student = students.get(enrollment.studentId);
+        if (!student || !session.gymIds.some(id=>gymIds.has(id)&&student.gymIds.includes(id))) continue;
+        counted.add(enrollment.studentId);
+        enrolledStudents.add(enrollment.studentId);
+        totalEnrollments++;
+      }
+    }
+    return {month, totalEnrollments, studentCount: enrolledStudents.size};
   }
 });
