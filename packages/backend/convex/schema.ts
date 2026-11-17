@@ -1,5 +1,5 @@
 import { defineSchema, defineTable } from "convex/server";
-import { beltValidator, teacherClassTypeValidator } from "./lib/validators";
+import { beltValidator, teacherClassTypeValidator, unityAddressValidator } from "./lib/validators";
 import { v } from "convex/values";
 
 const userTypeValidator = v.union(v.literal("Normal"), v.literal("Admin"));
@@ -49,7 +49,9 @@ export default defineSchema({
 
   unities: defineTable({
     name: v.optional(v.string()),
+    phone: v.optional(v.string()),
     address: v.string(),
+    addressDetails: v.optional(unityAddressValidator),
     gymId: v.union(v.id("gyms"), v.null()),
     createdAt: v.number(),
     updatedAt: v.number()

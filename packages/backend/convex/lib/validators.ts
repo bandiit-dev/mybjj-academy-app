@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, type Infer } from "convex/values";
 
 export const BELT_LABELS = {
   White: "Branca",
@@ -90,4 +90,19 @@ export function assertInvitationEmail(email: string): void {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
     throw new Error("A valid email is required to create an account");
   }
+}
+
+export const unityAddressValidator = v.object({
+  street: v.string(),
+  number: v.string(),
+  complement: v.string(),
+  district: v.string(),
+  city: v.string(),
+  state: v.string(),
+  postalCode: v.string()
+});
+
+export function formatUnityAddress(address: Infer<typeof unityAddressValidator>): string {
+  return [address.street, address.number, address.complement, address.district,
+    address.city, address.state, address.postalCode].map(part => part.trim()).filter(Boolean).join(", ");
 }

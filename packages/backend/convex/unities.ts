@@ -1,12 +1,15 @@
 import { mutationGeneric as mutation, queryGeneric as query } from "convex/server";
 import { v } from "convex/values";
 
+import { formatUnityAddress, unityAddressValidator } from "./lib/validators";
 import { getAccessibleGymIds, requireAdmin } from "./lib/auth";
 
 export const createUnity = mutation({
   args: {
     name: v.string(),
+    phone: v.optional(v.string()),
     address: v.string(),
+    addressDetails: v.optional(unityAddressValidator),
     gymId: v.union(v.id("gyms"), v.null())
   },
   handler: async (ctx, args) => {
@@ -15,6 +18,7 @@ export const createUnity = mutation({
 
     return ctx.db.insert("unities", {
       ...args,
+      address: args.addressDetails ? formatUnityAddress(args.addressDetails) : args.address,
       createdAt: now,
       updatedAt: now
     });
@@ -25,7 +29,9 @@ export const updateUnity = mutation({
   args: {
     unityId: v.id("unities"),
     name: v.optional(v.string()),
+    phone: v.optional(v.string()),
     address: v.optional(v.string()),
+    addressDetails: v.optional(unityAddressValidator),
     gymId: v.optional(v.union(v.id("gyms"), v.null()))
   },
   handler: async (ctx, { unityId, ...patch }) => {
@@ -43,6 +49,9 @@ export const updateUnity = mutation({
 
     await ctx.db.patch(unityId, {
       ...patch,
+      // Keep the address used by lists/mobile in sync with the editable fields.
+      ...(patch.addressDetails ? { address: formatUnityAddress(patch.addressDetails) } :
+        patch.address !== undefined ? { addressDetails: undefined } : {}),
       updatedAt: Date.now()
     });
 
