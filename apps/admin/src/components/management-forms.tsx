@@ -12,7 +12,7 @@ import { AdminShell } from "@/components/dashboard";
 type Option={label:string;value:string};
 function Field({name,label,required,placeholder,type="text",options,defaultValue,textarea}:{name:string;label:string;required?:boolean;placeholder?:string;type?:string;options?:Option[];defaultValue?:string;textarea?:boolean}){return <label className="management-field"><span>{label}{required&&<b> *</b>}</span>{options?<select name={name} required={required} defaultValue={defaultValue??""}><option value="" disabled>{placeholder??"Selecione"}</option>{options.map(x=><option value={x.value} key={x.value}>{x.label}</option>)}</select>:textarea?<textarea name={name} defaultValue={defaultValue} placeholder={placeholder}/>:<input name={name} required={required} type={type} defaultValue={defaultValue} placeholder={placeholder}/>}</label>}
 function Section({title,children,onChange}:{title:string;children:ReactNode;onChange?:()=>void}){return <section className="management-section" onChange={onChange}><h2>{title}</h2><div className="management-fields">{children}</div></section>}
-function friendlyError(cause:unknown){const message=cause instanceof Error?cause.message:"";if(message.includes("dateOfBirth"))return "Informe uma data de nascimento válida, até a data de hoje.";if(message.includes("valid email"))return "Informe um e-mail válido para criar a conta do aluno.";if(message.includes("Unauthorized"))return "Sua sessão expirou. Entre novamente para continuar.";if(message.includes("Forbidden")||message.includes("admin role required"))return "Você não tem permissão para realizar esta ação.";if(message.includes("already")||message.includes("duplicate"))return "Já existe um cadastro com estes dados.";return "Não foi possível salvar. Revise os campos e tente novamente."}
+function friendlyError(cause:unknown){const message=cause instanceof Error?cause.message:"";if(message.includes("already has an account or pending invitation"))return "Este aluno já possui uma conta ou convite de acesso.";if(message.includes("dateOfBirth"))return "Informe uma data de nascimento válida, até a data de hoje.";if(message.includes("valid email"))return "Informe um e-mail válido para criar a conta do aluno.";if(message.includes("Unauthorized"))return "Sua sessão expirou. Entre novamente para continuar.";if(message.includes("Forbidden")||message.includes("admin role required"))return "Você não tem permissão para realizar esta ação.";if(message.includes("already")||message.includes("duplicate"))return "Já existe um cadastro com estes dados.";return "Não foi possível salvar. Revise os campos e tente novamente."}
 function Shell({title,breadcrumb,backHref,saveLabel,busy,error,onSubmit,children}:{title:string;breadcrumb:string;backHref:string;saveLabel:string;busy:boolean;error:string|null;onSubmit:(data:FormData)=>Promise<void>;children:ReactNode}){async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();if(!busy)await onSubmit(new FormData(e.currentTarget))}const back=<><Link className="button secondary form-back" href={backHref}>← Voltar</Link><span className="divider"/></>;return <AdminShell title={title} breadcrumb={breadcrumb} actions={back}><main className="management-content">{error&&<div className="students-notice" role="alert"><span>{error}</span></div>}<form id="management-form" className="management-card" onSubmit={submit}>{children}</form><div className="management-actions"><Link className="button secondary" href={backHref}>Cancelar</Link><button className="button primary form-save" form="management-form" disabled={busy} type="submit">{busy?"Salvando...":saveLabel}</button></div></main></AdminShell>}
 function useSubmit(backHref:string){const router=useRouter();const [busy,setBusy]=useState(false);const [error,setError]=useState<string|null>(null);async function run(action:()=>Promise<unknown>){setBusy(true);setError(null);try{await action();router.push(backHref)}catch(cause){setError(friendlyError(cause))}finally{setBusy(false)}}return{busy,error,run}}
 const belts: Option[] = BELTS.map(value => ({ value, label: `Faixa ${BELT_LABELS[value]}` }));
@@ -123,7 +123,58 @@ export function CreateClassForm(){const gyms=useQuery(api.gyms.getAllGyms);const
 function LoadingForm({title}:{title:string}){return <AdminShell title={title}><main className="management-content"><div className="students-empty"><strong>Carregando dados...</strong></div></main></AdminShell>}
 function MissingForm({title}:{title:string}){return <AdminShell title={title}><main className="management-content"><div className="students-empty"><strong>Cadastro não encontrado</strong></div></main></AdminShell>}
 
-export function EditStudentForm({studentId}:{studentId:Id<"students">}){const student=useQuery(api.students.getStudentById,{studentId});const gyms=useQuery(api.gyms.getAllGyms);const units=useQuery(api.unities.getAllUnities);const update=useMutation(api.students.updateStudent);const submit=useSubmit("/alunos");if(student===undefined||gyms===undefined||units===undefined)return <LoadingForm title="Editar Aluno"/>;if(!student)return <MissingForm title="Editar Aluno"/>;return <Shell title="Editar Aluno" breadcrumb="Alunos / Editar Aluno" backHref="/alunos" saveLabel="Salvar alterações" {...submit} onSubmit={async d=>submit.run(()=>update({studentId,dateOfBirth:String(d.get("dateOfBirth") ?? ""),name:String(d.get("name")),email:String(d.get("email")),phone:String(d.get("phone")),belt:String(d.get("belt")) as Belt,degree:Number(d.get("degree")),gymIds:[d.get("gymId") as Id<"gyms">],unityIds:[d.get("unityId") as Id<"unities">],picture:String(d.get("picture"))}))}><Section title="Dados pessoais"><div className="form-grid four"><Field name="name" label="Nome completo" required defaultValue={student.name}/><Field name="dateOfBirth" label="Data de nascimento" type="date" defaultValue={student.dateOfBirth}/><Field name="email" label="E-mail" required={Boolean(student.clerkUserId)} type="email" defaultValue={student.email}/><Field name="phone" label="Telefone" defaultValue={student.phone}/><Field name="belt" label="Faixa" required options={belts} defaultValue={student.belt}/><Field name="degree" label="Grau" required type="number" defaultValue={String(student.degree)}/><Field name="gymId" label="Academia" required options={gyms.map(x=>({label:x.name,value:x._id}))} defaultValue={student.gymIds[0]}/><Field name="unityId" label="Unidade" required options={units.map(x=>({label:x.name??x.address,value:x._id}))} defaultValue={student.unityIds[0]}/><Field name="picture" label="URL da foto" defaultValue={student.picture}/></div></Section></Shell>}
+export function EditStudentForm({studentId}: {studentId: Id<"students">}) {
+  const student = useQuery(api.students.getStudentById, {studentId});
+  const gyms = useQuery(api.gyms.getAllGyms);
+  const units = useQuery(api.unities.getAllUnities);
+  const update = useMutation(api.students.updateStudent);
+  const invite = useAction(api.provisioning.inviteExistingStudent);
+  const [createAccount, setCreateAccount] = useState(false);
+  const submit = useSubmit("/alunos");
+  if (student===undefined || gyms===undefined || units===undefined) return <LoadingForm title="Editar Aluno"/>;
+  if (!student) return <MissingForm title="Editar Aluno"/>;
+  const shouldInvite = createAccount && !student.clerkUserId;
+  return <Shell title="Editar Aluno" breadcrumb="Alunos / Editar Aluno" backHref="/alunos"
+    saveLabel={shouldInvite ? "Salvar e convidar aluno" : "Salvar alterações"} {...submit}
+    onSubmit={async data=>submit.run(() => {
+      const profile = {
+        studentId, name: String(data.get("name")), email: String(data.get("email")??""),
+        phone: String(data.get("phone")??""), dateOfBirth: String(data.get("dateOfBirth")??""),
+        belt: String(data.get("belt")) as Belt, degree: Number(data.get("degree")),
+        picture: String(data.get("picture")??"")
+      };
+      const gymId = data.get("gymId") as Id<"gyms">;
+      const unityId = data.get("unityId") as Id<"unities">;
+      return shouldInvite
+        ? invite({...profile, gymId, unityId, redirectUrl: `${window.location.origin}/sign-in`})
+        : update({...profile, gymIds: [gymId], unityIds: [unityId]});
+    })}>
+    <Section title="Dados pessoais"><div className="form-grid four">
+      <Field name="name" label="Nome completo" required defaultValue={student.name}/>
+      <Field name="dateOfBirth" label="Data de nascimento" type="date" defaultValue={student.dateOfBirth}/>
+      <Field name="email" label="E-mail" required={shouldInvite || Boolean(student.clerkUserId)} type="email" defaultValue={student.email}/>
+      <Field name="phone" label="Telefone" defaultValue={student.phone}/>
+      <Field name="belt" label="Faixa" required options={belts} defaultValue={student.belt}/>
+      <Field name="degree" label="Grau" required type="number" defaultValue={String(student.degree)}/>
+      <Field name="gymId" label="Academia" required options={gyms.map(x=>({label:x.name,value:x._id}))} defaultValue={student.gymIds[0]}/>
+      <Field name="unityId" label="Unidade" required options={units.map(x=>({label:x.name??x.address,value:x._id}))} defaultValue={student.unityIds[0]}/>
+      <Field name="picture" label="URL da foto" defaultValue={student.picture}/>
+    </div></Section>
+    <Section title="Acesso ao aplicativo">
+      {student.clerkUserId ? <p className="account-access-help">{student.clerkUserId.startsWith("invitation:")
+        ? "Um convite de acesso já foi enviado para este aluno."
+        : "Este aluno já possui uma conta de acesso ao aplicativo."}</p> : <>
+        <label className="account-access-option"><input type="checkbox" name="createAccount" checked={createAccount}
+          onChange={event=>setCreateAccount(event.target.checked)} aria-describedby="edit-account-access-help"/>
+          Criar conta para o aluno acessar o aplicativo
+        </label>
+        <p className="account-access-help" id="edit-account-access-help">{createAccount
+          ? "Informe um e-mail para enviar o convite de acesso ao aluno."
+          : "O aluno continuará sem acesso ao aplicativo. E-mail e telefone são opcionais."}</p>
+      </>}
+    </Section>
+  </Shell>;
+}
 
 export function EditProfessorForm({teacherId}:{teacherId:Id<"teachers">}){const teacher=useQuery(api.teachers.getTeacherById,{teacherId});const gyms=useQuery(api.gyms.getAllGyms);const units=useQuery(api.unities.getAllUnities);const update=useMutation(api.teachers.updateTeacher);const submit=useSubmit("/professores");if(teacher===undefined||gyms===undefined||units===undefined)return <LoadingForm title="Editar Professor"/>;if(!teacher)return <MissingForm title="Editar Professor"/>;return <Shell title="Editar Professor" breadcrumb="Professores / Editar Professor" backHref="/professores" saveLabel="Salvar alterações" {...submit} onSubmit={async d=>submit.run(()=>update({teacherId,name:String(d.get("name")),email:String(d.get("email")),phone:String(d.get("phone")),belt:String(d.get("belt")) as Belt,degree:Number(d.get("degree")),gymIds:[d.get("gymId") as Id<"gyms">],unityIds:[d.get("unityId") as Id<"unities">],role:String(d.get("role")),picture:String(d.get("picture")),classType:String(d.get("classType")) as Doc<"teachers">["classType"],userType:String(d.get("userType")) as "Normal"}))}><Section title="Dados pessoais"><Field name="name" label="Nome completo" required defaultValue={teacher.name}/><Field name="email" label="E-mail" required type="email" defaultValue={teacher.email}/><Field name="phone" label="Telefone" required defaultValue={teacher.phone}/><div className="field-pair"><Field name="belt" label="Faixa" required options={belts} defaultValue={teacher.belt}/><Field name="degree" label="Grau" required type="number" defaultValue={String(teacher.degree)}/></div><Field name="picture" label="URL da foto" defaultValue={teacher.picture}/></Section><Section title="Informações profissionais"><Field name="gymId" label="Academia" required options={gyms.map(x=>({label:x.name,value:x._id}))} defaultValue={teacher.gymIds[0]}/><Field name="unityId" label="Unidade" required options={units.map(x=>({label:x.name??x.address,value:x._id}))} defaultValue={teacher.unityIds[0]}/><Field name="role" label="Função" required defaultValue={teacher.role}/><div className="field-pair"><Field name="classType" label="Modalidade" required options={teacherModalities} defaultValue={teacher.classType}/><Field name="userType" label="Permissão" required options={[{label:"Professor",value:"Normal"},{label:"Administrador",value:"Admin"}]} defaultValue={teacher.userType}/></div></Section></Shell>}
 

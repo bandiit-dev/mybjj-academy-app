@@ -3,24 +3,37 @@ import { assertDateOfBirth, assertDegree, assertInvitationEmail, beltValidator, 
 
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { action, internalMutation, internalQuery } from "./_generated/server";
+import { action, internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { requireAcademyUnitAdmin } from "./lib/auth";
 
 const userTypeValidator = v.union(v.literal("Normal"), v.literal("Admin"));
 
-export const assertInvitationAllowed = internalQuery({
-  args: { email: v.string(), gymId: v.id("gyms"), unityId: v.id("unities") },
-  handler: async (ctx, args) => {
-    await requireAcademyUnitAdmin(ctx, args.gymId, args.unityId);
-    assertInvitationEmail(args.email);
-    const email = args.email.trim().toLowerCase();
-    const [teacher, student] = await Promise.all([
-      ctx.db.query("teachers").withIndex("by_email", (q) => q.eq("email", email)).first(),
-      ctx.db.query("students").withIndex("by_email", (q) => q.eq("email", email)).first()
-    ]);
-    if (teacher || student) throw new Error("A profile already exists for this email");
-    return true;
+async function checkInvitationAllowed(
+  ctx: QueryCtx | MutationCtx,
+  args: { email: string; gymId: Id<"gyms">; unityId: Id<"unities">; studentId?: Id<"students"> }
+) {
+  const principal = await requireAcademyUnitAdmin(ctx, args.gymId, args.unityId);
+  if (args.studentId) {
+    const student = await ctx.db.get(args.studentId);
+    if (!student) throw new Error("Student not found");
+    const gymIds = new Set([...(principal.teacher?.gymIds ?? []), ...(principal.student?.gymIds ?? [])]);
+    if (!student.gymIds.some(id => gymIds.has(id))) throw new Error("Forbidden: student belongs to another academy");
+    if (student.clerkUserId) throw new Error("Student already has an account or pending invitation");
   }
+  assertInvitationEmail(args.email);
+  const email = args.email.trim().toLowerCase();
+  const students = ctx.db.query("students").withIndex("by_email", q => q.eq("email", email));
+  const [teacher, student] = await Promise.all([
+    ctx.db.query("teachers").withIndex("by_email", q => q.eq("email", email)).first(),
+    args.studentId ? students.filter(q => q.neq(q.field("_id"), args.studentId)).first() : students.first()
+  ]);
+  if (teacher || student) throw new Error("A profile already exists for this email");
+  return true;
+}
+
+export const assertInvitationAllowed = internalQuery({
+  args: { email: v.string(), gymId: v.id("gyms"), unityId: v.id("unities"), studentId: v.optional(v.id("students")) },
+  handler: checkInvitationAllowed
 });
 
 export const insertInvitedTeacher = internalMutation({
@@ -101,5 +114,43 @@ export const inviteStudent = action({
     const invitationId = await createClerkInvitation(args.email, args.redirectUrl);
     const { redirectUrl, ...profile } = args;
     return ctx.runMutation(internal.provisioning.insertInvitedStudent, { ...profile, invitationId });
+  }
+});
+
+const existingStudentInvitationArgs = {
+  studentId: v.id("students"), name: v.string(), email: v.string(), phone: v.optional(v.string()),
+  dateOfBirth: v.optional(v.string()), belt: beltValidator, degree: v.number(),
+  gymId: v.id("gyms"), unityId: v.id("unities"), picture: v.string()
+};
+
+export const updateInvitedStudent = internalMutation({
+  args: { ...existingStudentInvitationArgs, invitationId: v.string() },
+  handler: async (ctx, args) => {
+    await checkInvitationAllowed(ctx, args);
+    assertDateOfBirth(args.dateOfBirth);
+    assertDegree(args.degree);
+    await ctx.db.patch(args.studentId, {
+      name: args.name.trim(), email: args.email.trim().toLowerCase(), phone: (args.phone ?? "").trim(),
+      dateOfBirth: args.dateOfBirth, belt: args.belt, degree: args.degree,
+      gymIds: [args.gymId], unityIds: [args.unityId], picture: args.picture.trim(),
+      clerkUserId: `invitation:${args.invitationId}`, updatedAt: Date.now()
+    });
+    return args.studentId;
+  }
+});
+
+export const inviteExistingStudent = action({
+  args: { ...existingStudentInvitationArgs, redirectUrl: v.string() },
+  handler: async (ctx, args): Promise<Id<"students">> => {
+    if (!(await ctx.auth.getUserIdentity())) throw new Error("Unauthorized");
+    assertDateOfBirth(args.dateOfBirth);
+    assertDegree(args.degree);
+    if (!args.name.trim()) throw new Error("Student name is required");
+    await ctx.runQuery(internal.provisioning.assertInvitationAllowed, {
+      studentId: args.studentId, email: args.email, gymId: args.gymId, unityId: args.unityId
+    });
+    const invitationId = await createClerkInvitation(args.email, args.redirectUrl);
+    const { redirectUrl, ...profile } = args;
+    return ctx.runMutation(internal.provisioning.updateInvitedStudent, { ...profile, invitationId });
   }
 });
