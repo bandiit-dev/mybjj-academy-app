@@ -7,7 +7,7 @@ Convex backend package for MyBJJAcademy.
 - `pnpm --filter @mybjj/backend dev`: run local Convex dev server
 - `pnpm --filter @mybjj/backend codegen`: regenerate Convex API types
 - `pnpm --filter @mybjj/backend typecheck`: type-check backend TS files
-- `pnpm --filter @mybjj/backend test`: run registration and invitation regression tests (Node 22.6+ with built-in TypeScript support)
+- `pnpm --filter @mybjj/backend test`: run backend regression tests (Node 22.6+ with built-in TypeScript support)
 
 ## Structure
 
@@ -31,3 +31,18 @@ Date of birth is optional for both existing and new students and uses `YYYY-MM-D
 
 The belt options include all twelve youth belts. Teachers additionally support
 `GI_NOGI` (GI e NO-GI); individual class templates still use GI or NOGI.
+
+## Portal images
+
+Student/professor photos and academy/team logos use JPG/PNG file inputs with a
+2 MB limit. The browser previews the selection and sends Base64 to
+`images.uploadBase64` when the form is saved. Only authenticated administrators
+can upload. The backend validates MIME type, file signatures, encoding and size,
+then decodes the bytes into Convex File Storage.
+
+The `images` table tracks the storage ID, serving URL, original filename, type,
+size, uploading user and timestamp. Domain records keep the serving URL in their
+existing `picture`, `branding.logoUrl` or `logo` fields. Existing image URLs are
+preserved when no new file is selected. Replaced images are retained in storage.
+
+Sync the new schema and functions with `pnpm dev:backend` before using uploads.

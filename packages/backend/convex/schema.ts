@@ -27,6 +27,16 @@ const enrollmentStatusValidator = v.union(v.literal("Confirmed"), v.literal("Can
 const attendanceStatusValidator = v.union(v.literal("Present"), v.literal("Absent"));
 
 export default defineSchema({
+  images: defineTable({
+    storageId: v.id("_storage"),
+    url: v.string(),
+    contentType: v.string(),
+    fileName: v.string(),
+    size: v.number(),
+    uploadedBy: v.string(),
+    createdAt: v.number()
+  }).index("by_uploadedBy", ["uploadedBy"]),
+
   gyms: defineTable({
     name: v.string(),
     cnpj: v.string(),

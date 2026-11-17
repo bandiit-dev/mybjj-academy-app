@@ -266,3 +266,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .belt-dot.green-black, .belt-line.green-black { background:linear-gradient(90deg,#22c55e 0 65%,#09090b 65%); }
 .belt-dot.coral, .belt-line.coral { background:repeating-linear-gradient(90deg,#dc2626 0 5px,#09090b 5px 10px); }
 .belt-dot.red, .belt-line.red { background:#dc2626; }
+
+.image-file-field input[type="file"] { height:auto; min-height:44px; padding:10px; }
+.image-file-field input[type="file"]::file-selector-button { margin-right:10px; border:0; border-radius:5px; padding:6px 10px; background:#f4f4f5; color:var(--ink); cursor:pointer; }
+.image-file-preview { width:104px; height:104px; object-fit:contain; border:1px solid var(--border); border-radius:10px; background:#fafafa; }
+.image-file-clear { align-self:flex-start; border:0; padding:0; background:none; color:var(--muted); font:inherit; text-decoration:underline; cursor:pointer; }
+.portal-image { overflow:hidden; }
+.portal-image img { display:block; width:100%; height:100%; object-fit:cover; }
+.portal-image-contain img { object-fit:contain; }
+.team-logo { display:block; width:48px; height:48px; border-radius:8px; }
+.academy-logo { display:block; width:128px; height:96px; margin-bottom:20px; }
