@@ -1,22 +1,20 @@
-export default function LandingPage() {
-  return (
-    <main style={{ fontFamily: "sans-serif", padding: "4rem 1.5rem", maxWidth: 960, margin: "0 auto" }}>
-      <section style={{ marginBottom: "4rem" }}>
-        <h1 style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>MyBJJAcademy</h1>
-        <p style={{ color: "#4b5563", maxWidth: 620 }}>
-          Manage your academy operations, classes, and student journey from one connected platform.
-        </p>
-      </section>
+import Image from "next/image";
 
-      <section style={{ marginBottom: "4rem" }}>
-        <h2>Features</h2>
-        <p style={{ color: "#4b5563" }}>Scheduling, attendance, and academy operations modules will be added here.</p>
-      </section>
+const adminUrl="https://admin.mybjjacademy.com.br";
+const benefits=[{icon:"⌂",title:"Gerencie sua academia",copy:"Unidades, horários, faixas e configurações."},{icon:"♙",title:"Professores e turmas",copy:"Organize professores, turmas e graduações."},{icon:"▣",title:"Aulas e agenda",copy:"Crie aulas, defina horários e capacidade."},{icon:"♙",title:"Alunos e matrículas",copy:"Acompanhe alunos, pagamentos e planos."}];
+const productFeatures=[{title:"Gestão de professores",copy:"Cadastre e organize sua equipe por faixa, unidade e função.",kind:"teachers"},{title:"Criação de aulas",copy:"Defina modalidade, horário, capacidade e objetivos da aula.",kind:"class"},{title:"Cadastro de alunos",copy:"Acompanhe informações, planos, pagamentos e presença.",kind:"students"},{title:"Gestão de unidades",copy:"Gerencie unidades, horários e configurações de cada local.",kind:"units"}];
 
-      <section>
-        <h2>Get Early Access</h2>
-        <p style={{ color: "#4b5563" }}>Launch your academy with a mobile and admin-first workflow.</p>
-      </section>
-    </main>
-  );
-}
+function Logo({className=""}:{className?:string}){return <Image className={className} src="/brand/mybjj-academy-logo.png" width={2172} height={724} alt="MyBJJ Academy" priority/>}
+function DashboardPreview({compact=false}:{compact?:boolean}){return <div className={`product-window dashboard-preview ${compact?"compact":""}`}><aside><Logo/><i/><i/><i/><i/><i/></aside><div className="preview-body"><header><span>Dashboard</span><b>Admin</b></header><div className="mini-metrics">{["248","12","28","40"].map((x,i)=><span key={x}><small>{["ALUNOS","PROFESSORES","TURMAS","AULAS"][i]}</small><strong>{x}</strong></span>)}</div><div className="preview-panels"><section><b>Aulas de hoje</b>{["07:00  GI Básico","12:00  NoGi","19:30  Avançado"].map(x=><i key={x}>{x}</i>)}</section><section><b>Frequência</b><div className="bars">{[50,78,62,90,55,72].map((x,i)=><i style={{height:`${x}%`}} key={i}/>)}</div></section></div></div></div>}
+function ListPreview({kind}:{kind:string}){const heading={teachers:"Professores",class:"Criar Aula",students:"Alunos",units:"Unidades"}[kind];if(kind==="class")return <div className="product-window list-preview"><aside><i/><i/><i/><i/></aside><div className="form-preview"><b>{heading}</b><div>{[1,2,3,4,5,6].map(x=><span key={x}/>)}</div><button>Salvar aula</button></div></div>;return <div className="product-window list-preview"><aside><i/><i/><i/><i/></aside><div className="table-preview"><b>{heading}</b><span className="table-filter"/>{[1,2,3,4,5].map(x=><div key={x}><i/><span/><span/><span/></div>)}</div></div>}
+
+export default function LandingPage(){return <main>
+  <header className="site-header"><a href="#inicio" aria-label="MyBJJ Academy - início"><Logo className="header-logo"/></a><nav><a href="#recursos">Recursos</a><a href="#planos">Planos</a><a href="#sobre">Sobre</a><a href="#contato">Contato</a></nav><div className="header-actions"><a className="button ghost" href={adminUrl}>Entrar</a><a className="button dark" href={adminUrl}>Começar agora</a></div></header>
+  <section className="hero section" id="inicio"><div className="hero-copy"><span className="price-pill">◇ &nbsp; Planos a partir de <b>R$39,90/mês</b></span><h1>A plataforma completa para <em>gestão</em> da sua academia de jiu-jitsu.</h1><p>Organize sua operação, gerencie alunos, professores, turmas e aulas em um só lugar.</p><div className="hero-actions"><a className="button dark large" href={adminUrl}>Teste grátis</a><a className="button ghost large" href="#contato">▣ &nbsp; Agendar demonstração</a></div><small className="ideal">● &nbsp; Ideal para academias, equipes e unidades em crescimento.</small></div><div className="hero-visual"><DashboardPreview/><div className="floating-list"><ListPreview kind="teachers"/></div><div className="social-proof"><b>♙ &nbsp; +100</b><span>academias organizando a gestão com mais eficiência</span></div></div></section>
+  <section className="benefits section" aria-label="Benefícios">{benefits.map(x=><article key={x.title}><i>{x.icon}</i><h2>{x.title}</h2><p>{x.copy}</p></article>)}</section>
+  <section className="features section" id="recursos"><h2>Tudo que você precisa em uma única plataforma</h2><div className="feature-grid">{productFeatures.map(x=><article key={x.title}><ListPreview kind={x.kind}/><div><h3>{x.title}</h3><p>{x.copy}</p></div></article>)}</div></section>
+  <section className="quote section" id="sobre"><span>“</span><strong>Tudo que você precisa para focar no que realmente importa: o crescimento dos seus alunos.</strong></section>
+  <section className="pricing section" id="planos"><h2>Planos simples para sua academia crescer</h2><article className="price-card"><span>PLANO <b>STARTER</b></span><small>A partir de</small><div><sup>R$</sup><strong>39,90</strong><em>/mês</em></div><ul>{["Gestão de alunos","Cadastro de professores","Criação de aulas","Controle de unidades","Suporte dedicado"].map(x=><li key={x}>● &nbsp; {x}</li>)}</ul><a className="button dark" href={adminUrl}>Começar com R$39,90</a><p>◇ &nbsp; Teste grátis disponível</p></article></section>
+  <section className="final-cta" id="contato"><div className="section cta-inner"><div><h2>Pronto para <em>modernizar</em> a gestão da sua academia?</h2><p>Centralize sua operação, economize tempo e entregue uma experiência melhor para seus alunos.</p><div><a className="button light" href={adminUrl}>Criar minha conta</a><a className="button outline-light" href="mailto:contato@mybjjacademy.com.br">◯ &nbsp; Falar com especialista</a></div></div><div className="devices"><DashboardPreview compact/><span className="phone"><b>Dashboard</b><i/><i/><i/></span></div></div></section>
+  <footer><div className="section footer-grid"><div><Logo className="footer-logo"/><p>A plataforma completa para gestão da sua academia de jiu-jitsu.</p><span>◎ &nbsp; ● &nbsp; ◉</span></div><div><b>Produto</b><a href="#recursos">Recursos</a><a href="#planos">Planos</a><a href="#">Atualizações</a></div><div><b>Empresa</b><a href="#sobre">Sobre</a><a href="mailto:contato@mybjjacademy.com.br">Contato</a><a href="#">Política de Privacidade</a></div><div><b>Suporte</b><a href="#">Central de Ajuda</a><a href="mailto:contato@mybjjacademy.com.br">Fale Conosco</a><a href="#">Status do Sistema</a></div></div><p className="copyright">© 2026 MYBJJ ACADEMY. Todos os direitos reservados.</p></footer>
+</main>}
