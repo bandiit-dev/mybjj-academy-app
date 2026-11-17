@@ -14,7 +14,7 @@ test("the root route is public and serves the portal instead of hosted authentic
   assert.match(await response.text(), /MyBJJAcademy Admin/);
 });
 
-for (const path of ["/alunos", "/academia", "/onboarding", "/professores", "/sign-in", "/sign-up"]) {
+for (const path of ["/assinatura", "/alunos", "/academia", "/onboarding", "/professores", "/sign-in", "/sign-up"]) {
   test(`signed-out request to ${path} returns to the application root`, async () => {
     const response = await fetch(new URL(path, base), { redirect: "manual" });
     assert.ok([302, 303, 307, 308].includes(response.status));

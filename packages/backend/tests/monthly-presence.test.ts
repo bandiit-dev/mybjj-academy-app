@@ -5,6 +5,7 @@ import { getMonthlyPresence } from "../convex/enrollments";
 const handler=(getMonthlyPresence as unknown as {_handler:(ctx:any,args:any)=>Promise<any>})._handler;
 function context({admin=true,authenticated=true}={}) {
   const tables:Record<string,any[]>={
+    billingAccounts: [{_id:"billing_1",gymId:"gym_1",status:"active",priceId:"price_test",paidThrough:Date.UTC(2199,0,1)}],
     teachers:admin?[{clerkUserId:"owner",userType:"Admin",gymIds:["gym_1"]}]:[],
     students:[{_id:"a",clerkUserId:"student",gymIds:["gym_1"],plan:{isActive:false}},{_id:"b",gymIds:["gym_1"]},{_id:"outsider",gymIds:["gym_2"]}],
     classSessions:[

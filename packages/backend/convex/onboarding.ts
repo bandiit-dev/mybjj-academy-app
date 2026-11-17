@@ -1,3 +1,4 @@
+import { hasPaidPortalAccess, subscriptionRequired } from "./lib/portalBilling";
 import { v } from "convex/values";
 import { assertDegree, beltValidator } from "./lib/validators";
 
@@ -114,6 +115,10 @@ export const bootstrapAcademyAdmin = mutation({
     const existingGym = await ctx.db.query("gyms").withIndex("by_cnpj", (q) => q.eq("cnpj", args.cnpj.trim())).first();
     if (existingGym) throw new Error("A gym already exists with this CNPJ");
 
+    const accounts = await ctx.db.query("billingAccounts").withIndex("by_owner", q => q.eq("ownerClerkUserId", identity.subject)).collect();
+    const billingAccount = accounts.find(account => !account.gymId && hasPaidPortalAccess(account));
+    if (!billingAccount) subscriptionRequired();
+
     assertDegree(args.adminDegree);
     const now = Date.now();
     const gymId = await ctx.db.insert("gyms", {
@@ -122,6 +127,7 @@ export const bootstrapAcademyAdmin = mutation({
       email: args.contactEmail.trim().toLowerCase(), unityIds: [], founded: args.founded,
       teamId: null, branding: {}, teacherIds: [], createdAt: now, updatedAt: now
     });
+    await ctx.db.patch(billingAccount._id, {gymId, updatedAt: now});
     const unityId = await ctx.db.insert("unities", {
       name: args.unityName.trim(), address: args.unityAddress.trim(), gymId, createdAt: now, updatedAt: now
     });

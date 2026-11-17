@@ -9,6 +9,7 @@ const monthly = {type: "Mensal" as const, startDate: "2024-01-31", isActive: tru
 
 function context({admin = true, authenticated = true, otherAcademy = false} = {}) {
   const tables: Record<string, any[]> = {
+    billingAccounts: [{_id:"billing_1",gymId:"gym_1",status:"active",priceId:"price_test",paidThrough:Date.UTC(2199,0,1)}],
     teachers: admin ? [{_id:"teacher_1",clerkUserId:"owner",userType:"Admin",gymIds:["gym_1"]}] : [],
     students: [{_id:"student_1",clerkUserId:"student_user",gymIds:[otherAcademy?"gym_2":"gym_1"],plan:{...monthly},userType:"Normal"}],
     studentPayments: []

@@ -15,7 +15,7 @@ function context({ authenticated = true, admin = true, metadataFailure = false, 
     records, files, deleted,
     auth: { getUserIdentity: async () => authenticated ? { subject: "user_admin" } : null },
     db: {
-      query: (table: string) => ({ withIndex: () => ({ unique: async () => table === "teachers" && admin
+      query: (table: string) => ({ withIndex: () => ({ unique: async () => table === "billingAccounts" ? {status:"active",priceId:"price_test",paidThrough:Date.UTC(2199,0,1)} : table === "teachers" && admin
         ? { clerkUserId: "user_admin", userType: "Admin", gymIds: ["gym_1"] } : null }) }),
       insert: async (_table: string, record: any) => {
         if (metadataFailure) throw new Error("Metadata failed");

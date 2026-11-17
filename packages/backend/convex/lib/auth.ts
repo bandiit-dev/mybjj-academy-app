@@ -1,3 +1,4 @@
+import { paidGymIds } from "./portalBilling";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 
@@ -33,7 +34,7 @@ export async function getCurrentStudentByClerkId(ctx: AuthCtx, clerkUserId: stri
     .unique();
 }
 
-export async function getCurrentPrincipal(ctx: AuthCtx) {
+export async function getCurrentPrincipal(ctx: AuthCtx, options: {skipSubscription?: boolean} = {}) {
   const identity = await getAuthUserIdentity(ctx);
 
   const [teacher, student] = await Promise.all([
@@ -43,12 +44,15 @@ export async function getCurrentPrincipal(ctx: AuthCtx) {
 
   const isAdmin = teacher?.userType === "Admin" || student?.userType === "Admin";
 
-  return {
-    identity,
-    teacher,
-    student,
-    isAdmin
-  };
+  if(isAdmin && !options.skipSubscription) {
+    const allowed = await paidGymIds(ctx, new Set([...(teacher?.gymIds??[]),...(student?.gymIds??[])]));
+    return {
+      identity, isAdmin,
+      teacher: teacher ? {...teacher,gymIds:teacher.gymIds.filter(id=>allowed.has(id))} : null,
+      student: student ? {...student,gymIds:student.gymIds.filter(id=>allowed.has(id))} : null
+    };
+  }
+  return {identity, teacher, student, isAdmin};
 }
 
 export async function getAccessibleGymIds(ctx: AuthCtx) {
@@ -92,6 +96,9 @@ export async function requireTeacherOrAdmin(ctx: AuthCtx, teacherId: Id<"teacher
     throw new Error("Teacher not found");
   }
 
+  if(principal.isAdmin && !targetTeacher.gymIds.some(id=>[...(principal.teacher?.gymIds??[]),...(principal.student?.gymIds??[])].includes(id))) {
+    throw new Error("Forbidden: teacher belongs to another or unpaid academy");
+  }
   const isSelf = targetTeacher.clerkUserId === principal.identity.subject;
 
   if (!principal.isAdmin && !isSelf) {
@@ -113,6 +120,9 @@ export async function requireStudentSelfOrAdmin(ctx: AuthCtx, studentId: Id<"stu
     throw new Error("Student not found");
   }
 
+  if(principal.isAdmin && !targetStudent.gymIds.some(id=>[...(principal.teacher?.gymIds??[]),...(principal.student?.gymIds??[])].includes(id))) {
+    throw new Error("Forbidden: student belongs to another or unpaid academy");
+  }
   const isSelf = targetStudent.clerkUserId === principal.identity.subject;
 
   if (!principal.isAdmin && !isSelf) {
@@ -134,6 +144,9 @@ export async function requireSessionTeacherOrAdmin(ctx: AuthCtx, classSessionId:
     throw new Error("Class session not found");
   }
 
+  if(principal.isAdmin && !session.gymIds.some(id=>[...(principal.teacher?.gymIds??[]),...(principal.student?.gymIds??[])].includes(id))) {
+    throw new Error("Forbidden: session belongs to another or unpaid academy");
+  }
   const teacherId = principal.teacher?._id;
   const teachesSession = teacherId ? session.teacherIds.includes(teacherId) : false;
 
@@ -158,4 +171,9 @@ export async function requireAcademyUnitAdmin(ctx: AuthCtx, gymId: Id<"gyms">, u
   const unity = await ctx.db.get(unityId);
   if (!unity || unity.gymId !== gymId) throw new Error("The selected unit does not belong to this academy");
   return principal;
+}
+
+export function assertAdminGymScope(principal: Awaited<ReturnType<typeof requireAdmin>>, gymIds: Id<"gyms">[]) {
+  const allowed = new Set([...(principal.teacher?.gymIds??[]),...(principal.student?.gymIds??[])]);
+  if(!gymIds.length || gymIds.some(id=>!allowed.has(id))) throw new Error("Forbidden: paid academy access required");
 }

@@ -14,7 +14,7 @@ function context() {
     units,
     auth: { getUserIdentity: async () => ({ subject: "owner" }) },
     db: {
-      query: (table: string) => ({ withIndex: () => ({ unique: async () => table === "teachers"
+      query: (table: string) => ({ withIndex: () => ({ unique: async () => table === "billingAccounts" ? {status:"active",priceId:"price_test",paidThrough:Date.UTC(2199,0,1)} : table === "teachers"
         ? { _id: "teacher_1", clerkUserId: "owner", userType: "Admin", gymIds: ["gym_1"] } : null }) }),
       get: async (id: string) => units.get(id) ?? null,
       insert: async (_table: string, value: any) => { units.set("unit_1", value); return "unit_1"; },

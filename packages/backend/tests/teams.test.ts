@@ -5,6 +5,7 @@ import { createTeam, getAllTeams, getTeamById, recoverUnlinkedTeam, updateTeam }
 const handler=(fn:unknown)=>(fn as {_handler:(ctx:any,args:any)=>Promise<any>})._handler;
 function context({admin=true}={}) {
   const tables:Record<string,any[]>={
+    billingAccounts: [{_id:"billing_1",gymId:"gym_1",status:"active",priceId:"price_test",paidThrough:Date.UTC(2199,0,1)}],
     teachers:[{_id:"owner",clerkUserId:"user_1",userType:admin?"Admin":"Normal",gymIds:["gym_1"]}],students:[],
     gyms:[{_id:"gym_1",teamId:null},{_id:"gym_2",teamId:"other_team"}],
     teams:[{_id:"other_team",name:"Other academy"}]

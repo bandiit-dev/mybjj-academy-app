@@ -1,3 +1,4 @@
+import { assertAdminGymScope } from "./lib/auth";
 import { v } from "convex/values";
 
 import { mutation, query } from "./_generated/server";
@@ -28,7 +29,8 @@ export const createClass = mutation({
     weekDays: v.array(weekDayValidator)
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
+    const principal = await requireAdmin(ctx);
+    assertAdminGymScope(principal, args.gymIds);
     assertWeekDays(args.weekDays);
     const now = Date.now();
 
@@ -69,6 +71,7 @@ export const updateClass = mutation({
       assertWeekDays(patch.weekDays);
     }
 
+    if (patch.gymIds) assertAdminGymScope(principal, patch.gymIds);
     await ctx.db.patch(classId, {
       ...patch,
       updatedAt: Date.now()

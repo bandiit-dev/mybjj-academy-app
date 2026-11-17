@@ -19,6 +19,14 @@ function AdminAccessGate({ children }: { children: React.ReactNode }) {
   const [timedOut, setTimedOut] = useState(false);
   const onboarding = useQuery(api.onboarding.getOnboardingStatus, isAuthenticated ? {} : "skip");
 
+  const [refreshKey, setRefreshKey] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => setRefreshKey(value => value + 1), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const needsBilling = isAuthenticated && (onboarding?.status === "needs_academy" || (onboarding?.status === "ready" && onboarding.isAdmin));
+  const billing = useQuery(api.billing.getStatus, needsBilling ? {refreshKey} : "skip");
+
   useEffect(() => {
     if (!clerk.isLoaded || (clerk.isSignedIn && (isLoading || !isAuthenticated))) {
       const timeout = window.setTimeout(() => setTimedOut(true), 8000);
@@ -30,9 +38,17 @@ function AdminAccessGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (clerk.isLoaded && !clerk.isSignedIn && pathname !== "/") router.replace("/");
     if (!isAuthenticated || onboarding === undefined) return;
-    if (onboarding.status === "ready" && pathname.startsWith("/onboarding")) router.replace("/");
-    if (onboarding.status !== "ready" && onboarding.status !== "unauthenticated" && !pathname.startsWith("/onboarding")) router.replace("/onboarding");
-  }, [clerk.isLoaded, clerk.isSignedIn, isAuthenticated, onboarding, pathname, router]);
+    if (onboarding.status === "link_required") {
+      if (!pathname.startsWith("/onboarding")) router.replace("/onboarding");
+      return;
+    }
+    if (!needsBilling || !billing) return;
+    if (!billing.hasAccess) {
+      if (pathname !== "/assinatura") router.replace("/assinatura");
+    } else if (onboarding.status === "needs_academy") {
+      if (!pathname.startsWith("/onboarding")) router.replace("/onboarding");
+    } else if (pathname.startsWith("/onboarding") || pathname === "/assinatura") router.replace("/");
+  }, [clerk.isLoaded, clerk.isSignedIn, isAuthenticated, onboarding, billing, needsBilling, pathname, router]);
 
   if (clerk.isLoaded && !clerk.isSignedIn) return <LoginPage/>;
   if (timedOut) {
@@ -41,12 +57,16 @@ function AdminAccessGate({ children }: { children: React.ReactNode }) {
   if (!clerk.isLoaded || isLoading || !isAuthenticated || onboarding === undefined) {
     return <main className="auth-state"><div className="auth-spinner"/><strong>Validando acesso...</strong></main>;
   }
-  if (onboarding?.status !== "ready") {
+  if (onboarding?.status === "link_required") {
     return pathname.startsWith("/onboarding") ? children : <main className="auth-state"><div className="auth-spinner"/><strong>Preparando seu cadastro...</strong></main>;
   }
-  if (!onboarding.isAdmin) {
+  if (onboarding.status === "ready" && !onboarding.isAdmin) {
     return <main className="auth-state"><div className="auth-denied"><BrandLogo className="auth-brand-logo"/><h1>Acesso não autorizado</h1><p>Esta conta não possui permissão administrativa no MyBJJAcademy.</p><SignOutButton redirectUrl="/"><button className="button primary" type="button">Sair e entrar com outra conta</button></SignOutButton></div></main>;
   }
+  if (!billing || (!billing.hasAccess && pathname !== "/assinatura")) return <main className="auth-state"><div className="auth-spinner"/><strong>Verificando assinatura...</strong></main>;
+  if (!billing.hasAccess) return children;
+  if (onboarding.status === "needs_academy") return pathname.startsWith("/onboarding") ? children : <main className="auth-state"><strong>Preparando sua academia...</strong></main>;
+  if (pathname === "/assinatura" || pathname.startsWith("/onboarding")) return <main className="auth-state"><strong>Abrindo o portal...</strong></main>;
   return children;
 }
 

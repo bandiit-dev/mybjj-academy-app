@@ -94,3 +94,78 @@ classes in the month. It excludes cancelled classes, cancelled enrollments,
 deleted students and records outside the admin's academies. One student counts
 once per class session; `studentCount` counts distinct enrolled students. This is
 an enrollment-based summary, separate from teacher-marked attendance records.
+
+## Portal subscription (Stripe)
+
+The portal costs **R$39.90 per academy per month**. Clerk remains responsible for
+sign-in/sign-up. Signed-in administrators without a paid period go to
+`/assinatura`. New owners pay before academy setup; setup atomically attaches the
+paid billing account to the academy. Other admins of that academy share its
+access, while only the billing owner can open Checkout or the customer portal.
+The academy details page includes the subscription tile.
+
+This is separate from the student plans and manually recorded student payments.
+There is no free access or automatic grandfathering for existing academies.
+
+### Stripe and deployment setup
+
+1. In Stripe test mode, create a product with one recurring monthly price:
+   **BRL 39.90**, quantity 1, no trial. Save its `price_...` ID.
+2. Set these **Convex deployment environment variables** in the Convex dashboard:
+   - `STRIPE_SECRET_KEY`: Stripe test secret key (live key at launch).
+   - `STRIPE_MONTHLY_PRICE_ID`: the monthly price ID from step 1.
+   - `APP_URL`: admin origin, e.g. `https://admin.mybjjacademy.com.br`.
+   - `STRIPE_WEBHOOK_SECRET`: signing secret for the endpoint below.
+   These are backend values; do not add them to `NEXT_PUBLIC_*` or commit them.
+   Separate test/live Stripe resources and secrets must match each deployment.
+3. Deploy the Convex functions (`pnpm --filter @mybjj/backend exec convex deploy`
+   for production), then create a Stripe webhook endpoint:
+   `https://<deployment>.convex.site/stripe/webhook`.
+   Use the Convex **HTTP Actions URL**, rather than the `.convex.cloud` client URL.
+   Select API version `2026-10-28.endive` and these events:
+   - `checkout.session.completed`, `checkout.session.async_payment_succeeded`
+   - `invoice.paid`, `invoice.payment_failed`, `invoice.payment_action_required`
+   - `customer.subscription.created`, `customer.subscription.updated`,
+     `customer.subscription.deleted`, `customer.subscription.paused`,
+     `customer.subscription.resumed`
+   Copy this endpoint's signing secret into `STRIPE_WEBHOOK_SECRET`.
+4. Enable Stripe's customer portal with invoice history, payment method updates,
+   and cancellation **at the end of the paid period**. Disable plan/quantity
+   changes, coupons and trials for this single-price product. Checkout currently
+   accepts cards. Configure failed-payment recovery to cancel unpaid subscriptions
+   after retries are exhausted.
+5. Deploy the admin app. Its existing Clerk and Convex environment variables are
+   sufficient; no new Stripe variable is required in Vercel. The backend's
+   `APP_URL` must match the deployment you are testing.
+6. Complete a test checkout with a new Clerk signup. Verify academy setup then
+   dashboard access, the academy subscription tile and customer portal, a failed
+   renewal, recovery, cancellation and expiry. In Stripe, resend a webhook to
+   verify duplicate delivery. Repeat in live mode before public launch.
+
+### Access and synchronization
+
+`billingAccounts` stores owner, academy, Stripe customer/subscription/checkout IDs,
+status, price, paid-through date, renewal date and cancellation scheduling.
+`billingEvents` deduplicates verified webhook deliveries. Payment cards are handled
+by Stripe; the application stores no card numbers.
+
+The HTTP action verifies the raw request's HMAC signature and timestamp, then
+retrieves the current subscription and latest invoice from Stripe. The paid invoice
+must belong to that subscription and match the configured BRL monthly price.
+Checkout return verification makes the same server-side checks. A success URL or
+browser-supplied flag alone never unlocks access. Out-of-order events cannot
+restore a terminated subscription. The Checkout lock, saved session reuse and
+Stripe idempotency keys reduce duplicate checkout creation.
+
+An `active` (or retrying `past_due`) subscription grants access only until its
+verified paid-through timestamp. Failed renewals do not extend that date.
+Scheduled cancellation preserves the paid remainder; terminal cancellation,
+`unpaid`, paused, trialing and invalid-plan states block access. Administrators'
+backend domain operations enforce the paid academy scope; the UI refreshes its
+access check every 30 seconds. Billing routes remain available for recovery.
+Regular student/teacher mobile access retains its existing role rules.
+
+Missing Stripe configuration shows a payment-unavailable message and keeps the
+portal blocked. Automated tests mock Stripe and verify signatures, paid invoice
+checks, ownership, expiry, renewal failure, duplicate/out-of-order events, checkout
+session reuse and paid academy onboarding. They do not perform real charges.

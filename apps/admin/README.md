@@ -33,3 +33,14 @@ To run routing regression tests, start a local app with
 `pnpm --filter @mybjj/admin exec next dev --port 3010`, then run
 `pnpm --filter @mybjj/admin test:auth`. `AUTH_TEST_BASE_URL` can select another
 local port. These tests do not create accounts or send invitations.
+
+## Subscription access
+
+The embedded login is unchanged. After authentication, unpaid academy admins and
+new owners go to `/assinatura`; Stripe confirms payment on the backend before
+access is granted. New owners then complete academy setup. `/academia` includes
+plan price, paid period, renewal/cancellation details and subscription management.
+
+See [backend subscription setup](../../packages/backend/README.md#portal-subscription-stripe)
+for Stripe product, customer portal, webhook and Convex environment configuration.
+No additional Stripe environment variables are needed in Vercel.

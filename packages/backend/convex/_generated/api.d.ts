@@ -9,18 +9,23 @@
  */
 
 import type * as attendance from "../attendance.js";
+import type * as billing from "../billing.js";
 import type * as classSessions from "../classSessions.js";
 import type * as classes from "../classes.js";
 import type * as enrollments from "../enrollments.js";
 import type * as gyms from "../gyms.js";
+import type * as http from "../http.js";
 import type * as images from "../images.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_imageValidation from "../lib/imageValidation.js";
+import type * as lib_portalBilling from "../lib/portalBilling.js";
+import type * as lib_stripeApi from "../lib/stripeApi.js";
 import type * as lib_studentPlans from "../lib/studentPlans.js";
 import type * as lib_validators from "../lib/validators.js";
 import type * as onboarding from "../onboarding.js";
 import type * as provisioning from "../provisioning.js";
 import type * as seeds from "../seeds.js";
+import type * as stripe from "../stripe.js";
 import type * as studentPlans from "../studentPlans.js";
 import type * as students from "../students.js";
 import type * as teachers from "../teachers.js";
@@ -35,18 +40,23 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   attendance: typeof attendance;
+  billing: typeof billing;
   classSessions: typeof classSessions;
   classes: typeof classes;
   enrollments: typeof enrollments;
   gyms: typeof gyms;
+  http: typeof http;
   images: typeof images;
   "lib/auth": typeof lib_auth;
   "lib/imageValidation": typeof lib_imageValidation;
+  "lib/portalBilling": typeof lib_portalBilling;
+  "lib/stripeApi": typeof lib_stripeApi;
   "lib/studentPlans": typeof lib_studentPlans;
   "lib/validators": typeof lib_validators;
   onboarding: typeof onboarding;
   provisioning: typeof provisioning;
   seeds: typeof seeds;
+  stripe: typeof stripe;
   studentPlans: typeof studentPlans;
   students: typeof students;
   teachers: typeof teachers;

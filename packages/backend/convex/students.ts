@@ -1,3 +1,4 @@
+import { assertAdminGymScope } from "./lib/auth";
 import { getStudentPlan, studentPlanValidator, validateStudentPlan, withStudentPlan } from "./lib/studentPlans";
 import { mutationGeneric as mutation, queryGeneric as query } from "convex/server";
 import { assertDateOfBirth, assertDegree, beltValidator } from "./lib/validators";
@@ -32,6 +33,8 @@ export const createStudent = mutation({
   },
   handler: async (ctx, args) => {
     const principal = await getCurrentPrincipal(ctx);
+
+    if (principal.isAdmin) assertAdminGymScope(principal, args.gymIds);
 
     // Policy choice: authenticated users can create only their own student profile.
     if (!principal.isAdmin && args.clerkUserId !== principal.identity.subject) {
@@ -99,6 +102,7 @@ export const updateStudent = mutation({
       return studentId;
     }
 
+    if (patch.gymIds) assertAdminGymScope(authResult, patch.gymIds);
     const adminGymIds = new Set([...(authResult.teacher?.gymIds ?? []), ...(authResult.student?.gymIds ?? [])]);
     if (!authResult.targetStudent.gymIds.some((gymId: Id<"gyms">) => adminGymIds.has(gymId))) {
       throw new Error("Forbidden: student belongs to another academy");

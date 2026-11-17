@@ -1,3 +1,4 @@
+import { assertAdminGymScope } from "./lib/auth";
 import { mutationGeneric as mutation, queryGeneric as query } from "convex/server";
 import { v } from "convex/values";
 
@@ -13,7 +14,8 @@ export const createUnity = mutation({
     gymId: v.union(v.id("gyms"), v.null())
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
+    const principal = await requireAdmin(ctx);
+    assertAdminGymScope(principal, args.gymId ? [args.gymId] : []);
     const now = Date.now();
 
     return ctx.db.insert("unities", {
@@ -42,6 +44,7 @@ export const updateUnity = mutation({
       throw new Error("Unity not found");
     }
 
+    if (patch.gymId !== undefined) assertAdminGymScope(principal, patch.gymId ? [patch.gymId] : []);
     const adminGymIds = new Set([...(principal.teacher?.gymIds ?? []), ...(principal.student?.gymIds ?? [])]);
     if (unity.gymId === null || !adminGymIds.has(unity.gymId)) {
       throw new Error("Forbidden: unit belongs to another academy");

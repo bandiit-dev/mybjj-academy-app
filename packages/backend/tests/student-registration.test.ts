@@ -10,6 +10,7 @@ const profile = { name: "Aluno infantil", belt: "GrayWhite", degree: 0, gymId: "
 
 function context({ admin = true, authenticated = true, email = "owner@example.com" } = {}) {
   const tables: Record<string, any[]> = {
+    billingAccounts: [{_id:"billing_1",gymId:"gym_1",status:"active",priceId:"price_test",paidThrough:Date.UTC(2199,0,1)}],
     teachers: admin ? [{ _id: "teacher_1", clerkUserId: "user_1", userType: "Admin", gymIds: ["gym_1"] }] : [],
     students: [], unities: [{ _id: "unity_1", gymId: "gym_1" }]
   };

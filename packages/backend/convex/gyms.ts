@@ -1,3 +1,4 @@
+import { assertAdminGymScope } from "./lib/auth";
 import type { Doc } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { mutationGeneric as mutation, queryGeneric as query } from "convex/server";
@@ -62,7 +63,8 @@ export const updateGym = mutation({
     teacherIds: v.optional(v.array(v.id("teachers")))
   },
   handler: async (ctx, { gymId, ...patch }) => {
-    await requireAdmin(ctx);
+    const principal = await requireAdmin(ctx);
+    assertAdminGymScope(principal, [gymId]);
 
     const gym = await ctx.db.get(gymId);
     if (!gym) {
@@ -82,6 +84,8 @@ export const updateGym = mutation({
 export const getGymById = query({
   args: { gymId: v.id("gyms") },
   handler: async (ctx, { gymId }) => {
+    const {gymIds} = await getAccessibleGymIds(ctx);
+    if (!gymIds.has(gymId)) return null;
     const gym = await ctx.db.get(gymId);
     return gym ? withTeamName(ctx, gym) : null;
   }

@@ -28,6 +28,20 @@ const enrollmentStatusValidator = v.union(v.literal("Confirmed"), v.literal("Can
 const attendanceStatusValidator = v.union(v.literal("Present"), v.literal("Absent"));
 
 export default defineSchema({
+  billingAccounts: defineTable({
+    ownerClerkUserId: v.string(), gymId: v.optional(v.id("gyms")),
+    stripeCustomerId: v.optional(v.string()), stripeSubscriptionId: v.optional(v.string()),
+    checkoutSessionId: v.optional(v.string()), checkoutExpiresAt: v.optional(v.number()),
+    checkoutAttempt: v.number(), checkoutLockUntil: v.optional(v.number()),
+    status: v.string(), priceId: v.optional(v.string()),
+    paidThrough: v.optional(v.number()), currentPeriodEnd: v.optional(v.number()),
+    cancelAtPeriodEnd: v.boolean(), stripeSyncedAt: v.number(), lastEventCreated: v.number(),
+    createdAt: v.number(), updatedAt: v.number()
+  }).index("by_owner", ["ownerClerkUserId"]).index("by_gymId", ["gymId"])
+    .index("by_customer", ["stripeCustomerId"]).index("by_subscription", ["stripeSubscriptionId"]),
+  billingEvents: defineTable({eventId: v.string(), type: v.string(), processedAt: v.number()})
+    .index("by_eventId", ["eventId"]),
+
   images: defineTable({
     storageId: v.id("_storage"),
     url: v.string(),

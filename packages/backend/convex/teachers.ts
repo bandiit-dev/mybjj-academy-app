@@ -1,3 +1,4 @@
+import { assertAdminGymScope } from "./lib/auth";
 import { mutationGeneric as mutation, queryGeneric as query } from "convex/server";
 import { assertDegree, beltValidator, teacherClassTypeValidator } from "./lib/validators";
 import { v } from "convex/values";
@@ -30,7 +31,8 @@ export const createTeacher = mutation({
     userType: userTypeValidator
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
+    const principal = await requireAdmin(ctx);
+    assertAdminGymScope(principal, args.gymIds);
     assertDegree(args.degree);
     const now = Date.now();
 
@@ -84,6 +86,7 @@ export const updateTeacher = mutation({
       return teacherId;
     }
 
+    if (patch.gymIds) assertAdminGymScope(authResult, patch.gymIds);
     const adminGymIds = new Set([...(authResult.teacher?.gymIds ?? []), ...(authResult.student?.gymIds ?? [])]);
     if (!authResult.targetTeacher.gymIds.some((gymId: Id<"gyms">) => adminGymIds.has(gymId))) {
       throw new Error("Forbidden: teacher belongs to another academy");

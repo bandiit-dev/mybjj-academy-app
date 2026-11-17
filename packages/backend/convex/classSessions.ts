@@ -1,3 +1,4 @@
+import { assertAdminGymScope } from "./lib/auth";
 import { v } from "convex/values";
 
 import type { Id } from "./_generated/dataModel";
@@ -64,6 +65,10 @@ export const createClassSession = mutation({
     const gymIds = args.gymIds ?? classTemplate.gymIds;
     const unityIds = args.unityIds ?? classTemplate.unityIds;
 
+    if (principal.isAdmin) {
+      assertAdminGymScope(principal, classTemplate.gymIds);
+      assertAdminGymScope(principal, gymIds);
+    }
     await assertTeacherCanCreateSession(principal, teacherIds);
 
     const now = Date.now();
@@ -97,7 +102,9 @@ export const updateClassSession = mutation({
     notes: v.optional(v.string())
   },
   handler: async (ctx, { classSessionId, ...patch }) => {
-    const { session } = await requireSessionTeacherOrAdmin(ctx, classSessionId);
+    const principal = await requireSessionTeacherOrAdmin(ctx, classSessionId);
+    const {session} = principal;
+    if (principal.isAdmin && patch.gymIds) assertAdminGymScope(principal, patch.gymIds);
 
     if (patch.sessionDate) {
       assertSessionDate(patch.sessionDate);
@@ -151,8 +158,9 @@ export const completeClassSession = mutation({
 export const getClassSessionById = query({
   args: { classSessionId: v.id("classSessions") },
   handler: async (ctx, { classSessionId }) => {
-    await getAuthUserIdentity(ctx);
-    return ctx.db.get(classSessionId);
+    const {gymIds} = await getAccessibleGymIds(ctx);
+    const session = await ctx.db.get(classSessionId);
+    return session?.gymIds.some(id => gymIds.has(id)) ? session : null;
   }
 });
 
@@ -243,6 +251,8 @@ export const getClassSessionDetail = query({
       return null;
     }
 
+    const allowed = new Set([...(principal.teacher?.gymIds ?? []), ...(principal.student?.gymIds ?? [])]);
+    if (!session.gymIds.some(id => allowed.has(id))) throw new Error("Forbidden: academy access required");
     const classTemplate = await ctx.db.get(session.classId);
 
     const [teachers, gyms, unities, enrollments, attendanceRows] = await Promise.all([
