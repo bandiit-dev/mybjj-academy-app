@@ -1,6 +1,7 @@
 "use client";
 
 import { api } from "@mybjj/backend/convex/_generated/api";
+import { BELT_LABELS, BELT_CLASSES } from "@mybjj/backend/convex/lib/validators";
 import type { Doc } from "@mybjj/backend/convex/_generated/dataModel";
 import { useQuery } from "convex/react";
 import Image from "next/image";
@@ -8,8 +9,8 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AdminShell } from "@/components/dashboard";
 
-const beltLabels:Record<Doc<"teachers">["belt"],string>={White:"Faixa Branca",Blue:"Faixa Azul",Purple:"Faixa Roxa",Brown:"Faixa Marrom",Black:"Faixa Preta",Coral:"Faixa Coral",Red:"Faixa Vermelha"};
-const beltClasses:Record<Doc<"teachers">["belt"],string>={White:"white",Blue:"blue",Purple:"purple",Brown:"brown",Black:"black",Coral:"brown",Red:"brown"};
+const beltLabels = BELT_LABELS;
+const beltClasses = BELT_CLASSES;
 function Icon({name}:{name:string}){return <Image src={`/figma-students/${name}`} alt="" width={16} height={16} aria-hidden/>}
 function initials(name:string){return name.split(" ").slice(0,2).map(part=>part[0]).join("")}
 

@@ -9,7 +9,8 @@
     "codegen": "convex codegen",
     "seed:demo": "convex run seeds:seedDemoData",
     "lint": "echo 'No lint configured for backend'",
-    "typecheck": "tsc --project tsconfig.json --noEmit"
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "test": "node --experimental-strip-types --loader ./tests/resolve-typescript.mjs --test tests/*.test.ts"
   },
   "dependencies": {
     "convex": "^1.16.0",

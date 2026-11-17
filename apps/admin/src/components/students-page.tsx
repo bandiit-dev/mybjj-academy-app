@@ -1,6 +1,7 @@
 "use client";
 
 import { api } from "@mybjj/backend/convex/_generated/api";
+import { BELT_LABELS, BELT_CLASSES } from "@mybjj/backend/convex/lib/validators";
 import type { Doc } from "@mybjj/backend/convex/_generated/dataModel";
 import { useQuery } from "convex/react";
 import Image from "next/image";
@@ -9,8 +10,8 @@ import { useMemo, useState } from "react";
 
 import { AdminShell } from "@/components/dashboard";
 
-const beltLabels: Record<Doc<"students">["belt"], string> = { White:"Branca", Blue:"Azul", Purple:"Roxa", Brown:"Marrom", Black:"Preta", Coral:"Coral", Red:"Vermelha" };
-const beltClasses: Record<Doc<"students">["belt"], string> = { White:"white", Blue:"blue", Purple:"purple", Brown:"brown", Black:"black", Coral:"brown", Red:"brown" };
+const beltLabels = BELT_LABELS;
+const beltClasses = BELT_CLASSES;
 
 function SmallIcon({ name }: { name:string }) { return <Image src={`/figma-students/${name}`} alt="" width={14} height={14} aria-hidden/>; }
 
@@ -23,7 +24,7 @@ export function StudentsPage() {
   const action=<><Link className="button primary" href="/alunos/novo"><Image src="/figma-dashboard/plus.svg" alt="" width={14} height={14} aria-hidden/>Adicionar Aluno</Link><span className="divider"/></>;
   return <AdminShell title="Gestão de Alunos" breadcrumb="Alunos" actions={action}><main className="students-content">
     <section className="filters-bar" aria-label="Filtros de alunos"><label className="search-field"><SmallIcon name="search.svg"/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar aluno..." aria-label="Buscar aluno"/></label><label className="filter-select"><span>Faixa:</span><select value={belt} onChange={e=>setBelt(e.target.value)}><option value="all">Todas</option>{Object.entries(beltLabels).map(([value,label])=><option value={value} key={value}>{label}</option>)}</select></label><label className="filter-select"><span>Unidade:</span><select value={unit} onChange={e=>setUnit(e.target.value)}><option value="all">Todas</option>{(unities??[]).map(item=><option value={item._id} key={item._id}>{item.name??item.address}</option>)}</select></label></section>
-    <section className="students-table-card"><div className="table-scroll"><table className="students-table"><thead><tr><th>Aluno</th><th>Contato</th><th>Faixa / Grau</th><th>Unidade</th><th>Tipo</th><th>Status</th><th>Ações</th></tr></thead><tbody>{filtered.map(student=><tr key={student._id}><td><div className="student-identity"><span className="professor-avatar">{student.name.slice(0,2).toUpperCase()}</span><strong>{student.name}</strong></div></td><td><div className="contact-cell"><span>{student.email}</span><small>{student.phone}</small></div></td><td><div className="belt-cell"><span className="belt-badge"><i className={`belt-dot ${beltClasses[student.belt]}`}/>{beltLabels[student.belt]}</span><small>{student.degree} {student.degree===1?"Grau":"Graus"}</small></div></td><td>{student.unityIds.map(id=>unityById.get(id)).filter(Boolean).join(", ")||"—"}</td><td><span className="member-badge student">Aluno</span></td><td><span className="student-status active">Ativo</span></td><td><div className="row-actions"><Link href={`/alunos/${student._id}/editar`} title="Editar aluno"><SmallIcon name="edit.svg"/></Link></div></td></tr>)}</tbody></table></div>
+    <section className="students-table-card"><div className="table-scroll"><table className="students-table"><thead><tr><th>Aluno</th><th>Contato</th><th>Faixa / Grau</th><th>Unidade</th><th>Tipo</th><th>Status</th><th>Ações</th></tr></thead><tbody>{filtered.map(student=><tr key={student._id}><td><div className="student-identity"><span className="professor-avatar">{student.name.slice(0,2).toUpperCase()}</span><strong>{student.name}</strong></div></td><td><div className="contact-cell"><span>{student.email || "—"}</span><small>{student.phone || "—"}</small></div></td><td><div className="belt-cell"><span className="belt-badge"><i className={`belt-dot ${beltClasses[student.belt]}`}/>{beltLabels[student.belt]}</span><small>{student.degree} {student.degree===1?"Grau":"Graus"}</small></div></td><td>{student.unityIds.map(id=>unityById.get(id)).filter(Boolean).join(", ")||"—"}</td><td><span className="member-badge student">Aluno</span></td><td><span className="student-status active">Ativo</span></td><td><div className="row-actions"><Link href={`/alunos/${student._id}/editar`} title="Editar aluno"><SmallIcon name="edit.svg"/></Link></div></td></tr>)}</tbody></table></div>
       {students===undefined||unities===undefined?<div className="students-empty"><strong>Carregando alunos...</strong></div>:filtered.length===0?<div className="students-empty"><strong>Nenhum aluno encontrado</strong><span>Alunos aparecerão aqui após serem adicionados.</span></div>:<div className="students-pagination"><span>Mostrando {filtered.length} de {students.length} alunos</span></div>}
     </section></main></AdminShell>;
 }

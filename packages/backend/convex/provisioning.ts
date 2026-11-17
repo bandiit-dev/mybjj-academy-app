@@ -1,23 +1,18 @@
 import { v } from "convex/values";
+import { assertDateOfBirth, assertDegree, assertInvitationEmail, beltValidator, teacherClassTypeValidator } from "./lib/validators";
 
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { action, internalMutation, internalQuery } from "./_generated/server";
-import { requireAdmin } from "./lib/auth";
-import { assertDegree } from "./lib/validators";
+import { requireAcademyUnitAdmin } from "./lib/auth";
 
-const beltValidator = v.union(v.literal("White"), v.literal("Blue"), v.literal("Purple"), v.literal("Brown"), v.literal("Black"), v.literal("Coral"), v.literal("Red"));
-const classTypeValidator = v.union(v.literal("GI"), v.literal("NOGI"));
 const userTypeValidator = v.union(v.literal("Normal"), v.literal("Admin"));
 
 export const assertInvitationAllowed = internalQuery({
   args: { email: v.string(), gymId: v.id("gyms"), unityId: v.id("unities") },
   handler: async (ctx, args) => {
-    const principal = await requireAdmin(ctx);
-    const allowedGymIds = new Set([...(principal.teacher?.gymIds ?? []), ...(principal.student?.gymIds ?? [])]);
-    if (!allowedGymIds.has(args.gymId)) throw new Error("Forbidden: academy access required");
-    const unity = await ctx.db.get(args.unityId);
-    if (!unity || unity.gymId !== args.gymId) throw new Error("The selected unit does not belong to this academy");
+    await requireAcademyUnitAdmin(ctx, args.gymId, args.unityId);
+    assertInvitationEmail(args.email);
     const email = args.email.trim().toLowerCase();
     const [teacher, student] = await Promise.all([
       ctx.db.query("teachers").withIndex("by_email", (q) => q.eq("email", email)).first(),
@@ -32,7 +27,7 @@ export const insertInvitedTeacher = internalMutation({
   args: {
     invitationId: v.string(), name: v.string(), email: v.string(), phone: v.string(), belt: beltValidator,
     degree: v.number(), gymId: v.id("gyms"), unityId: v.id("unities"), role: v.string(),
-    picture: v.string(), classType: classTypeValidator, userType: userTypeValidator
+    picture: v.string(), classType: teacherClassTypeValidator, userType: userTypeValidator
   },
   handler: async (ctx, args) => {
     assertDegree(args.degree); const now = Date.now();
@@ -50,14 +45,15 @@ export const insertInvitedTeacher = internalMutation({
 
 export const insertInvitedStudent = internalMutation({
   args: {
-    invitationId: v.string(), name: v.string(), email: v.string(), phone: v.string(), belt: beltValidator,
+    invitationId: v.string(), name: v.string(), email: v.string(), phone: v.optional(v.string()), dateOfBirth: v.optional(v.string()), belt: beltValidator,
     degree: v.number(), gymId: v.id("gyms"), unityId: v.id("unities"), picture: v.string()
   },
   handler: async (ctx, args) => {
+    assertDateOfBirth(args.dateOfBirth);
     assertDegree(args.degree); const now = Date.now();
     return ctx.db.insert("students", {
       clerkUserId: `invitation:${args.invitationId}`, name: args.name.trim(), email: args.email.trim().toLowerCase(),
-      phone: args.phone.trim(), belt: args.belt, degree: args.degree, gymIds: [args.gymId], unityIds: [args.unityId],
+      phone: (args.phone ?? "").trim(), dateOfBirth: args.dateOfBirth, belt: args.belt, degree: args.degree, gymIds: [args.gymId], unityIds: [args.unityId],
       picture: args.picture.trim(), userType: "Normal", createdAt: now, updatedAt: now
     });
   }
@@ -80,27 +76,30 @@ export const inviteTeacher = action({
   args: {
     name: v.string(), email: v.string(), phone: v.string(), belt: beltValidator, degree: v.number(),
     gymId: v.id("gyms"), unityId: v.id("unities"), role: v.string(), picture: v.string(),
-    classType: classTypeValidator, userType: userTypeValidator, redirectUrl: v.string()
+    classType: teacherClassTypeValidator, userType: userTypeValidator, redirectUrl: v.string()
   },
   handler: async (ctx, args): Promise<Id<"teachers">> => {
     if (!(await ctx.auth.getUserIdentity())) throw new Error("Unauthorized");
     await ctx.runQuery(internal.provisioning.assertInvitationAllowed, { email: args.email, gymId: args.gymId, unityId: args.unityId });
     assertDegree(args.degree);
     const invitationId = await createClerkInvitation(args.email, args.redirectUrl);
-    return ctx.runMutation(internal.provisioning.insertInvitedTeacher, { ...args, invitationId });
+    const { redirectUrl, ...profile } = args;
+    return ctx.runMutation(internal.provisioning.insertInvitedTeacher, { ...profile, invitationId });
   }
 });
 
 export const inviteStudent = action({
   args: {
-    name: v.string(), email: v.string(), phone: v.string(), belt: beltValidator, degree: v.number(),
+    name: v.string(), email: v.string(), phone: v.optional(v.string()), dateOfBirth: v.optional(v.string()), belt: beltValidator, degree: v.number(),
     gymId: v.id("gyms"), unityId: v.id("unities"), picture: v.string(), redirectUrl: v.string()
   },
   handler: async (ctx, args): Promise<Id<"students">> => {
     if (!(await ctx.auth.getUserIdentity())) throw new Error("Unauthorized");
     await ctx.runQuery(internal.provisioning.assertInvitationAllowed, { email: args.email, gymId: args.gymId, unityId: args.unityId });
+    assertDateOfBirth(args.dateOfBirth);
     assertDegree(args.degree);
     const invitationId = await createClerkInvitation(args.email, args.redirectUrl);
-    return ctx.runMutation(internal.provisioning.insertInvitedStudent, { ...args, invitationId });
+    const { redirectUrl, ...profile } = args;
+    return ctx.runMutation(internal.provisioning.insertInvitedStudent, { ...profile, invitationId });
   }
 });

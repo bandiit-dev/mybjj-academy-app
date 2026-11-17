@@ -1,4 +1,5 @@
 import { mutationGeneric as mutation, queryGeneric as query } from "convex/server";
+import { assertDateOfBirth, assertDegree, beltValidator } from "./lib/validators";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 
@@ -7,25 +8,16 @@ import {
   getAccessibleGymIds,
   getCurrentPrincipal,
   getCurrentStudentByClerkId,
+  requireAcademyUnitAdmin,
   requireStudentOrAdmin
 } from "./lib/auth";
-import { assertDegree } from "./lib/validators";
-
-const beltValidator = v.union(
-  v.literal("White"),
-  v.literal("Blue"),
-  v.literal("Purple"),
-  v.literal("Brown"),
-  v.literal("Black"),
-  v.literal("Coral"),
-  v.literal("Red")
-);
 
 const userTypeValidator = v.union(v.literal("Normal"), v.literal("Admin"));
 
 export const createStudent = mutation({
   args: {
     clerkUserId: v.string(),
+    dateOfBirth: v.optional(v.string()),
     name: v.string(),
     email: v.string(),
     phone: v.string(),
@@ -44,6 +36,10 @@ export const createStudent = mutation({
       throw new Error("Forbidden: users can only create their own student profile");
     }
 
+    if (!principal.isAdmin && args.userType !== "Normal") {
+      throw new Error("Forbidden: users cannot assign admin access");
+    }
+    assertDateOfBirth(args.dateOfBirth);
     assertDegree(args.degree);
 
     const now = Date.now();
@@ -60,6 +56,7 @@ export const updateStudent = mutation({
   args: {
     studentId: v.id("students"),
     clerkUserId: v.optional(v.string()),
+    dateOfBirth: v.optional(v.string()),
     name: v.optional(v.string()),
     email: v.optional(v.string()),
     phone: v.optional(v.string()),
@@ -72,6 +69,8 @@ export const updateStudent = mutation({
   },
   handler: async (ctx, { studentId, ...patch }) => {
     const authResult = await requireStudentOrAdmin(ctx, studentId);
+
+    assertDateOfBirth(patch.dateOfBirth);
 
     if (patch.degree !== undefined) {
       assertDegree(patch.degree);
@@ -130,5 +129,27 @@ export const getCurrentStudent = query({
   handler: async (ctx) => {
     const identity = await getAuthUserIdentity(ctx);
     return getCurrentStudentByClerkId(ctx, identity.subject);
+  }
+});
+
+// Academy records without credentials, including children who do not use the app.
+export const createStudentWithoutAccount = mutation({
+  args: {
+    name: v.string(), email: v.optional(v.string()), phone: v.optional(v.string()),
+    dateOfBirth: v.optional(v.string()), belt: beltValidator, degree: v.number(),
+    gymId: v.id("gyms"), unityId: v.id("unities"), picture: v.string()
+  },
+  handler: async (ctx, args) => {
+    await requireAcademyUnitAdmin(ctx, args.gymId, args.unityId);
+    assertDegree(args.degree);
+    assertDateOfBirth(args.dateOfBirth);
+    if (!args.name.trim()) throw new Error("Student name is required");
+    const now = Date.now();
+    return ctx.db.insert("students", {
+      name: args.name.trim(), email: (args.email ?? "").trim().toLowerCase(),
+      phone: (args.phone ?? "").trim(), dateOfBirth: args.dateOfBirth,
+      belt: args.belt, degree: args.degree, gymIds: [args.gymId], unityIds: [args.unityId],
+      picture: args.picture.trim(), userType: "Normal", createdAt: now, updatedAt: now
+    });
   }
 });

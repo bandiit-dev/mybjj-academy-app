@@ -248,3 +248,21 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .login-brand-logo { width:270px; height:90px; margin:-24px 0 0; }
 .onboarding-brand-logo { width:220px; height:70px; }
 .auth-brand-logo { width:230px; height:78px; margin:0 auto; }
+
+.account-access-option { display:flex; align-items:center; gap:10px; font-size:14px; cursor:pointer; }
+.account-access-option input { width:18px; height:18px; accent-color:var(--ink); }
+.account-access-help { margin:0; color:var(--muted); font-size:13px; }
+.belt-dot.gray, .belt-line.gray { background:#9ca3af; }
+.belt-dot.gray-white, .belt-line.gray-white { background:linear-gradient(90deg,#9ca3af 0 65%,#fff 65%); }
+.belt-dot.gray-black, .belt-line.gray-black { background:linear-gradient(90deg,#9ca3af 0 65%,#09090b 65%); }
+.belt-dot.yellow, .belt-line.yellow { background:#facc15; }
+.belt-dot.yellow-white, .belt-line.yellow-white { background:linear-gradient(90deg,#facc15 0 65%,#fff 65%); }
+.belt-dot.yellow-black, .belt-line.yellow-black { background:linear-gradient(90deg,#facc15 0 65%,#09090b 65%); }
+.belt-dot.orange, .belt-line.orange { background:#f97316; }
+.belt-dot.orange-white, .belt-line.orange-white { background:linear-gradient(90deg,#f97316 0 65%,#fff 65%); }
+.belt-dot.orange-black, .belt-line.orange-black { background:linear-gradient(90deg,#f97316 0 65%,#09090b 65%); }
+.belt-dot.green, .belt-line.green { background:#22c55e; }
+.belt-dot.green-white, .belt-line.green-white { background:linear-gradient(90deg,#22c55e 0 65%,#fff 65%); }
+.belt-dot.green-black, .belt-line.green-black { background:linear-gradient(90deg,#22c55e 0 65%,#09090b 65%); }
+.belt-dot.coral, .belt-line.coral { background:repeating-linear-gradient(90deg,#dc2626 0 5px,#09090b 5px 10px); }
+.belt-dot.red, .belt-line.red { background:#dc2626; }

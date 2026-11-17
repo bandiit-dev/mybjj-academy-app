@@ -150,3 +150,12 @@ export async function requireSessionTeacherOrAdmin(ctx: AuthCtx, classSessionId:
 
 // Backward-compatible alias used by existing student module.
 export const requireStudentOrAdmin = requireStudentSelfOrAdmin;
+
+export async function requireAcademyUnitAdmin(ctx: AuthCtx, gymId: Id<"gyms">, unityId: Id<"unities">) {
+  const principal = await requireAdmin(ctx);
+  const gymIds = new Set([...(principal.teacher?.gymIds ?? []), ...(principal.student?.gymIds ?? [])]);
+  if (!gymIds.has(gymId)) throw new Error("Forbidden: academy access required");
+  const unity = await ctx.db.get(unityId);
+  if (!unity || unity.gymId !== gymId) throw new Error("The selected unit does not belong to this academy");
+  return principal;
+}

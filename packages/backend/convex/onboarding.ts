@@ -1,10 +1,8 @@
 import { v } from "convex/values";
+import { assertDegree, beltValidator } from "./lib/validators";
 
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { getAuthUserIdentity, getCurrentStudentByClerkId, getCurrentTeacherByClerkId } from "./lib/auth";
-import { assertDegree } from "./lib/validators";
-
-const beltValidator = v.union(v.literal("White"), v.literal("Blue"), v.literal("Purple"), v.literal("Brown"), v.literal("Black"), v.literal("Coral"), v.literal("Red"));
 
 type AuthCtx = Pick<QueryCtx, "auth" | "db"> | Pick<MutationCtx, "auth" | "db">;
 
@@ -13,7 +11,8 @@ async function findProfilesByEmail(ctx: AuthCtx, email: string | undefined) {
   const normalized = email.trim().toLowerCase();
   const [teacher, student] = await Promise.all([
     ctx.db.query("teachers").withIndex("by_email", (q) => q.eq("email", normalized)).first(),
-    ctx.db.query("students").withIndex("by_email", (q) => q.eq("email", normalized)).first()
+    ctx.db.query("students").withIndex("by_email", (q) => q.eq("email", normalized))
+      .filter((q) => q.neq(q.field("clerkUserId"), undefined)).first()
   ]);
   return { teacher, student };
 }

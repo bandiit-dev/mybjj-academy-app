@@ -1,4 +1,5 @@
 import { mutationGeneric as mutation, queryGeneric as query } from "convex/server";
+import { assertDegree, beltValidator, teacherClassTypeValidator } from "./lib/validators";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 
@@ -9,19 +10,7 @@ import {
   requireAdmin,
   requireTeacherOrAdmin
 } from "./lib/auth";
-import { assertDegree } from "./lib/validators";
 
-const beltValidator = v.union(
-  v.literal("White"),
-  v.literal("Blue"),
-  v.literal("Purple"),
-  v.literal("Brown"),
-  v.literal("Black"),
-  v.literal("Coral"),
-  v.literal("Red")
-);
-
-const classTypeValidator = v.union(v.literal("GI"), v.literal("NOGI"));
 const userTypeValidator = v.union(v.literal("Normal"), v.literal("Admin"));
 
 export const createTeacher = mutation({
@@ -36,7 +25,7 @@ export const createTeacher = mutation({
     unityIds: v.array(v.id("unities")),
     role: v.string(),
     picture: v.string(),
-    classType: classTypeValidator,
+    classType: teacherClassTypeValidator,
     classIds: v.array(v.id("classes")),
     userType: userTypeValidator
   },
@@ -66,7 +55,7 @@ export const updateTeacher = mutation({
     unityIds: v.optional(v.array(v.id("unities"))),
     role: v.optional(v.string()),
     picture: v.optional(v.string()),
-    classType: v.optional(classTypeValidator),
+    classType: v.optional(teacherClassTypeValidator),
     classIds: v.optional(v.array(v.id("classes"))),
     userType: v.optional(userTypeValidator)
   },

@@ -1,15 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
+import { beltValidator, teacherClassTypeValidator } from "./lib/validators";
 import { v } from "convex/values";
-
-const beltValidator = v.union(
-  v.literal("White"),
-  v.literal("Blue"),
-  v.literal("Purple"),
-  v.literal("Brown"),
-  v.literal("Black"),
-  v.literal("Coral"),
-  v.literal("Red")
-);
 
 const userTypeValidator = v.union(v.literal("Normal"), v.literal("Admin"));
 
@@ -85,7 +76,7 @@ export default defineSchema({
     unityIds: v.array(v.id("unities")),
     role: v.string(),
     picture: v.string(),
-    classType: classTypeValidator,
+    classType: teacherClassTypeValidator,
     classIds: v.array(v.id("classes")),
     userType: userTypeValidator,
     createdAt: v.number(),
@@ -95,7 +86,8 @@ export default defineSchema({
     .index("by_email", ["email"]),
 
   students: defineTable({
-    clerkUserId: v.string(),
+    clerkUserId: v.optional(v.string()),
+    dateOfBirth: v.optional(v.string()),
     name: v.string(),
     email: v.string(),
     phone: v.string(),
