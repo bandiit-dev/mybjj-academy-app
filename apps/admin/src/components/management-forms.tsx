@@ -7,6 +7,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, ReactNode, useEffect, useState } from "react";
+import { StudentPlanFields, readStudentPlan } from "@/components/student-plan-fields";
 import { ImageFileField } from "@/components/image-file-field";
 import { useImageUpload } from "@/lib/image-uploads";
 import { AdminShell } from "@/components/dashboard";
@@ -14,7 +15,7 @@ import { AdminShell } from "@/components/dashboard";
 type Option={label:string;value:string};
 function Field({name,label,required,placeholder,type="text",options,defaultValue,textarea}:{name:string;label:string;required?:boolean;placeholder?:string;type?:string;options?:Option[];defaultValue?:string;textarea?:boolean}){return <label className="management-field"><span>{label}{required&&<b> *</b>}</span>{options?<select name={name} required={required} defaultValue={defaultValue??""}><option value="" disabled>{placeholder??"Selecione"}</option>{options.map(x=><option value={x.value} key={x.value}>{x.label}</option>)}</select>:textarea?<textarea name={name} defaultValue={defaultValue} placeholder={placeholder}/>:<input name={name} required={required} type={type} defaultValue={defaultValue} placeholder={placeholder}/>}</label>}
 function Section({title,children,onChange}:{title:string;children:ReactNode;onChange?:()=>void}){return <section className="management-section" onChange={onChange}><h2>{title}</h2><div className="management-fields">{children}</div></section>}
-function friendlyError(cause:unknown){const message=cause instanceof Error?cause.message:"";if(/JPG|PNG|2 MB|ler a imagem|carregar a imagem/.test(message))return message;if(message.includes("already has an account or pending invitation"))return "Este aluno já possui uma conta ou convite de acesso.";if(message.includes("dateOfBirth"))return "Informe uma data de nascimento válida, até a data de hoje.";if(message.includes("valid email"))return "Informe um e-mail válido para criar a conta do aluno.";if(message.includes("Unauthorized"))return "Sua sessão expirou. Entre novamente para continuar.";if(message.includes("Forbidden")||message.includes("admin role required"))return "Você não tem permissão para realizar esta ação.";if(message.includes("already")||message.includes("duplicate"))return "Já existe um cadastro com estes dados.";return "Não foi possível salvar. Revise os campos e tente novamente."}
+function friendlyError(cause:unknown){const message=cause instanceof Error?cause.message:"";if(/plano|pagamento|JPG|PNG|2 MB|ler a imagem|carregar a imagem/.test(message))return message;if(message.includes("already has an account or pending invitation"))return "Este aluno já possui uma conta ou convite de acesso.";if(message.includes("dateOfBirth"))return "Informe uma data de nascimento válida, até a data de hoje.";if(message.includes("valid email"))return "Informe um e-mail válido para criar a conta do aluno.";if(message.includes("Unauthorized"))return "Sua sessão expirou. Entre novamente para continuar.";if(message.includes("Forbidden")||message.includes("admin role required"))return "Você não tem permissão para realizar esta ação.";if(message.includes("already")||message.includes("duplicate"))return "Já existe um cadastro com estes dados.";return "Não foi possível salvar. Revise os campos e tente novamente."}
 function Shell({title,breadcrumb,backHref,saveLabel,busy,error,onSubmit,children}:{title:string;breadcrumb:string;backHref:string;saveLabel:string;busy:boolean;error:string|null;onSubmit:(data:FormData)=>Promise<void>;children:ReactNode}){async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();if(!busy)await onSubmit(new FormData(e.currentTarget))}const back=<><Link className="button secondary form-back" href={backHref}>← Voltar</Link></>;return <AdminShell title={title} breadcrumb={breadcrumb} actions={back}><main className="management-content">{error&&<div className="students-notice" role="alert"><span>{error}</span></div>}<form id="management-form" className="management-card" onSubmit={submit}>{children}</form><div className="management-actions"><Link className="button secondary" href={backHref}>Cancelar</Link><button className="button primary form-save" form="management-form" disabled={busy} type="submit">{busy?"Salvando...":saveLabel}</button></div></main></AdminShell>}
 function useSubmit(backHref:string){const router=useRouter();const [busy,setBusy]=useState(false);const [error,setError]=useState<string|null>(null);async function run(action:()=>Promise<unknown>){setBusy(true);setError(null);try{await action();router.push(backHref)}catch(cause){setError(friendlyError(cause))}finally{setBusy(false)}}return{busy,error,run}}
 const belts: Option[] = BELTS.map(value => ({ value, label: `Faixa ${BELT_LABELS[value]}` }));
@@ -88,6 +89,7 @@ export function AddStudentForm() {
     saveLabel={createAccount ? "Salvar e convidar aluno" : "Salvar aluno"} {...submit}
     onSubmit={async d => submit.run(async () => {
       const profile = {
+        plan: readStudentPlan(d),
         name: String(d.get("name")), email: String(d.get("email") ?? ""), phone: String(d.get("phone") ?? ""),
         dateOfBirth: String(d.get("dateOfBirth") ?? "") || undefined,
         belt: String(d.get("belt")) as Belt, degree: Number(d.get("degree")),
@@ -109,6 +111,7 @@ export function AddStudentForm() {
       <Field name="unityId" label="Unidade" required options={(units??[]).map(x=>({label:x.name??x.address,value:x._id}))}/>
       <ImageFileField name="picture" label="Foto"/>
     </div></Section>
+    <StudentPlanFields/>
     <Section title="Acesso ao aplicativo">
       <label className="account-access-option"><input type="checkbox" name="createAccount" checked={createAccount}
         onChange={event => setCreateAccount(event.target.checked)} aria-describedby="account-access-help"/>
@@ -142,6 +145,7 @@ export function EditStudentForm({studentId}: {studentId: Id<"students">}) {
     saveLabel={shouldInvite ? "Salvar e convidar aluno" : "Salvar alterações"} {...submit}
     onSubmit={async data=>submit.run(async () => {
       const profile = {
+        plan: readStudentPlan(data),
         studentId, name: String(data.get("name")), email: String(data.get("email")??""),
         phone: String(data.get("phone")??""), dateOfBirth: String(data.get("dateOfBirth")??""),
         belt: String(data.get("belt")) as Belt, degree: Number(data.get("degree")),
@@ -164,6 +168,7 @@ export function EditStudentForm({studentId}: {studentId: Id<"students">}) {
       <Field name="unityId" label="Unidade" required options={units.map(x=>({label:x.name??x.address,value:x._id}))} defaultValue={student.unityIds[0]}/>
       <ImageFileField name="picture" label="Foto" currentUrl={student.picture}/>
     </div></Section>
+    <StudentPlanFields plan={student.plan} detailsHref={`/alunos/${studentId}`}/>
     <Section title="Acesso ao aplicativo">
       {student.clerkUserId ? <p className="account-access-help">{student.clerkUserId.startsWith("invitation:")
         ? "Um convite de acesso já foi enviado para este aluno."

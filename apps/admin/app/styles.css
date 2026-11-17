@@ -96,7 +96,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .students-table th:nth-child(4) { width:10%; }
 .students-table th:nth-child(5) { width:9%; }
 .students-table th:nth-child(6) { width:10%; }
-.students-table th:last-child { width:85px; text-align:center; }
+.students-table th:last-child { width:112px; text-align:left; }
 .students-table td { height:64px; padding:10px 16px; border-top:1px solid var(--border); font-size:13px; vertical-align:middle; }
 .student-identity { display:flex; align-items:center; gap:12px; min-width:0; }
 .student-identity img { flex:none; border-radius:50%; object-fit:cover; }
@@ -110,9 +110,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .belt-dot.blue { background:#2563eb; }.belt-dot.purple { background:#9333ea; }.belt-dot.brown { background:#78350f; }.belt-dot.black { background:linear-gradient(90deg,#09090b 0 70%,#dc2626 70%); }
 .member-badge, .student-status { display:inline-flex; padding:3px 7px; border-radius:6px; font-size:11px; font-weight:600; white-space:nowrap; }
 .member-badge.student { background:#f4f4f5; }.member-badge.professor { color:#2563eb; background:#dbeafe; }
-.student-status.active { color:#6b6b6b; background:#eeeeee; }.student-status.inactive { color:var(--muted); background:#f4f4f5; }
+.student-status.active { color:#166534; background:#dcfce7; }.student-status.inactive { color:var(--muted); background:#f4f4f5; }
 .row-actions { display:flex; align-items:center; justify-content:center; gap:10px; }
-.row-actions button, .row-actions a { width:32px; height:32px; display:grid; place-items:center; padding:0; border:0; border-radius:6px; background:transparent; cursor:pointer; }
+.row-actions button, .row-actions a { color:var(--ink); text-decoration:none; width:32px; height:32px; display:grid; place-items:center; padding:0; border:0; border-radius:6px; background:transparent; cursor:pointer; }
 .row-actions button:hover, .row-actions a:hover { background:#f4f4f5; }
 .students-pagination { min-height:58px; display:flex; align-items:center; justify-content:space-between; gap:20px; padding:12px 16px; border-top:1px solid var(--border); background:#f4f4f5; color:var(--muted); font-size:13px; }
 .students-pagination nav { display:flex; gap:8px; }
@@ -275,3 +275,33 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .portal-image-contain img { object-fit:contain; }
 .team-logo { display:block; width:48px; height:48px; border-radius:8px; }
 .academy-logo { display:block; width:128px; height:96px; margin-bottom:20px; }
+
+.student-status.inactive { color:#991b1b; background:#fee2e2; }
+.student-status.pending { color:#92400e; background:#fef3c7; }
+.student-identity a { color:inherit; text-decoration:none; }
+.student-identity a:hover { text-decoration:underline; }
+.student-plan-section { grid-column:1/-1; border-top:1px solid var(--border); }
+.student-detail-heading { display:flex; align-items:center; gap:12px; }
+.student-detail-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:24px; margin:0; }
+.student-detail-grid dt { color:var(--muted); font-size:12px; margin-bottom:6px; }
+.student-detail-grid dd { margin:0; overflow-wrap:anywhere; font-size:14px; }
+.student-billing>header { gap:20px; align-items:flex-start; }
+.student-billing>header .account-access-help { max-width:620px; margin-top:10px; }
+.payments-table { width:100%; min-width:900px; border-collapse:collapse; text-align:left; }
+.payments-table th { padding:12px; font-size:12px; color:var(--muted); background:#f4f4f5; }
+.payments-table td { padding:14px 12px; border-bottom:1px solid var(--border); vertical-align:top; font-size:13px; }
+.payments-table td small { display:block; margin-top:6px; color:var(--muted); white-space:nowrap; }
+.payment-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.payment-error { max-width:260px; color:#b91c1c; font-size:12px; }
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+@media(max-width:800px) { .student-detail-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:560px) { .student-detail-grid { grid-template-columns:1fr; } }
+
+.student-plan-section .card-action { align-self:flex-start; }
+.student-plan-section .card-action:hover { background:#f4f4f5; }
+
+.students-table td:last-child { text-align:left; }
+.students-table .row-actions { display:inline-flex; justify-content:flex-start; vertical-align:middle; gap:8px; }
+.students-table .row-actions a { flex:0 0 32px; }
+
+.student-status.paid { color:#166534; background:#dcfce7; }

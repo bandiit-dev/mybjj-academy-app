@@ -46,3 +46,27 @@ existing `picture`, `branding.logoUrl` or `logo` fields. Existing image URLs are
 preserved when no new file is selected. Replaced images are retained in storage.
 
 Sync the new schema and functions with `pnpm dev:backend` before using uploads.
+
+## Student plans and manual payments
+
+Each student has a plan with a `type` (`Mensal`, `Semestral`, `Anual`),
+`startDate` (YYYY-MM-DD), and `isActive`. This flag is the student status shown
+in the portal. Managers can change it in student editing or student details.
+Unpaid periods and payment corrections never change activation automatically.
+
+The details page at `/alunos/[studentId]` displays the student record, plan and
+payment history. Periods recur every 1, 6 or 12 months from the start date; month
+ends are clamped without accumulating date drift. Payment records are created
+only when a manager records them, and retain the plan type and exact period.
+Changing a plan preserves old payments. Managers may mark a period paid, correct
+its payment date/notes, or mark it pending again. Only admins from the student's
+academy can view or change billing records.
+
+Existing records without a plan default to Mensal, active, starting on the first
+day of the current Brasília month. After deployment, persist those defaults with:
+
+```sh
+pnpm --filter @mybjj/backend exec convex run studentPlans:initializeExistingPlans '{}'
+```
+
+Initialization is idempotent, preserves existing plans, and creates no payments.

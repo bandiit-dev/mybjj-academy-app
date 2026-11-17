@@ -1,0 +1,80 @@
+import { v, type Infer } from "convex/values";
+import type { Doc, Id } from "../_generated/dataModel";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { requireAdmin } from "./auth";
+
+export const PLAN_MONTHS = { Mensal: 1, Semestral: 6, Anual: 12 } as const;
+export type PlanType = keyof typeof PLAN_MONTHS;
+export const planTypeValidator = v.union(v.literal("Mensal"), v.literal("Semestral"), v.literal("Anual"));
+export const studentPlanValidator = v.object({ type: planTypeValidator, startDate: v.string(), isActive: v.boolean() });
+export type StudentPlan = Infer<typeof studentPlanValidator>;
+
+// Academy dates use Brasília time. Billing periods are date-only, never timestamps.
+export function academyToday(now = Date.now()) {
+  return new Date(now - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+export function assertPlanDate(value: string) {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(date.getTime()) ||
+    date.toISOString().slice(0, 10) !== value || value < "1900-01-01" || value > "2199-12-31") {
+    throw new Error("Informe uma data válida para o plano ou pagamento.");
+  }
+}
+
+export function validateStudentPlan(plan: StudentPlan) {
+  assertPlanDate(plan.startDate);
+  return plan;
+}
+
+export function getStudentPlan(student: { plan?: StudentPlan }, today = academyToday()): StudentPlan {
+  return student.plan ?? { type: "Mensal", startDate: `${today.slice(0, 7)}-01`, isActive: true };
+}
+
+export function addPlanMonths(date: string, months: number) {
+  const [year, month, day] = date.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(year, month - 1 + months + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(year, month - 1 + months, Math.min(day, lastDay))).toISOString().slice(0, 10);
+}
+
+export function periodAt(plan: StudentPlan, index: number) {
+  const months = PLAN_MONTHS[plan.type];
+  return { planType: plan.type, periodStart: addPlanMonths(plan.startDate, index * months),
+    periodEnd: addPlanMonths(plan.startDate, (index + 1) * months) };
+}
+
+export function isPlanPeriod(plan: StudentPlan, start: string, end: string) {
+  const [year, month] = start.split("-").map(Number);
+  const [startYear, startMonth] = plan.startDate.split("-").map(Number);
+  const index = Math.floor(((year - startYear) * 12 + month - startMonth) / PLAN_MONTHS[plan.type]);
+  if (index < 0) return false;
+  const period = periodAt(plan, index);
+  return period.periodStart === start && period.periodEnd === end;
+}
+
+export function scheduledPlanPeriods(plan: StudentPlan, today = academyToday()) {
+  const limit = addPlanMonths(today, 12);
+  const periods: ReturnType<typeof periodAt>[] = [];
+  for (let index = 0; ; index++) {
+    const period = periodAt(plan, index);
+    if (index > 0 && period.periodStart > limit) break;
+    periods.push(period);
+  }
+  return periods;
+}
+
+export const paymentKey = (period: { planType: PlanType; periodStart: string; periodEnd: string }) =>
+  `${period.planType}:${period.periodStart}:${period.periodEnd}`;
+
+export async function requireStudentPlanAdmin(ctx: QueryCtx | MutationCtx, studentId: Id<"students">) {
+  const principal = await requireAdmin(ctx);
+  const student = await ctx.db.get(studentId);
+  if (!student) throw new Error("Aluno não encontrado.");
+  const gyms = new Set([...(principal.teacher?.gymIds ?? []), ...(principal.student?.gymIds ?? [])]);
+  if (!student.gymIds.some(id => gyms.has(id))) throw new Error("Forbidden: student belongs to another academy");
+  return { student, principal };
+}
+
+export function withStudentPlan(student: Doc<"students"> | null) {
+  return student ? { ...student, plan: getStudentPlan(student) } : null;
+}

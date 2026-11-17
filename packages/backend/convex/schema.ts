@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { beltValidator, teacherClassTypeValidator, unityAddressValidator } from "./lib/validators";
+import { planTypeValidator, studentPlanValidator } from "./lib/studentPlans";
 import { v } from "convex/values";
 
 const userTypeValidator = v.union(v.literal("Normal"), v.literal("Admin"));
@@ -98,6 +99,7 @@ export default defineSchema({
     .index("by_email", ["email"]),
 
   students: defineTable({
+    plan: v.optional(studentPlanValidator),
     clerkUserId: v.optional(v.string()),
     dateOfBirth: v.optional(v.string()),
     name: v.string(),
@@ -114,6 +116,14 @@ export default defineSchema({
   })
     .index("by_clerkUserId", ["clerkUserId"])
     .index("by_email", ["email"]),
+
+  studentPayments: defineTable({
+    studentId: v.id("students"), planType: planTypeValidator,
+    periodStart: v.string(), periodEnd: v.string(), paid: v.boolean(),
+    paidOn: v.optional(v.string()), notes: v.string(), recordedBy: v.string(),
+    createdAt: v.number(), updatedAt: v.number()
+  }).index("by_studentId", ["studentId"])
+    .index("by_period", ["studentId", "planType", "periodStart", "periodEnd"]),
 
   classes: defineTable({
     teacherIds: v.array(v.id("teachers")),

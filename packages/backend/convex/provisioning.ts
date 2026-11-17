@@ -1,3 +1,4 @@
+import { getStudentPlan, studentPlanValidator, validateStudentPlan } from "./lib/studentPlans";
 import { v } from "convex/values";
 import { assertDateOfBirth, assertDegree, assertInvitationEmail, beltValidator, teacherClassTypeValidator } from "./lib/validators";
 
@@ -58,13 +59,16 @@ export const insertInvitedTeacher = internalMutation({
 
 export const insertInvitedStudent = internalMutation({
   args: {
+    plan: v.optional(studentPlanValidator),
     invitationId: v.string(), name: v.string(), email: v.string(), phone: v.optional(v.string()), dateOfBirth: v.optional(v.string()), belt: beltValidator,
     degree: v.number(), gymId: v.id("gyms"), unityId: v.id("unities"), picture: v.string()
   },
   handler: async (ctx, args) => {
+    if (args.plan) validateStudentPlan(args.plan);
     assertDateOfBirth(args.dateOfBirth);
     assertDegree(args.degree); const now = Date.now();
     return ctx.db.insert("students", {
+      plan: validateStudentPlan(getStudentPlan(args)),
       clerkUserId: `invitation:${args.invitationId}`, name: args.name.trim(), email: args.email.trim().toLowerCase(),
       phone: (args.phone ?? "").trim(), dateOfBirth: args.dateOfBirth, belt: args.belt, degree: args.degree, gymIds: [args.gymId], unityIds: [args.unityId],
       picture: args.picture.trim(), userType: "Normal", createdAt: now, updatedAt: now
@@ -103,12 +107,14 @@ export const inviteTeacher = action({
 
 export const inviteStudent = action({
   args: {
+    plan: v.optional(studentPlanValidator),
     name: v.string(), email: v.string(), phone: v.optional(v.string()), dateOfBirth: v.optional(v.string()), belt: beltValidator, degree: v.number(),
     gymId: v.id("gyms"), unityId: v.id("unities"), picture: v.string(), redirectUrl: v.string()
   },
   handler: async (ctx, args): Promise<Id<"students">> => {
     if (!(await ctx.auth.getUserIdentity())) throw new Error("Unauthorized");
     await ctx.runQuery(internal.provisioning.assertInvitationAllowed, { email: args.email, gymId: args.gymId, unityId: args.unityId });
+    if (args.plan) validateStudentPlan(args.plan);
     assertDateOfBirth(args.dateOfBirth);
     assertDegree(args.degree);
     const invitationId = await createClerkInvitation(args.email, args.redirectUrl);
@@ -118,6 +124,7 @@ export const inviteStudent = action({
 });
 
 const existingStudentInvitationArgs = {
+  plan: v.optional(studentPlanValidator),
   studentId: v.id("students"), name: v.string(), email: v.string(), phone: v.optional(v.string()),
   dateOfBirth: v.optional(v.string()), belt: beltValidator, degree: v.number(),
   gymId: v.id("gyms"), unityId: v.id("unities"), picture: v.string()
@@ -127,9 +134,11 @@ export const updateInvitedStudent = internalMutation({
   args: { ...existingStudentInvitationArgs, invitationId: v.string() },
   handler: async (ctx, args) => {
     await checkInvitationAllowed(ctx, args);
+    if (args.plan) validateStudentPlan(args.plan);
     assertDateOfBirth(args.dateOfBirth);
     assertDegree(args.degree);
     await ctx.db.patch(args.studentId, {
+      ...(args.plan ? { plan: args.plan } : {}),
       name: args.name.trim(), email: args.email.trim().toLowerCase(), phone: (args.phone ?? "").trim(),
       dateOfBirth: args.dateOfBirth, belt: args.belt, degree: args.degree,
       gymIds: [args.gymId], unityIds: [args.unityId], picture: args.picture.trim(),
@@ -143,6 +152,7 @@ export const inviteExistingStudent = action({
   args: { ...existingStudentInvitationArgs, redirectUrl: v.string() },
   handler: async (ctx, args): Promise<Id<"students">> => {
     if (!(await ctx.auth.getUserIdentity())) throw new Error("Unauthorized");
+    if (args.plan) validateStudentPlan(args.plan);
     assertDateOfBirth(args.dateOfBirth);
     assertDegree(args.degree);
     if (!args.name.trim()) throw new Error("Student name is required");
