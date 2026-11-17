@@ -88,6 +88,7 @@ export const bootstrapAcademyAdmin = mutation({
     adminBelt: beltValidator,
     adminDegree: v.number(),
     gymName: v.string(),
+    teamName: v.optional(v.string()),
     cnpj: v.string(),
     gymPhone: v.string(),
     contactEmail: v.string(),
@@ -116,6 +117,7 @@ export const bootstrapAcademyAdmin = mutation({
     assertDegree(args.adminDegree);
     const now = Date.now();
     const gymId = await ctx.db.insert("gyms", {
+      teamName: (args.teamName ?? "").trim(),
       name: args.gymName.trim(), cnpj: args.cnpj.trim(), phone: args.gymPhone.trim(),
       email: args.contactEmail.trim().toLowerCase(), unityIds: [], founded: args.founded,
       teamId: null, branding: {}, teacherIds: [], createdAt: now, updatedAt: now

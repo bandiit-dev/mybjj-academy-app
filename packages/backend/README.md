@@ -70,3 +70,18 @@ pnpm --filter @mybjj/backend exec convex run studentPlans:initializeExistingPlan
 ```
 
 Initialization is idempotent, preserves existing plans, and creates no payments.
+
+## Team visibility
+
+Teams created in the portal store `ownerGymId` for the selected academy. Team
+queries include both owned teams and the academy's existing `teamId` affiliation.
+The first team created for an academy with no affiliation becomes its affiliated
+team; later creations preserve that affiliation and remain visible through
+ownership. Reads and updates require academy access; creation/updates require
+an admin. The internal `teams.recoverUnlinkedTeam` mutation restores a verified
+legacy team without replacing another academy's ownership or affiliation.
+
+The portal currently hides team management: `/equipe` redirects to `/academia`.
+Academy creation and editing use an optional free-text `teamName` field instead.
+Academy queries prefill the existing linked team's name when `teamName` has not
+yet been saved; saving an empty value explicitly clears the displayed name.

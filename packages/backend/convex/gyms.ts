@@ -1,10 +1,19 @@
+import type { Doc } from "./_generated/dataModel";
+import type { QueryCtx } from "./_generated/server";
 import { mutationGeneric as mutation, queryGeneric as query } from "convex/server";
 import { v } from "convex/values";
 
 import { getAccessibleGymIds, requireAdmin } from "./lib/auth";
 
+async function withTeamName(ctx: Pick<QueryCtx, "db">, gym: Doc<"gyms">) {
+  // Prefill the free-text field from an existing affiliation until it is edited.
+  const team = gym.teamName === undefined && gym.teamId ? await ctx.db.get(gym.teamId) : null;
+  return {...gym, teamName: gym.teamName ?? team?.name ?? ""};
+}
+
 export const createGym = mutation({
   args: {
+    teamName: v.optional(v.string()),
     name: v.string(),
     cnpj: v.string(),
     phone: v.string(),
@@ -25,6 +34,7 @@ export const createGym = mutation({
 
     return ctx.db.insert("gyms", {
       ...args,
+      ...(args.teamName !== undefined ? {teamName: args.teamName.trim()} : {}),
       createdAt: now,
       updatedAt: now
     });
@@ -34,6 +44,7 @@ export const createGym = mutation({
 export const updateGym = mutation({
   args: {
     gymId: v.id("gyms"),
+    teamName: v.optional(v.string()),
     name: v.optional(v.string()),
     cnpj: v.optional(v.string()),
     phone: v.optional(v.string()),
@@ -60,6 +71,7 @@ export const updateGym = mutation({
 
     await ctx.db.patch(gymId, {
       ...patch,
+      ...(patch.teamName !== undefined ? {teamName: patch.teamName.trim()} : {}),
       updatedAt: Date.now()
     });
 
@@ -69,7 +81,10 @@ export const updateGym = mutation({
 
 export const getGymById = query({
   args: { gymId: v.id("gyms") },
-  handler: async (ctx, { gymId }) => ctx.db.get(gymId)
+  handler: async (ctx, { gymId }) => {
+    const gym = await ctx.db.get(gymId);
+    return gym ? withTeamName(ctx, gym) : null;
+  }
 });
 
 export const getAllGyms = query({
@@ -77,6 +92,6 @@ export const getAllGyms = query({
   handler: async (ctx) => {
     const { gymIds } = await getAccessibleGymIds(ctx);
     const gyms = await Promise.all([...gymIds].map((gymId) => ctx.db.get(gymId)));
-    return gyms.filter((gym) => gym !== null);
+    return Promise.all(gyms.filter((gym) => gym !== null).map(gym => withTeamName(ctx, gym)));
   }
 });

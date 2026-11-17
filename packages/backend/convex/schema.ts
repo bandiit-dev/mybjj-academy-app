@@ -39,6 +39,7 @@ export default defineSchema({
   }).index("by_uploadedBy", ["uploadedBy"]),
 
   gyms: defineTable({
+    teamName: v.optional(v.string()),
     name: v.string(),
     cnpj: v.string(),
     phone: v.string(),
@@ -69,6 +70,7 @@ export default defineSchema({
   }).index("by_gymId", ["gymId"]),
 
   teams: defineTable({
+    ownerGymId: v.optional(v.id("gyms")),
     name: v.string(),
     leader: v.string(),
     logo: v.string(),
