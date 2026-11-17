@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider signInUrl="/sign-in" signInFallbackRedirectUrl="/">
+    <ClerkProvider signInUrl="/" signUpUrl="/" signInFallbackRedirectUrl="/" signInForceRedirectUrl="/" signUpFallbackRedirectUrl="/" signUpForceRedirectUrl="/">
       <html lang="pt-BR">
         <body className={geist.variable}>
           <ConvexClientProvider>{children}</ConvexClientProvider>

@@ -1,5 +1,6 @@
 "use client";
 
+import { LoginPage } from "@/components/login-page";
 import { api } from "@mybjj/backend/convex/_generated/api";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
 import { ConvexReactClient, useConvexAuth, useQuery } from "convex/react";
@@ -19,32 +20,32 @@ function AdminAccessGate({ children }: { children: React.ReactNode }) {
   const onboarding = useQuery(api.onboarding.getOnboardingStatus, isAuthenticated ? {} : "skip");
 
   useEffect(() => {
-    if (!clerk.isLoaded || isLoading) {
+    if (!clerk.isLoaded || (clerk.isSignedIn && (isLoading || !isAuthenticated))) {
       const timeout = window.setTimeout(() => setTimedOut(true), 8000);
       return () => window.clearTimeout(timeout);
     }
     setTimedOut(false);
-  }, [clerk.isLoaded, isLoading]);
+  }, [clerk.isLoaded, clerk.isSignedIn, isLoading, isAuthenticated]);
 
   useEffect(() => {
+    if (clerk.isLoaded && !clerk.isSignedIn && pathname !== "/") router.replace("/");
     if (!isAuthenticated || onboarding === undefined) return;
     if (onboarding.status === "ready" && pathname.startsWith("/onboarding")) router.replace("/");
     if (onboarding.status !== "ready" && onboarding.status !== "unauthenticated" && !pathname.startsWith("/onboarding")) router.replace("/onboarding");
-  }, [isAuthenticated, onboarding, pathname, router]);
+  }, [clerk.isLoaded, clerk.isSignedIn, isAuthenticated, onboarding, pathname, router]);
 
-  if (pathname.startsWith("/sign-in")) return children;
+  if (clerk.isLoaded && !clerk.isSignedIn) return <LoginPage/>;
   if (timedOut) {
-    return <main className="auth-state"><div className="auth-denied"><BrandLogo className="auth-brand-logo"/><h1>Não foi possível validar o acesso</h1><p>{clerk.isLoaded ? "O Clerk iniciou, mas o Convex não confirmou a sessão. Saia, entre novamente e tente recarregar a página." : "O Clerk não conseguiu finalizar a inicialização. Verifique a conexão e a chave pública configurada."}</p><div className="auth-recovery"><button className="button secondary" type="button" onClick={() => window.location.reload()}>Tentar novamente</button><SignOutButton redirectUrl="/sign-in"><button className="button primary" type="button">Sair</button></SignOutButton></div></div></main>;
+    return <main className="auth-state"><div className="auth-denied"><BrandLogo className="auth-brand-logo"/><h1>Não foi possível validar o acesso</h1><p>{clerk.isLoaded ? "O Clerk iniciou, mas o Convex não confirmou a sessão. Saia, entre novamente e tente recarregar a página." : "O Clerk não conseguiu finalizar a inicialização. Verifique a conexão e a chave pública configurada."}</p><div className="auth-recovery"><button className="button secondary" type="button" onClick={() => window.location.reload()}>Tentar novamente</button><SignOutButton redirectUrl="/"><button className="button primary" type="button">Sair</button></SignOutButton></div></div></main>;
   }
-  if (isLoading || (isAuthenticated && onboarding === undefined)) {
+  if (!clerk.isLoaded || isLoading || !isAuthenticated || onboarding === undefined) {
     return <main className="auth-state"><div className="auth-spinner"/><strong>Validando acesso...</strong></main>;
   }
-  if (!isAuthenticated) return children;
   if (onboarding?.status !== "ready") {
     return pathname.startsWith("/onboarding") ? children : <main className="auth-state"><div className="auth-spinner"/><strong>Preparando seu cadastro...</strong></main>;
   }
   if (!onboarding.isAdmin) {
-    return <main className="auth-state"><div className="auth-denied"><BrandLogo className="auth-brand-logo"/><h1>Acesso não autorizado</h1><p>Esta conta não possui permissão administrativa no MyBJJAcademy.</p><SignOutButton redirectUrl="/sign-in"><button className="button primary" type="button">Sair e entrar com outra conta</button></SignOutButton></div></main>;
+    return <main className="auth-state"><div className="auth-denied"><BrandLogo className="auth-brand-logo"/><h1>Acesso não autorizado</h1><p>Esta conta não possui permissão administrativa no MyBJJAcademy.</p><SignOutButton redirectUrl="/"><button className="button primary" type="button">Sair e entrar com outra conta</button></SignOutButton></div></main>;
   }
   return children;
 }

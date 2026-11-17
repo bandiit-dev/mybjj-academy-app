@@ -75,7 +75,7 @@ export function AddUnitForm() {
   </Shell>;
 }
 
-export function AddProfessorForm(){const uploadImage=useImageUpload();const gyms=useQuery(api.gyms.getAllGyms);const units=useQuery(api.unities.getAllUnities);const invite=useAction(api.provisioning.inviteTeacher);const submit=useSubmit("/professores");return <Shell title="Adicionar Professor" breadcrumb="Professores / Adicionar Professor" backHref="/professores" saveLabel="Convidar professor" {...submit} onSubmit={async d=>submit.run(async ()=>invite({name:String(d.get("name")),email:String(d.get("email")),phone:String(d.get("phone")),belt:String(d.get("belt")) as Belt,degree:Number(d.get("degree")),gymId:d.get("gymId") as Id<"gyms">,unityId:d.get("unityId") as Id<"unities">,role:String(d.get("role")),picture:await uploadImage(d,"picture"),classType:String(d.get("classType")) as Doc<"teachers">["classType"],userType:String(d.get("userType")) as "Normal",redirectUrl:`${window.location.origin}/sign-in`}))}><Section title="Dados pessoais"><Field name="name" label="Nome completo" required/><Field name="email" label="E-mail" required type="email"/><Field name="phone" label="Telefone" required/><div className="field-pair"><Field name="belt" label="Faixa" required options={belts}/><Field name="degree" label="Grau" required type="number" defaultValue="0"/></div><ImageFileField name="picture" label="Foto"/></Section><Section title="Informações profissionais"><Field name="gymId" label="Academia" required options={(gyms??[]).map(x=>({label:x.name,value:x._id}))}/><Field name="unityId" label="Unidade" required options={(units??[]).map(x=>({label:x.name??x.address,value:x._id}))}/><Field name="role" label="Função" required/><div className="field-pair"><Field name="classType" label="Modalidade" required options={teacherModalities}/><Field name="userType" label="Permissão" required options={[{label:"Professor",value:"Normal"},{label:"Administrador",value:"Admin"}]}/></div></Section></Shell>}
+export function AddProfessorForm(){const uploadImage=useImageUpload();const gyms=useQuery(api.gyms.getAllGyms);const units=useQuery(api.unities.getAllUnities);const invite=useAction(api.provisioning.inviteTeacher);const submit=useSubmit("/professores");return <Shell title="Adicionar Professor" breadcrumb="Professores / Adicionar Professor" backHref="/professores" saveLabel="Convidar professor" {...submit} onSubmit={async d=>submit.run(async ()=>invite({name:String(d.get("name")),email:String(d.get("email")),phone:String(d.get("phone")),belt:String(d.get("belt")) as Belt,degree:Number(d.get("degree")),gymId:d.get("gymId") as Id<"gyms">,unityId:d.get("unityId") as Id<"unities">,role:String(d.get("role")),picture:await uploadImage(d,"picture"),classType:String(d.get("classType")) as Doc<"teachers">["classType"],userType:String(d.get("userType")) as "Normal",redirectUrl:`${window.location.origin}/`}))}><Section title="Dados pessoais"><Field name="name" label="Nome completo" required/><Field name="email" label="E-mail" required type="email"/><Field name="phone" label="Telefone" required/><div className="field-pair"><Field name="belt" label="Faixa" required options={belts}/><Field name="degree" label="Grau" required type="number" defaultValue="0"/></div><ImageFileField name="picture" label="Foto"/></Section><Section title="Informações profissionais"><Field name="gymId" label="Academia" required options={(gyms??[]).map(x=>({label:x.name,value:x._id}))}/><Field name="unityId" label="Unidade" required options={(units??[]).map(x=>({label:x.name??x.address,value:x._id}))}/><Field name="role" label="Função" required/><div className="field-pair"><Field name="classType" label="Modalidade" required options={teacherModalities}/><Field name="userType" label="Permissão" required options={[{label:"Professor",value:"Normal"},{label:"Administrador",value:"Admin"}]}/></div></Section></Shell>}
 
 export function AddStudentForm() {
   const uploadImage = useImageUpload();
@@ -97,7 +97,7 @@ export function AddStudentForm() {
         picture: await uploadImage(d,"picture")
       };
       return createAccount
-        ? invite({...profile, redirectUrl: `${window.location.origin}/sign-in`})
+        ? invite({...profile, redirectUrl: `${window.location.origin}/`})
         : create(profile);
     })}>
     <Section title="Dados pessoais"><div className="form-grid four">
@@ -154,7 +154,7 @@ export function EditStudentForm({studentId}: {studentId: Id<"students">}) {
       const gymId = data.get("gymId") as Id<"gyms">;
       const unityId = data.get("unityId") as Id<"unities">;
       return shouldInvite
-        ? invite({...profile, gymId, unityId, redirectUrl: `${window.location.origin}/sign-in`})
+        ? invite({...profile, gymId, unityId, redirectUrl: `${window.location.origin}/`})
         : update({...profile, gymIds: [gymId], unityIds: [unityId]});
     })}>
     <Section title="Dados pessoais"><div className="form-grid four">
