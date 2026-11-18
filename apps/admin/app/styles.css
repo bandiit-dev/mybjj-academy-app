@@ -360,3 +360,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .subscription-footnote { color:var(--muted); font-size:12px!important; line-height:1.6; }
 .subscription-error { color:#b91c1c!important; font-size:13px; }
 @media(max-width:560px) { .subscription-screen { padding:20px 16px; }.subscription-header { margin-bottom:32px; }.subscription-checkout { padding:24px; }.subscription-checkout h1 { font-size:26px; } }
+
+.subscription-coupon { display:flex; flex-direction:column; gap:8px; }
+.subscription-coupon>span { font-size:14px; font-weight:600; }
+.subscription-coupon input { width:100%; min-height:44px; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:white; color:var(--ink); font:inherit; font-size:14px; }
+.subscription-coupon small { color:var(--muted); font-size:12px; line-height:1.5; }

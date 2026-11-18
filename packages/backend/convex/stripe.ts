@@ -19,7 +19,9 @@ async function portalUrl(account:Doc<"billingAccounts">) {
 }
 
 export const createCheckout = action({
-  args:{},handler:async(ctx):Promise<{url:string}>=>{
+  args:{promotionCode:v.optional(v.string())},handler:async(ctx,{promotionCode}):Promise<{url:string}>=>{
+    const code=promotionCode?.trim()??"";
+    if(code.length>100) throw new ConvexError("O cupom deve ter no máximo 100 caracteres.");
     const config=billingConfiguration();
     const context=await ctx.runQuery(internal.billing.getCheckoutContext,{});
     if(!context.canManage) throw new ConvexError("Somente o responsável pela assinatura pode gerenciar o pagamento.");
@@ -36,9 +38,27 @@ export const createCheckout = action({
         customerId=customer.id;
         await ctx.runMutation(internal.billing.setCustomer,{accountId:account._id,customerId:customerId!});
       }
+      let promotionCodeId:string|undefined;
+      if(code) {
+        const promotions=await stripeRequest(`promotion_codes?code=${encodeURIComponent(code)}&active=true&limit=100`);
+        const eligible=(promotions.data??[]).filter((promo:StripeData)=>promo.active &&
+          typeof promo.code==="string" && promo.code.toLowerCase()===code.toLowerCase() &&
+          (!promo.customer || stripeId(promo.customer)===customerId) &&
+          (!promo.expires_at || promo.expires_at*1000>Date.now()) &&
+          (promo.max_redemptions==null || promo.times_redeemed<promo.max_redemptions));
+        const promotion=eligible.find((promo:StripeData)=>stripeId(promo.customer)===customerId)??eligible[0];
+        if(!promotion) throw new ConvexError("Cupom inválido, expirado ou indisponível para sua conta.");
+        promotionCodeId=promotion.id;
+      }
+      const matchesPromotion=(session:StripeData)=>promotionCodeId
+        ? session.metadata?.promotionCodeId===promotionCodeId
+        : !session.metadata?.promotionCodeId && session.allow_promotion_codes===true;
       if(account.checkoutSessionId) {
         const previous=await stripeRequest(`checkout/sessions/${encodeURIComponent(account.checkoutSessionId)}`);
-        if(previous.status==="open" && previous.expires_at*1000>Date.now() && previous.url) return {url:previous.url};
+        if(previous.status==="open" && previous.expires_at*1000>Date.now() && previous.url) {
+          if(matchesPromotion(previous)) return {url:previous.url};
+          await stripeRequest(`checkout/sessions/${encodeURIComponent(previous.id??account.checkoutSessionId)}/expire`,{});
+        }
         if(previous.status==="complete" && stripeId(previous.subscription)) {
           const snapshot = await applySubscription(ctx,{...account,stripeCustomerId:customerId},stripeId(previous.subscription)!);
           if (!["canceled", "incomplete_expired"].includes(snapshot.status)) return {url:`${config.appUrl}/assinatura?checkout=success`};
@@ -52,7 +72,11 @@ export const createCheckout = action({
       }
       // Recover a session whose creation succeeded before a network timeout.
       const openSessions=await stripeRequest(`checkout/sessions?customer=${encodeURIComponent(customerId!)}&status=open&limit=100`);
-      const openSession=openSessions.data?.find((session:StripeData)=>session.client_reference_id===account._id && session.mode==="subscription" && session.expires_at*1000>Date.now() && session.url);
+      const ownedSessions=(openSessions.data??[]).filter((session:StripeData)=>session.client_reference_id===account._id && session.mode==="subscription" && session.expires_at*1000>Date.now() && session.url);
+      for(const session of ownedSessions) {
+        if(!matchesPromotion(session)) await stripeRequest(`checkout/sessions/${encodeURIComponent(session.id)}/expire`,{});
+      }
+      const openSession=ownedSessions.find(matchesPromotion);
       if(openSession) {
         await ctx.runMutation(internal.billing.finishCheckout,{accountId:account._id,attempt,sessionId:openSession.id,expiresAt:openSession.expires_at*1000});
         return {url:openSession.url};
@@ -61,6 +85,7 @@ export const createCheckout = action({
       if(!price.active||!validPortalPrice(price)) throw new ConvexError("O plano de pagamento não está disponível. Entre em contato com o suporte.");
       const session=await stripeRequest("checkout/sessions",{
         mode:"subscription",customer:customerId!,client_reference_id:account._id,locale:"pt-BR",
+        ...(promotionCodeId?{"discounts[0][promotion_code]":promotionCodeId,"metadata[promotionCodeId]":promotionCodeId}:{allow_promotion_codes:"true"}),
         "line_items[0][price]":config.priceId,"line_items[0][quantity]":"1","payment_method_types[0]":"card",
         "metadata[billingAccountId]":account._id,"subscription_data[metadata][billingAccountId]":account._id,
         success_url:`${config.appUrl}/assinatura?checkout=success&session_id={CHECKOUT_SESSION_ID}`,

@@ -3,25 +3,32 @@
 import { api } from "@mybjj/backend/convex/_generated/api";
 import type { Id } from "@mybjj/backend/convex/_generated/dataModel";
 import { SignOutButton } from "@clerk/nextjs";
-import { useAction, useQuery } from "convex/react";
+import { ConvexError } from "convex/values";
+import { useAction, useConvexAuth, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { BrandLogo } from "./brand-logo";
 
 const date = (value: number | null) => value ? new Intl.DateTimeFormat("pt-BR", {timeZone:"America/Sao_Paulo"}).format(value) : "—";
 function useSubscription(gymId?: Id<"gyms">) {
+  const {isAuthenticated} = useConvexAuth();
   const [refreshKey, refresh] = useState(0);
   useEffect(() => {const timer = window.setInterval(() => refresh(key => key + 1), 30000); return () => window.clearInterval(timer);}, []);
-  return useQuery(api.billing.getStatus, {gymId, refreshKey});
+  return useQuery(api.billing.getStatus, isAuthenticated ? {gymId, refreshKey} : "skip");
 }
 function usePaymentAction(gymId?: Id<"gyms">) {
   const checkout = useAction(api.stripe.createCheckout);
   const portal = useAction(api.stripe.createPortal);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  async function open(manage: boolean) {
+  async function open(manage: boolean, promotionCode?: string) {
     setBusy(true); setError("");
-    try { const result = await (manage ? portal({gymId}) : checkout({})); window.location.assign(result.url); }
-    catch { setError("Não foi possível abrir o pagamento. Tente novamente em alguns instantes."); setBusy(false); }
+    try { const result = await (manage ? portal({gymId}) : checkout({promotionCode})); window.location.assign(result.url); }
+    catch (error) {
+      const data = error instanceof ConvexError ? error.data : undefined;
+      const message = typeof data === "string" ? data : data && typeof data === "object" && "message" in data && typeof data.message === "string" ? data.message : undefined;
+      setError(message ?? "Não foi possível abrir o pagamento. Tente novamente em alguns instantes.");
+      setBusy(false);
+    }
   }
   return {busy, error, open};
 }
@@ -32,6 +39,8 @@ export function SubscriptionPage() {
   const confirm = useAction(api.stripe.confirmCheckout);
   const started = useRef(false);
   const [confirmation, setConfirmation] = useState("");
+  const [promotionCode, setPromotionCode] = useState("");
+  const manageSubscription = Boolean(billing?.hasSubscription && !["canceled", "incomplete_expired"].includes(billing.status));
   useEffect(() => {
     if (!billing || started.current) return;
     started.current = true;
@@ -43,7 +52,7 @@ export function SubscriptionPage() {
       confirm({sessionId}).then(() => setConfirmation("Aguardando a confirmação do pagamento. O portal abrirá automaticamente assim que ele for aprovado.")).catch(() => setConfirmation("Ainda estamos aguardando a confirmação do pagamento. Você pode tentar verificar novamente."));
     }
   }, [billing, confirm]);
-  return <main className="subscription-screen"><header className="subscription-header"><BrandLogo/><SignOutButton redirectUrl="/"><button className="button secondary" type="button">Sair</button></SignOutButton></header><section className="subscription-checkout academy-card"><span className="subscription-eyebrow">PLANO DO PORTAL</span><h1>Sua academia, organizada.</h1><p>Ative sua assinatura para gerenciar alunos, professores e aulas no MyBJJ Academy.</p><div className="subscription-price">R$ 39,90 <span>/ mês por academia</span></div><ul><li>Gestão de alunos, planos e pagamentos</li><li>Professores, unidades e aulas em um só lugar</li><li>Acesso ao painel administrativo</li></ul>{confirmation && <p role="status" className="subscription-notice">{confirmation}</p>}{!billing ? <p>Verificando assinatura...</p> : !billing.canManage ? <p className="subscription-notice">A assinatura desta academia precisa ser regularizada. Peça ao responsável pela assinatura para realizar o pagamento.</p> : !billing.configured ? <p className="subscription-notice">Os pagamentos ainda não estão disponíveis. Tente novamente mais tarde.</p> : <><button className="button primary" type="button" disabled={payment.busy} onClick={() => payment.open(billing.hasSubscription)}>{payment.busy ? "Abrindo pagamento..." : billing.hasSubscription ? "Regularizar assinatura" : "Assinar por R$ 39,90/mês"}</button>{confirmation && <button className="button secondary" type="button" onClick={() => window.location.reload()}>Verificar pagamento</button>}<p className="subscription-footnote">Cobrança mensal recorrente. Gerencie ou cancele sua assinatura a qualquer momento.</p></>}{payment.error && <p role="alert" className="subscription-error">{payment.error}</p>}</section></main>;
+  return <main className="subscription-screen"><header className="subscription-header"><BrandLogo/><SignOutButton redirectUrl="/"><button className="button secondary" type="button">Sair</button></SignOutButton></header><section className="subscription-checkout academy-card"><span className="subscription-eyebrow">PLANO DO PORTAL</span><h1>Sua academia, organizada.</h1><p>Ative sua assinatura para gerenciar alunos, professores e aulas no MyBJJ Academy.</p><div className="subscription-price">R$ 39,90 <span>/ mês por academia</span></div><ul><li>Gestão de alunos, planos e pagamentos</li><li>Professores, unidades e aulas em um só lugar</li><li>Acesso ao painel administrativo</li></ul>{confirmation && <p role="status" className="subscription-notice">{confirmation}</p>}{!billing ? <p>Verificando assinatura...</p> : !billing.canManage ? <p className="subscription-notice">A assinatura desta academia precisa ser regularizada. Peça ao responsável pela assinatura para realizar o pagamento.</p> : !billing.configured ? <p className="subscription-notice">Os pagamentos ainda não estão disponíveis. Tente novamente mais tarde.</p> : <>{!manageSubscription && <label className="subscription-coupon" htmlFor="subscription-promotion-code"><span>Tem um cupom?</span><input id="subscription-promotion-code" type="text" value={promotionCode} onChange={event => setPromotionCode(event.target.value)} maxLength={100} autoComplete="off" autoCapitalize="characters" spellCheck={false} disabled={payment.busy} placeholder="Digite seu código" aria-describedby="subscription-coupon-hint"/><small id="subscription-coupon-hint">O desconto será validado e exibido no pagamento.</small></label>}<button className="button primary" type="button" disabled={payment.busy} onClick={() => payment.open(manageSubscription, promotionCode)}>{payment.busy ? "Abrindo pagamento..." : manageSubscription ? "Regularizar assinatura" : promotionCode.trim() ? "Continuar com cupom" : "Assinar por R$ 39,90/mês"}</button>{confirmation && <button className="button secondary" type="button" onClick={() => window.location.reload()}>Verificar pagamento</button>}<p className="subscription-footnote">Cobrança mensal recorrente. Gerencie ou cancele sua assinatura a qualquer momento.</p></>}{payment.error && <p role="alert" className="subscription-error">{payment.error}</p>}</section></main>;
 }
 
 export function AcademySubscriptionTile({gymId}: {gymId: Id<"gyms">}) {

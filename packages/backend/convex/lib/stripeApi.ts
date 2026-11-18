@@ -10,6 +10,10 @@ export function billingConfiguration() {
   if(!key||!priceId||!appUrl||!process.env.STRIPE_WEBHOOK_SECRET) {
     throw new ConvexError("Os pagamentos ainda não estão disponíveis. Tente novamente mais tarde.");
   }
+  if (!/^price_[a-zA-Z0-9]+$/.test(priceId)) {
+    console.error("Stripe configuration: STRIPE_MONTHLY_PRICE_ID must be a price_ ID, not a product ID or payment link.");
+    throw new ConvexError({code:"STRIPE_PRICE_CONFIGURATION",message:"O plano de pagamento não está configurado corretamente. Entre em contato com o suporte."});
+  }
   const url=new URL(appUrl);
   if(url.protocol!=="https:" && !(url.protocol==="http:"&&["localhost","127.0.0.1"].includes(url.hostname))) throw new Error("APP_URL must use HTTPS");
   return {key,priceId,appUrl:url.origin};
@@ -22,7 +26,25 @@ export async function stripeRequest(path:string, body?:Record<string,string>, id
       ...(body?{"Content-Type":"application/x-www-form-urlencoded"}:{}),...(idempotencyKey?{"Idempotency-Key":idempotencyKey}:{})},
     ...(body?{body:new URLSearchParams(body).toString()}:{}),signal:AbortSignal.timeout(20000)
   });
-  if(!response.ok) throw new ConvexError("Não foi possível concluir a operação de pagamento. Tente novamente.");
+  if(!response.ok) {
+    const payload=await response.json().catch(()=>null);
+    const error=payload?.error;
+    // Log diagnostic fields only; never log authorization, request bodies or raw errors.
+    console.error("Stripe API request failed",{
+      resource:path.split(/[/?]/)[0],status:response.status,
+      code:typeof error?.code==="string"?error.code:undefined,
+      param:typeof error?.param==="string"?error.param:undefined,
+      requestId:response.headers.get("request-id")
+    });
+    if (body?.["discounts[0][promotion_code]"] && response.status===400 &&
+      (String(error?.param??"").startsWith("discounts") || /coupon|promotion/.test(String(error?.code??"")))) {
+      throw new ConvexError({code:"STRIPE_COUPON_REJECTED",message:"Este cupom não pode ser aplicado à assinatura. Verifique as condições ou tente outro código."});
+    }
+    if (path.startsWith("prices/") && response.status===404) {
+      throw new ConvexError({code:"STRIPE_PRICE_NOT_FOUND",message:"O plano de pagamento não foi encontrado. Entre em contato com o suporte."});
+    }
+    throw new ConvexError({code:"STRIPE_REQUEST_FAILED",message:"Não foi possível concluir a operação de pagamento. Tente novamente."});
+  }
   return response.json();
 }
 export const stripeId=(value:any):string|undefined=>typeof value==="string"?value:typeof value?.id==="string"?value.id:undefined;

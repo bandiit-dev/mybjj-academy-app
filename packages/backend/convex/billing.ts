@@ -24,6 +24,7 @@ async function billingContext(ctx: Ctx, selectedGymId?: Id<"gyms">) {
 export const getStatus = query({
   args:{gymId:v.optional(v.id("gyms")),refreshKey:v.optional(v.number())},
   handler:async(ctx,{gymId})=>{
+    if (!(await ctx.auth.getUserIdentity())?.subject) return null;
     const context=await billingContext(ctx,gymId);
     const account=context.account;
     return {

@@ -131,7 +131,7 @@ There is no free access or automatic grandfathering for existing academies.
    Copy this endpoint's signing secret into `STRIPE_WEBHOOK_SECRET`.
 4. Enable Stripe's customer portal with invoice history, payment method updates,
    and cancellation **at the end of the paid period**. Disable plan/quantity
-   changes, coupons and trials for this single-price product. Checkout currently
+   changes and trials for this single-price product. Checkout currently
    accepts cards. Configure failed-payment recovery to cancel unpaid subscriptions
    after retries are exhausted.
 5. Deploy the admin app. Its existing Clerk and Convex environment variables are
@@ -169,3 +169,20 @@ Missing Stripe configuration shows a payment-unavailable message and keeps the
 portal blocked. Automated tests mock Stripe and verify signatures, paid invoice
 checks, ownership, expiry, renewal failure, duplicate/out-of-order events, checkout
 session reuse and paid academy onboarding. They do not perform real charges.
+
+
+### Subscription coupons
+
+Create a coupon and a customer-facing **promotion code** in the same Stripe
+account and test/live mode as the configured monthly price. Owners can enter
+that code on `/assinatura`; the server resolves it against active Stripe promotion
+codes and passes the promotion ID to Checkout. Customer restrictions, expiry and
+redemption limits are respected; Stripe enforces the discount's remaining rules
+and shows the final price before confirmation. The code is not a `coupon_` or
+`promo_` resource ID. Without a code on the portal page, Stripe Checkout also
+allows promotion code entry.
+
+Checkout sessions created before coupon support, or with a different selected
+code, are expired and replaced. Discounts do not change the base monthly price
+or grant portal access before Stripe confirms a settled invoice, including a
+zero-total invoice from a full discount. Coupon duration determines later charges.
