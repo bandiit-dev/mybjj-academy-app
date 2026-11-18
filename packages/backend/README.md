@@ -114,7 +114,9 @@ There is no free access or automatic grandfathering for existing academies.
 2. Set these **Convex deployment environment variables** in the Convex dashboard:
    - `STRIPE_SECRET_KEY`: Stripe test secret key (live key at launch).
    - `STRIPE_MONTHLY_PRICE_ID`: the monthly price ID from step 1.
-   - `APP_URL`: admin origin, e.g. `https://admin.mybjjacademy.com.br`.
+   - `APP_URL`: the admin origin for that deployment. Use `http://localhost:3000`
+     on the Convex development deployment when testing locally; use
+     `https://admin.mybjjacademy.com.br` on production.
    - `STRIPE_WEBHOOK_SECRET`: signing secret for the endpoint below.
    These are backend values; do not add them to `NEXT_PUBLIC_*` or commit them.
    Separate test/live Stripe resources and secrets must match each deployment.
@@ -132,7 +134,10 @@ There is no free access or automatic grandfathering for existing academies.
 4. Enable Stripe's customer portal with invoice history, payment method updates,
    and cancellation **at the end of the paid period**. Disable plan/quantity
    changes and trials for this single-price product. Checkout currently
-   accepts cards. Configure failed-payment recovery to cancel unpaid subscriptions
+   filters eligible methods to cards using `allowed_payment_method_types`. Enable
+   cards in the Stripe Dashboard payment-method settings. The pinned API version
+   no longer accepts the legacy `payment_method_types` request parameter.
+   Configure failed-payment recovery to cancel unpaid subscriptions
    after retries are exhausted.
 5. Deploy the admin app. Its existing Clerk and Convex environment variables are
    sufficient; no new Stripe variable is required in Vercel. The backend's
@@ -183,6 +188,6 @@ and shows the final price before confirmation. The code is not a `coupon_` or
 allows promotion code entry.
 
 Checkout sessions created before coupon support, or with a different selected
-code, are expired and replaced. Discounts do not change the base monthly price
+code or a different return origin, are expired and replaced. Discounts do not change the base monthly price
 or grant portal access before Stripe confirms a settled invoice, including a
 zero-total invoice from a full discount. Coupon duration determines later charges.

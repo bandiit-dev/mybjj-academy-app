@@ -23,6 +23,8 @@ export const createCheckout = action({
     const code=promotionCode?.trim()??"";
     if(code.length>100) throw new ConvexError("O cupom deve ter no máximo 100 caracteres.");
     const config=billingConfiguration();
+    const successUrl=`${config.appUrl}/assinatura?checkout=success&session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl=`${config.appUrl}/assinatura?checkout=cancelled`;
     const context=await ctx.runQuery(internal.billing.getCheckoutContext,{});
     if(!context.canManage) throw new ConvexError("Somente o responsável pela assinatura pode gerenciar o pagamento.");
     const account=await ctx.runMutation(internal.billing.ensureAccount,{});
@@ -53,10 +55,11 @@ export const createCheckout = action({
       const matchesPromotion=(session:StripeData)=>promotionCodeId
         ? session.metadata?.promotionCodeId===promotionCodeId
         : !session.metadata?.promotionCodeId && session.allow_promotion_codes===true;
+      const matchesCheckout=(session:StripeData)=>matchesPromotion(session) && session.success_url===successUrl && session.cancel_url===cancelUrl;
       if(account.checkoutSessionId) {
         const previous=await stripeRequest(`checkout/sessions/${encodeURIComponent(account.checkoutSessionId)}`);
         if(previous.status==="open" && previous.expires_at*1000>Date.now() && previous.url) {
-          if(matchesPromotion(previous)) return {url:previous.url};
+          if(matchesCheckout(previous)) return {url:previous.url};
           await stripeRequest(`checkout/sessions/${encodeURIComponent(previous.id??account.checkoutSessionId)}/expire`,{});
         }
         if(previous.status==="complete" && stripeId(previous.subscription)) {
@@ -74,9 +77,9 @@ export const createCheckout = action({
       const openSessions=await stripeRequest(`checkout/sessions?customer=${encodeURIComponent(customerId!)}&status=open&limit=100`);
       const ownedSessions=(openSessions.data??[]).filter((session:StripeData)=>session.client_reference_id===account._id && session.mode==="subscription" && session.expires_at*1000>Date.now() && session.url);
       for(const session of ownedSessions) {
-        if(!matchesPromotion(session)) await stripeRequest(`checkout/sessions/${encodeURIComponent(session.id)}/expire`,{});
+        if(!matchesCheckout(session)) await stripeRequest(`checkout/sessions/${encodeURIComponent(session.id)}/expire`,{});
       }
-      const openSession=ownedSessions.find(matchesPromotion);
+      const openSession=ownedSessions.find(matchesCheckout);
       if(openSession) {
         await ctx.runMutation(internal.billing.finishCheckout,{accountId:account._id,attempt,sessionId:openSession.id,expiresAt:openSession.expires_at*1000});
         return {url:openSession.url};
@@ -86,10 +89,10 @@ export const createCheckout = action({
       const session=await stripeRequest("checkout/sessions",{
         mode:"subscription",customer:customerId!,client_reference_id:account._id,locale:"pt-BR",
         ...(promotionCodeId?{"discounts[0][promotion_code]":promotionCodeId,"metadata[promotionCodeId]":promotionCodeId}:{allow_promotion_codes:"true"}),
-        "line_items[0][price]":config.priceId,"line_items[0][quantity]":"1","payment_method_types[0]":"card",
+        "line_items[0][price]":config.priceId,"line_items[0][quantity]":"1","allowed_payment_method_types[0]":"card",
         "metadata[billingAccountId]":account._id,"subscription_data[metadata][billingAccountId]":account._id,
-        success_url:`${config.appUrl}/assinatura?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url:`${config.appUrl}/assinatura?checkout=cancelled`
+        success_url:successUrl,
+        cancel_url:cancelUrl
       },`checkout:${account._id}:${attempt}`);
       if(!session.url) throw new Error("Missing checkout URL");
       await ctx.runMutation(internal.billing.finishCheckout,{accountId:account._id,attempt,sessionId:session.id,expiresAt:session.expires_at*1000});

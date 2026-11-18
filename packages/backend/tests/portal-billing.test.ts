@@ -12,6 +12,7 @@ import { billingConfiguration, stripeRequest, subscriptionSnapshot, validPortalP
 
 const handler = (fn: unknown) => (fn as {_handler:(ctx:any,args:any)=>Promise<any>})._handler;
 const future = Date.now() + 86400000;
+const checkoutReturnUrls = {success_url:"https://admin.example.com/assinatura?checkout=success&session_id={CHECKOUT_SESSION_ID}",cancel_url:"https://admin.example.com/assinatura?checkout=cancelled"};
 const account = () => ({_id:"billing_1",ownerClerkUserId:"owner",gymId:"gym_1",stripeCustomerId:"cus_test",stripeSubscriptionId:"sub_test",checkoutAttempt:0,status:"active",priceId:"price_monthly",paidThrough:future,currentPeriodEnd:future,cancelAtPeriodEnd:false,stripeSyncedAt:0,lastEventCreated:0,createdAt:0,updatedAt:0});
 function context({newUser=false, subject="owner"}={}) {
   const tables:Record<string,any[]> = {
@@ -157,12 +158,14 @@ test("checkout uses server price and reuses an open session",async()=>{
     if(path.startsWith("checkout/sessions?"))return {data:[]};
     if(path.startsWith("prices/"))return price;
     if(path==="checkout/sessions") {creates.push(Object.fromEntries(body));return {id:"cs_existing",url:"https://checkout.stripe.com/test",expires_at:future/1000};}
-    if(path==="checkout/sessions/cs_existing")return {status:"open",allow_promotion_codes:true,url:"https://checkout.stripe.com/test",expires_at:future/1000};
+    if(path==="checkout/sessions/cs_existing")return {...checkoutReturnUrls,status:"open",allow_promotion_codes:true,url:"https://checkout.stripe.com/test",expires_at:future/1000};
     throw new Error(`Unexpected Stripe request ${path}`);
   },async()=>{
     assert.equal((await handler(stripe.createCheckout)(ctx,{})).url,"https://checkout.stripe.com/test");
     assert.equal((await handler(stripe.createCheckout)(ctx,{})).url,"https://checkout.stripe.com/test");
     assert.equal(creates.length,1);assert.equal(creates[0]["line_items[0][price]"],"price_monthly");
+    assert.equal(creates[0]["allowed_payment_method_types[0]"],"card");
+    assert.equal(creates[0]["payment_method_types[0]"],undefined);
     assert.equal(creates[0].allow_promotion_codes,"true");
     assert.equal(creates[0]["discounts[0][promotion_code]"],undefined);
     assert.match(creates[0].success_url,/\/assinatura\?checkout=success/);
@@ -206,7 +209,7 @@ test("an interrupted checkout request recovers its existing Stripe session",asyn
   const ctx=context();const row=ctx.tables.billingAccounts[0];row.status="pending";delete row.stripeSubscriptionId;
   await withStripe(path=>{
     if(path.startsWith("subscriptions?"))return {data:[]};
-    if(path.startsWith("checkout/sessions?"))return {data:[{id:"cs_recovered",allow_promotion_codes:true,client_reference_id:"billing_1",mode:"subscription",expires_at:future/1000,url:"https://checkout.stripe.com/recovered"}]};
+    if(path.startsWith("checkout/sessions?"))return {data:[{...checkoutReturnUrls,id:"cs_recovered",allow_promotion_codes:true,client_reference_id:"billing_1",mode:"subscription",expires_at:future/1000,url:"https://checkout.stripe.com/recovered"}]};
     throw new Error("Must reuse checkout, without creating another");
   },async()=>{
     assert.equal((await handler(stripe.createCheckout)(ctx,{})).url,"https://checkout.stripe.com/recovered");
@@ -268,6 +271,8 @@ test("coupon entered in the portal is resolved by Stripe and applied to checkout
   },async()=>{
     await handler(stripe.createCheckout)(ctx,{promotionCode:"  welcome  "});
     const create=requests.find(request=>request.path==="checkout/sessions").body;
+    assert.equal(create["allowed_payment_method_types[0]"],"card");
+    assert.equal(create["payment_method_types[0]"],undefined);
     assert.equal(create["discounts[0][promotion_code]"],"promo_valid");
     assert.equal(create["metadata[promotionCodeId]"],"promo_valid");
     assert.equal(create["line_items[0][price]"],"price_monthly");
@@ -324,5 +329,28 @@ test("Stripe eligibility errors return a coupon-specific message",async()=>{
   await withStripe(()=>null,async()=>{
     globalThis.fetch=async()=>Response.json({error:{code:"coupon_expired",param:"discounts[0][promotion_code]"}},{status:400});
     await assert.rejects(stripeRequest("checkout/sessions",{"discounts[0][promotion_code]":"promo_expired"}),(error:any)=>error.data?.code==="STRIPE_COUPON_REJECTED");
+  });
+});
+
+
+test("changing APP_URL replaces an open checkout that returns to the old domain",async()=>{
+  const ctx=context();const row=ctx.tables.billingAccounts[0];row.status="pending";delete row.stripeSubscriptionId;
+  row.checkoutSessionId="cs_old_origin";let expired=false;
+  await withStripe((path,body)=>{
+    if(path==="checkout/sessions/cs_old_origin")return {...checkoutReturnUrls,id:"cs_old_origin",status:"open",allow_promotion_codes:true,url:"https://checkout.stripe.com/old",expires_at:future/1000};
+    if(path==="checkout/sessions/cs_old_origin/expire"){expired=true;return {status:"expired"};}
+    if(path.startsWith("subscriptions?") || path.startsWith("checkout/sessions?"))return {data:[]};
+    if(path.startsWith("prices/"))return price;
+    if(path==="checkout/sessions") {
+      assert.equal(expired,true);
+      assert.equal(body.get("success_url"),"http://localhost:3000/assinatura?checkout=success&session_id={CHECKOUT_SESSION_ID}");
+      assert.equal(body.get("cancel_url"),"http://localhost:3000/assinatura?checkout=cancelled");
+      return {id:"cs_local",url:"https://checkout.stripe.com/local",expires_at:future/1000};
+    }
+    throw new Error(`Unexpected request ${path}`);
+  },async()=>{
+    process.env.APP_URL="http://localhost:3000";
+    assert.equal((await handler(stripe.createCheckout)(ctx,{})).url,"https://checkout.stripe.com/local");
+    assert.equal(row.checkoutSessionId,"cs_local");
   });
 });

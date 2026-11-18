@@ -343,10 +343,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .monthly-presence-students { align-self:flex-start; margin:0; padding:6px 10px; border:1px solid var(--border); border-radius:6px; background:white; font-size:12px; }
 .monthly-presence small { color:var(--muted); font-size:11px; line-height:1.5; }
 
-.subscription-screen { min-height:100vh; padding:32px; background:var(--paper,#f8f7f5); }
-.subscription-header { max-width:1100px; margin:0 auto 48px; display:flex; align-items:center; justify-content:space-between; gap:24px; }
-.subscription-header img { width:220px; max-width:60vw; height:auto; }
-.subscription-checkout { max-width:520px; margin:0 auto 40px; padding:36px; gap:24px; box-shadow:0 8px 32px #09090b08; }
+.subscription-form-side { min-width:0; }
+.subscription-checkout { width:min(100%,560px); margin:0; padding:36px 44px; gap:20px; border-radius:14px; box-shadow:0 4px 20px rgba(0,0,0,.06); }
+.subscription-card-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; }
 .subscription-eyebrow { font-size:11px; font-weight:700; letter-spacing:.1em; color:var(--muted); }
 .subscription-checkout h1 { margin:0; font-size:30px; line-height:1.2; letter-spacing:-.04em; }
 .subscription-checkout p { margin:0; line-height:1.6; color:var(--muted); font-size:14px; }
@@ -359,7 +358,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .subscription-badge.active { background:#dcfce7; color:#166534; }
 .subscription-footnote { color:var(--muted); font-size:12px!important; line-height:1.6; }
 .subscription-error { color:#b91c1c!important; font-size:13px; }
-@media(max-width:560px) { .subscription-screen { padding:20px 16px; }.subscription-header { margin-bottom:32px; }.subscription-checkout { padding:24px; }.subscription-checkout h1 { font-size:26px; } }
+@media(max-width:560px) { .subscription-checkout { padding:24px; }.subscription-checkout h1 { font-size:26px; } }
 
 .subscription-coupon { display:flex; flex-direction:column; gap:8px; }
 .subscription-coupon>span { font-size:14px; font-weight:600; }
