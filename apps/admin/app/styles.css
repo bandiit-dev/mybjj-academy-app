@@ -2263,6 +2263,7 @@ select:focus-visible {
   cursor: pointer;
 }
 .portal-image {
+  position: relative;
   overflow: hidden;
 }
 .portal-image img {

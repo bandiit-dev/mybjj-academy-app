@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState, type ReactNode } from "react";
 
 export function PortalImage({
@@ -22,7 +23,14 @@ export function PortalImage({
       className={`${className} portal-image${contain ? " portal-image-contain" : ""}`}
     >
       {src && !failed ? (
-        <img src={src} alt={alt} onError={() => setFailed(true)} />
+        <Image
+          src={src}
+          alt={alt}
+          fill
+          sizes="128px"
+          unoptimized
+          onError={() => setFailed(true)}
+        />
       ) : (
         fallback
       )}

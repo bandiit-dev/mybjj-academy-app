@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useId, useRef, useState } from "react";
 import { validateImageFile } from "@/lib/image-uploads";
 
@@ -35,10 +36,13 @@ export function ImageFileField({
       <label htmlFor={id}>{label}</label>
       <input type="hidden" name={name} value={currentUrl} />
       {(preview || currentUrl) && (
-        <img
+        <Image
           className="image-file-preview"
           src={preview || currentUrl}
           alt={`Prévia: ${label}`}
+          width={104}
+          height={104}
+          unoptimized
         />
       )}
       <input

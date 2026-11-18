@@ -1,9 +1,10 @@
 "use client";
 
+import { api } from "@mybjj/backend/convex/_generated/api";
 import { useQuery } from "convex/react";
 
 export function AdminSummaryCard() {
-  const gyms = useQuery("gyms:getAllGyms" as any);
+  const gyms = useQuery(api.gyms.getAllGyms);
 
   return (
     <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 16 }}>
