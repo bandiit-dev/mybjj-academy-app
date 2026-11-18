@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  icons: {icon: "/images/favicon.ico", shortcut: "/images/favicon.ico"},
   title: "MyBJJAcademy",
   description: "A plataforma completa para gestão da sua academia de jiu-jitsu."
 };

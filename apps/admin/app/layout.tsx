@@ -9,6 +9,7 @@ import "./styles.css";
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 
 export const metadata: Metadata = {
+  icons: {icon: "/images/favicon.ico", shortcut: "/images/favicon.ico"},
   title: "MyBJJAcademy Admin",
   description: "Admin portal base scaffold"
 };

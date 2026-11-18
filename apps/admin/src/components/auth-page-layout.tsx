@@ -38,7 +38,7 @@ export function AuthPageLayout({children, formSideClassName = ""}: {children: Re
           </blockquote>
         </div>
       </section>
-      <section className={`login-form-side ${formSideClassName}`}>
+      <section className={`login-form-side bjj-pattern-background ${formSideClassName}`}>
         {children}
       </section>
     </main>

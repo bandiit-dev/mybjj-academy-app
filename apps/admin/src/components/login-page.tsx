@@ -21,6 +21,7 @@ export function LoginPage() {
               rootBox: "clerk-login-root",
               cardBox: "clerk-login-box",
               card: "clerk-login-card",
+              header: "clerk-hidden",
               logoBox: "clerk-hidden",
               headerTitle: "clerk-hidden",
               headerSubtitle: "clerk-hidden",
