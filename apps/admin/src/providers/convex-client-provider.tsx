@@ -1,5 +1,6 @@
 "use client";
 
+import { usePortalSubscription } from "@/hooks/use-portal-subscription";
 import { LoginPage } from "@/components/login-page";
 import { api } from "@mybjj/backend/convex/_generated/api";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
@@ -19,13 +20,8 @@ function AdminAccessGate({ children }: { children: React.ReactNode }) {
   const [timedOut, setTimedOut] = useState(false);
   const onboarding = useQuery(api.onboarding.getOnboardingStatus, isAuthenticated ? {} : "skip");
 
-  const [refreshKey, setRefreshKey] = useState(0);
-  useEffect(() => {
-    const timer = window.setInterval(() => setRefreshKey(value => value + 1), 30000);
-    return () => window.clearInterval(timer);
-  }, []);
   const needsBilling = isAuthenticated && (onboarding?.status === "needs_academy" || (onboarding?.status === "ready" && onboarding.isAdmin));
-  const billing = useQuery(api.billing.getStatus, needsBilling ? {refreshKey} : "skip");
+  const billing = usePortalSubscription({enabled:needsBilling});
 
   useEffect(() => {
     if (!clerk.isLoaded || (clerk.isSignedIn && (isLoading || !isAuthenticated))) {
