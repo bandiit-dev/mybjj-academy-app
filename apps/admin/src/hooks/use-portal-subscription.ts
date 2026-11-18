@@ -9,18 +9,27 @@ import { useEffect, useRef, useState } from "react";
 
 type BillingStatus = FunctionReturnType<typeof api.billing.getStatus>;
 
-export function usePortalSubscription({enabled = true, gymId}: {enabled?: boolean; gymId?: Id<"gyms">} = {}) {
-  const {userId, sessionId} = useAuth();
-  const {isAuthenticated} = useConvexAuth();
+export function usePortalSubscription({
+  enabled = true,
+  gymId,
+}: { enabled?: boolean; gymId?: Id<"gyms"> } = {}) {
+  const { userId, sessionId } = useAuth();
+  const { isAuthenticated } = useConvexAuth();
   const [refreshKey, setRefreshKey] = useState(0);
-  const previous = useRef<{scope: string; value: BillingStatus} | null>(null);
+  const previous = useRef<{ scope: string; value: BillingStatus } | null>(null);
   const active = enabled && isAuthenticated && Boolean(userId && sessionId);
   const scope = JSON.stringify([userId, sessionId, gymId ?? null]);
-  const result = useQuery(api.billing.getStatus, active ? {gymId, refreshKey} : "skip");
+  const result = useQuery(
+    api.billing.getStatus,
+    active ? { gymId, refreshKey } : "skip",
+  );
 
   useEffect(() => {
     if (!active) return;
-    const timer = window.setInterval(() => setRefreshKey(value => value + 1), 30000);
+    const timer = window.setInterval(
+      () => setRefreshKey((value) => value + 1),
+      30000,
+    );
     return () => window.clearInterval(timer);
   }, [active]);
 
@@ -32,7 +41,7 @@ export function usePortalSubscription({enabled = true, gymId}: {enabled?: boolea
     return undefined;
   }
   if (result !== undefined) {
-    previous.current = {scope, value: result};
+    previous.current = { scope, value: result };
     return result;
   }
   return previous.current?.scope === scope ? previous.current.value : undefined;

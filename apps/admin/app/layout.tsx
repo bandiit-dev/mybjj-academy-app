@@ -9,14 +9,26 @@ import "./styles.css";
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 
 export const metadata: Metadata = {
-  icons: {icon: "/images/favicon.ico", shortcut: "/images/favicon.ico"},
+  icons: { icon: "/images/favicon.ico", shortcut: "/images/favicon.ico" },
   title: "MyBJJAcademy Admin",
-  description: "Admin portal base scaffold"
+  description: "Admin portal base scaffold",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <ClerkProvider localization={ptBR} signInUrl="/" signUpUrl="/" signInFallbackRedirectUrl="/" signInForceRedirectUrl="/" signUpFallbackRedirectUrl="/" signUpForceRedirectUrl="/">
+    <ClerkProvider
+      localization={ptBR}
+      signInUrl="/"
+      signUpUrl="/"
+      signInFallbackRedirectUrl="/"
+      signInForceRedirectUrl="/"
+      signUpFallbackRedirectUrl="/"
+      signUpForceRedirectUrl="/"
+    >
       <html lang="pt-BR">
         <body className={geist.variable}>
           <ConvexClientProvider>{children}</ConvexClientProvider>

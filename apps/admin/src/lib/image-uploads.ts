@@ -6,17 +6,26 @@ import { api } from "@mybjj/backend/convex/_generated/api";
 import { MAX_IMAGE_BYTES } from "@mybjj/backend/convex/lib/imageValidation";
 
 export function validateImageFile(file: File): string | null {
-  if (!/\.(jpe?g|png)$/i.test(file.name) || (file.type && !["image/jpeg", "image/png"].includes(file.type))) {
+  if (
+    !/\.(jpe?g|png)$/i.test(file.name) ||
+    (file.type && !["image/jpeg", "image/png"].includes(file.type))
+  ) {
     return "Selecione uma imagem JPG ou PNG.";
   }
-  if (!file.size || file.size > MAX_IMAGE_BYTES) return "A imagem deve ter até 2 MB.";
+  if (!file.size || file.size > MAX_IMAGE_BYTES)
+    return "A imagem deve ter até 2 MB.";
   return null;
 }
 
 function readBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Não foi possível ler a imagem. Selecione o arquivo novamente."));
+    reader.onerror = () =>
+      reject(
+        new Error(
+          "Não foi possível ler a imagem. Selecione o arquivo novamente.",
+        ),
+      );
     reader.onload = () => resolve(String(reader.result).split(",")[1]);
     reader.readAsDataURL(file);
   });
@@ -27,19 +36,25 @@ export function useImageUpload() {
   const cache = useRef(new Map<File, Promise<string>>());
   return async (data: FormData, name: string): Promise<string> => {
     const file = data.get(`${name}File`);
-    if (!(file instanceof File) || !file.size) return String(data.get(name) ?? "");
+    if (!(file instanceof File) || !file.size)
+      return String(data.get(name) ?? "");
     const error = validateImageFile(file);
     if (error) throw new Error(error);
     let result = cache.current.get(file);
     if (!result) {
       result = (async () => {
         const base64 = await readBase64(file);
-        const contentType = file.type || (/\.png$/i.test(file.name) ? "image/png" : "image/jpeg");
-        return (await upload({base64, contentType, fileName: file.name})).url;
+        const contentType =
+          file.type || (/\.png$/i.test(file.name) ? "image/png" : "image/jpeg");
+        return (await upload({ base64, contentType, fileName: file.name })).url;
       })();
       cache.current.set(file, result);
     }
-    try { return await result; }
-    catch (cause) { cache.current.delete(file); throw cause; }
+    try {
+      return await result;
+    } catch (cause) {
+      cache.current.delete(file);
+      throw cause;
+    }
   };
 }

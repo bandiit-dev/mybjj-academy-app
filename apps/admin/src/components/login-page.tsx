@@ -9,7 +9,10 @@ export function LoginPage() {
       <div className="login-card">
         <div className="login-card-heading">
           <h2>Entrar</h2>
-          <p>Entre com seu e-mail. Se ainda não tem conta, você poderá criar uma e depois assinar um plano.</p>
+          <p>
+            Entre com seu e-mail. Se ainda não tem conta, você poderá criar uma
+            e depois assinar um plano.
+          </p>
         </div>
         <SignIn
           routing="hash"

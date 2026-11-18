@@ -8,7 +8,13 @@ const features = [
   ["▣", "Aulas e agenda", "Crie aulas, defina horários e capacidade."],
 ];
 
-export function AuthPageLayout({children, formSideClassName = ""}: {children: ReactNode; formSideClassName?: string}) {
+export function AuthPageLayout({
+  children,
+  formSideClassName = "",
+}: {
+  children: ReactNode;
+  formSideClassName?: string;
+}) {
   return (
     <main className="login-page">
       <section className="login-presentation">
@@ -38,7 +44,9 @@ export function AuthPageLayout({children, formSideClassName = ""}: {children: Re
           </blockquote>
         </div>
       </section>
-      <section className={`login-form-side bjj-pattern-background ${formSideClassName}`}>
+      <section
+        className={`login-form-side bjj-pattern-background ${formSideClassName}`}
+      >
         {children}
       </section>
     </main>
