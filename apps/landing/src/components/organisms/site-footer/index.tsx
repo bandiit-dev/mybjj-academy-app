@@ -45,9 +45,7 @@ export function SiteFooter() {
           />
           <div className="flex flex-wrap gap-x-7 gap-y-2 text-sm">
             <Link href="/politica-de-privacidade">Política de Privacidade</Link>
-            <a href={`${contactUrl}?subject=Termos%20e%20Condi%C3%A7%C3%B5es`}>
-              Termos e Condições
-            </a>
+            <Link href="/termos-de-uso">Termos de Uso</Link>
           </div>
           <p className="text-xs sm:text-right">
             © 2026 MYBJJ ACADEMY. Todos os direitos reservados.
