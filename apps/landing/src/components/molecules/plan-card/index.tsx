@@ -1,28 +1,46 @@
 import { ActionLink } from "@/components/atoms/action-link";
 import { DesignImage } from "@/components/atoms/design-image";
 
-const benefits = [
-  "Controle de alunos e presença",
-  "Gestão de aulas e professores",
-  "Controle de unidades",
-  "Suporte dedicado",
-];
+export type Plan = {
+  name: string;
+  monthlyPrice?: string;
+  benefits: readonly string[];
+  actionLabel: string;
+  href?: string;
+  featured?: boolean;
+};
 
-export function PlanCard() {
+export function PlanCard({ plan }: { plan: Plan }) {
   return (
     <article
-      aria-label="Plano mensal"
-      className="relative z-10 flex min-h-[394px] w-full max-w-[326px] flex-col rounded-[15px] border border-[#9d9d9d] bg-white px-7 py-7"
+      aria-label={plan.name}
+      className={`relative flex min-h-[394px] w-full max-w-[326px] min-w-0 flex-col rounded-[15px] border bg-white px-7 py-7 ${plan.featured ? "border-black" : "border-[#9d9d9d]"}`}
     >
-      <p className="text-xs text-[#515151]">Comece agora por apenas:</p>
-      <p className="mt-2 whitespace-nowrap font-semibold">
-        <span className="text-[clamp(2rem,10vw,3rem)] leading-tight">
-          R$39,90
-        </span>{" "}
-        <span className="text-[28px] text-[#515151]">/ mês</span>
+      {plan.featured && (
+        <span className="absolute -top-4 left-1/2 flex h-[30px] w-[150px] -translate-x-1/2 items-center justify-center rounded-lg bg-black text-xs font-semibold text-white uppercase">
+          Mais indicado!
+        </span>
+      )}
+      <h3 className="text-[10px] font-semibold text-[#515151] uppercase">
+        {plan.name}
+      </h3>
+      <p className="mt-3 whitespace-nowrap text-[clamp(2.25rem,4vw,3rem)] leading-tight font-semibold">
+        {plan.monthlyPrice ? (
+          <>
+            <span className="text-[clamp(1.25rem,2.5vw,1.875rem)] font-normal">
+              R$
+            </span>{" "}
+            {plan.monthlyPrice}{" "}
+            <span className="text-[clamp(1rem,2vw,1.75rem)] text-[#515151]">
+              / mês
+            </span>
+          </>
+        ) : (
+          "Grátis"
+        )}
       </p>
-      <ul className="mt-8 space-y-4 text-base leading-[1.35] sm:-mr-4 sm:text-lg sm:leading-[1.2]">
-        {benefits.map((benefit) => (
+      <ul className="mt-8 mb-6 space-y-5 text-sm leading-[1.3]">
+        {plan.benefits.map((benefit) => (
           <li key={benefit} className="flex items-center gap-2.5">
             <DesignImage
               asset="9a136.svg"
@@ -34,7 +52,13 @@ export function PlanCard() {
           </li>
         ))}
       </ul>
-      <ActionLink className="mt-auto w-full">Começar agora</ActionLink>
+      <ActionLink
+        href={plan.href}
+        subtle={!plan.featured}
+        className="mt-auto w-full font-semibold"
+      >
+        {plan.actionLabel}
+      </ActionLink>
     </article>
   );
 }
