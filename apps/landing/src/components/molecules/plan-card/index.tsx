@@ -17,7 +17,7 @@ export function PlanCard() {
       <p className="text-xs text-[#515151]">Comece agora por apenas:</p>
       <p className="mt-2 whitespace-nowrap font-semibold">
         <span className="text-[clamp(2rem,10vw,3rem)] leading-tight">
-          R$49,90
+          R$39,90
         </span>{" "}
         <span className="text-[28px] text-[#515151]">/ mês</span>
       </p>

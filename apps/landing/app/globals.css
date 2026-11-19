@@ -6,7 +6,7 @@
 
 @layer base {
   body {
-    @apply bg-white font-sans text-black;
+    @apply bg-white font-sans text-black antialiased;
   }
 
   :focus-visible {
