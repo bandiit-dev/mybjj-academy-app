@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { BrandLogo } from "@/components/atoms/brand-logo";
 import { DesignImage } from "@/components/atoms/design-image";
 
@@ -43,9 +44,7 @@ export function SiteFooter() {
             alt="Instagram"
           />
           <div className="flex flex-wrap gap-x-7 gap-y-2 text-sm">
-            <a href={`${contactUrl}?subject=Pol%C3%ADtica%20de%20Privacidade`}>
-              Política de Privacidade
-            </a>
+            <Link href="/politica-de-privacidade">Política de Privacidade</Link>
             <a href={`${contactUrl}?subject=Termos%20e%20Condi%C3%A7%C3%B5es`}>
               Termos e Condições
             </a>

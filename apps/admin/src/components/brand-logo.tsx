@@ -5,7 +5,7 @@ export function BrandLogo({ className = "" }: { className?: string }) {
     <Image
       className={`brand-logo ${className}`}
       src="/brand/mybjj-academy-logo.png"
-      alt="MyBJJ Academy"
+      alt="My BJJ Academy"
       width={2172}
       height={724}
       priority

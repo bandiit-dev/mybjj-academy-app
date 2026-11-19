@@ -1,8 +1,15 @@
+import Link from "next/link";
 import { DesignImage } from "../design-image";
 
-export function BrandLogo({ footer = false }: { footer?: boolean }) {
+export function BrandLogo({
+  footer = false,
+  href = "#inicio",
+}: {
+  footer?: boolean;
+  href?: string;
+}) {
   return (
-    <a href="#inicio" aria-label="MyBJJ Academy — início">
+    <Link href={href} aria-label="MyBJJ Academy — início">
       <DesignImage
         asset="d98b8.png"
         alt="MyBJJ Academy"
@@ -10,6 +17,6 @@ export function BrandLogo({ footer = false }: { footer?: boolean }) {
         height={footer ? 45 : 34}
         className="h-auto"
       />
-    </a>
+    </Link>
   );
 }

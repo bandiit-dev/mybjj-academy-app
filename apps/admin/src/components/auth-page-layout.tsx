@@ -23,7 +23,7 @@ export function AuthPageLayout({
           <h1>
             <span>Bem-vindo</span> ao
             <br />
-            MyBJJ Academy!
+            My BJJ Academy!
           </h1>
           <p>A plataforma completa para gestão da sua academia de jiu-jitsu.</p>
           <div className="login-features">

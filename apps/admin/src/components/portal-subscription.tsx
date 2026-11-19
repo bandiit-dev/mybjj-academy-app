@@ -97,8 +97,8 @@ export function SubscriptionPage() {
         </div>
         <h1>Sua academia, organizada.</h1>
         <p>
-          Ative sua assinatura para gerenciar alunos, professores e aulas no
-          MyBJJ Academy.
+          Ative sua assinatura para gerenciar alunos, professores e aulas no My
+          BJJ Academy.
         </p>
         <div className="subscription-price">
           R$ 39,90 <span>/ mês por academia</span>
@@ -212,7 +212,7 @@ export function AcademySubscriptionTile({ gymId }: { gymId: Id<"gyms"> }) {
           <div className="academy-fields">
             <div className="academy-field">
               <span>Plano</span>
-              <strong>MyBJJ Academy · Mensal</strong>
+              <strong>My BJJ Academy · Mensal</strong>
             </div>
             <div className="academy-field">
               <span>Valor</span>
