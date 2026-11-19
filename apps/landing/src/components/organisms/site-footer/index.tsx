@@ -21,14 +21,14 @@ export function SiteFooter() {
             aria-label="Navegação do rodapé"
             className="flex flex-wrap gap-x-6 gap-y-[18px] text-lg leading-tight md:mt-8 md:flex-col md:items-start"
           >
-            <a href="#recursos">Recursos</a>
-            <a href="#planos">Planos</a>
-            <a href="#sobre">Sobre</a>
+            <Link href="/#recursos">Recursos</Link>
+            <Link href="/#planos">Planos</Link>
+            <Link href="/#sobre">Sobre</Link>
             <a href={contactUrl}>Contato</a>
           </nav>
         </div>
         <div className="mt-10 flex lg:mt-[47px]">
-          <BrandLogo footer />
+          <BrandLogo footer href="/#inicio" />
         </div>
         <DesignImage
           asset="2d02d.svg"

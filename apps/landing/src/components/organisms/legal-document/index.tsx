@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
-import { BrandLogo } from "@/components/atoms/brand-logo";
+import { RevealScope } from "@/components/atoms/reveal-scope";
+import { SiteFooter } from "../site-footer";
+import { SiteHeader } from "../site-header";
 
 export type LegalSection = {
   id: string;
@@ -18,15 +19,9 @@ export function LegalDocument({
   sections: LegalSection[];
 }) {
   return (
-    <div className="mx-auto max-w-4xl px-5 sm:px-8">
-      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-neutral-200 py-6">
-        <BrandLogo href="/#inicio" />
-        <Link href="/" className="text-sm underline underline-offset-4">
-          Voltar ao início
-        </Link>
-      </header>
-
-      <main className="py-12 sm:py-16">
+    <RevealScope className="mx-[10px] my-[12px]">
+      <SiteHeader />
+      <main className="mx-auto max-w-4xl px-5 pt-12 sm:px-8 sm:pt-16">
         <h1 className="text-4xl leading-tight font-semibold sm:text-5xl">
           {title}
         </h1>
@@ -66,6 +61,7 @@ export function LegalDocument({
           ))}
         </div>
       </main>
-    </div>
+      <SiteFooter />
+    </RevealScope>
   );
 }

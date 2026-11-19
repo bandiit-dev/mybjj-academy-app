@@ -179,7 +179,7 @@ const sections: LegalSection[] = [
     ),
   },
   {
-    id: "contato",
+    id: "contato-e-suporte",
     title: "Contato",
     content: (
       <address className="not-italic">
