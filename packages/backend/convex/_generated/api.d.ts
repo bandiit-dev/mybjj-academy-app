@@ -27,6 +27,7 @@ import type * as provisioning from "../provisioning.js";
 import type * as seeds from "../seeds.js";
 import type * as stripe from "../stripe.js";
 import type * as studentPlans from "../studentPlans.js";
+import type * as studentPortal from "../studentPortal.js";
 import type * as students from "../students.js";
 import type * as teachers from "../teachers.js";
 import type * as teams from "../teams.js";
@@ -58,6 +59,7 @@ declare const fullApi: ApiFromModules<{
   seeds: typeof seeds;
   stripe: typeof stripe;
   studentPlans: typeof studentPlans;
+  studentPortal: typeof studentPortal;
   students: typeof students;
   teachers: typeof teachers;
   teams: typeof teams;

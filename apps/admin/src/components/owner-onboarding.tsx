@@ -7,7 +7,7 @@ import {
 } from "@mybjj/backend/convex/lib/validators";
 import { api } from "@mybjj/backend/convex/_generated/api";
 import { SignOutButton, useUser } from "@clerk/nextjs";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { FormEvent, useState } from "react";
 import { BrandLogo } from "@/components/brand-logo";
 
@@ -23,7 +23,7 @@ function friendlyError(error: unknown) {
 export function OwnerOnboarding() {
   const { user } = useUser();
   const status = useQuery(api.onboarding.getOnboardingStatus);
-  const linkProfile = useMutation(api.onboarding.linkExistingProfile);
+  const linkProfile = useAction(api.onboarding.resolvePortalAccount);
   const bootstrap = useMutation(api.onboarding.bootstrapAcademyAdmin);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +33,9 @@ export function OwnerOnboarding() {
     setBusy(true);
     setError(null);
     try {
-      await linkProfile({});
+      const result = await linkProfile({});
+      if (result.status !== "linked")
+        throw new Error("No profile matches the verified email");
     } catch (cause) {
       setError(friendlyError(cause));
     } finally {

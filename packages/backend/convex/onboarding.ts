@@ -1,8 +1,9 @@
 import { hasPaidPortalAccess, subscriptionRequired } from "./lib/portalBilling";
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 import { assertDegree, beltValidator } from "./lib/validators";
 
-import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { action, internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { getAuthUserIdentity, getCurrentStudentByClerkId, getCurrentTeacherByClerkId } from "./lib/auth";
 
 type AuthCtx = Pick<QueryCtx, "auth" | "db"> | Pick<MutationCtx, "auth" | "db">;
@@ -17,6 +18,64 @@ async function findProfilesByEmail(ctx: AuthCtx, email: string | undefined) {
   ]);
   return { teacher, student };
 }
+
+async function linkVerifiedProfile(ctx: MutationCtx, subject: string, email: string) {
+  const [currentTeacher, currentStudent] = await Promise.all([
+    getCurrentTeacherByClerkId(ctx, subject),
+    getCurrentStudentByClerkId(ctx, subject),
+  ]);
+  if (currentTeacher || currentStudent) return { status: "linked" as const };
+
+  const { teacher, student } = await findProfilesByEmail(ctx, email);
+  if (teacher && student) throw new Error("Multiple profiles use this email; contact support");
+  const profile = teacher ?? student;
+  if (!profile) return { status: "needs_academy" as const };
+  if (!profile.clerkUserId?.startsWith("invitation:")) {
+    throw new Error("This profile is already linked to a different account");
+  }
+
+  await ctx.db.patch(profile._id, { clerkUserId: subject, updatedAt: Date.now() });
+  return { status: "linked" as const };
+}
+
+export const resolveVerifiedProfile = internalMutation({
+  args: { email: v.string() },
+  handler: async (ctx, { email }) => {
+    const { subject } = await getAuthUserIdentity(ctx);
+    return linkVerifiedProfile(ctx, subject, email);
+  },
+});
+
+export const resolvePortalAccount = action({
+  args: {},
+  handler: async (ctx): Promise<{ status: "linked" | "needs_academy" }> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.subject) throw new Error("Unauthorized");
+
+    let email = identity.emailVerified === true ? identity.email : undefined;
+    if (!email?.trim()) {
+      const secret = process.env.CLERK_SECRET_KEY;
+      if (!secret) throw new Error("Clerk account lookup is not configured");
+      const response = await fetch(`https://api.clerk.com/v1/users/${encodeURIComponent(identity.subject)}`, {
+        headers: { Authorization: `Bearer ${secret}` },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) throw new Error("Could not verify the signed-in Clerk account");
+      const user = await response.json() as {
+        id: string;
+        primary_email_address_id?: string;
+        email_addresses?: Array<{ id: string; email_address: string; verification?: { status: string } }>;
+      };
+      email = user.id === identity.subject
+        ? user.email_addresses?.find(address => address.id === user.primary_email_address_id &&
+          address.verification?.status === "verified")?.email_address
+        : undefined;
+    }
+    if (!email?.trim()) throw new Error("A verified primary email is required");
+
+    return ctx.runMutation(internal.onboarding.resolveVerifiedProfile, { email });
+  },
+});
 
 export const getOnboardingStatus = query({
   args: {},
@@ -39,7 +98,7 @@ export const getOnboardingStatus = query({
     }
 
     const email = typeof identity.email === "string" ? identity.email : undefined;
-    const candidates = await findProfilesByEmail(ctx, email);
+    const candidates = await findProfilesByEmail(ctx, identity.emailVerified === true ? email : undefined);
     const candidate = candidates.teacher ?? candidates.student;
 
     if (candidate) {
@@ -65,19 +124,11 @@ export const linkExistingProfile = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity?.subject) throw new Error("Unauthorized");
 
-    const [currentTeacher, currentStudent] = await Promise.all([
-      getCurrentTeacherByClerkId(ctx, identity.subject),
-      getCurrentStudentByClerkId(ctx, identity.subject)
-    ]);
-    if (currentTeacher || currentStudent) return { linked: true };
-
-    const email = typeof identity.email === "string" ? identity.email : undefined;
-    const { teacher, student } = await findProfilesByEmail(ctx, email);
-    if (teacher && student) throw new Error("Multiple profiles use this email; contact support");
-    const profile = teacher ?? student;
-    if (!profile) throw new Error("No profile matches the verified Clerk email");
-
-    await ctx.db.patch(profile._id, { clerkUserId: identity.subject, updatedAt: Date.now() });
+    if (identity.emailVerified !== true || !identity.email?.trim()) {
+      throw new Error("No profile matches the verified Clerk email");
+    }
+    const result = await linkVerifiedProfile(ctx, identity.subject, identity.email);
+    if (result.status !== "linked") throw new Error("No profile matches the verified Clerk email");
     return { linked: true };
   }
 });

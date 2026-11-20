@@ -18,6 +18,9 @@ test("the root route is public and serves the portal instead of hosted authentic
 
 for (const path of [
   "/assinatura",
+  "/aluno",
+  "/aluno/aulas",
+  "/aluno/perfil",
   "/alunos",
   "/academia",
   "/onboarding",

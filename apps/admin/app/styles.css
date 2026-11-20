@@ -2723,3 +2723,34 @@ select:focus-visible {
   opacity: 0.2;
   pointer-events: none;
 }
+
+.student-brand {
+  letter-spacing: normal;
+}
+.student-brand span {
+  color: #22c55e;
+}
+.student-sidebar-profile {
+  color: white;
+  text-decoration: none;
+}
+.student-sidebar-profile .student-sidebar-avatar {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  background: #27272a;
+  font-size: 12px;
+  font-weight: 600;
+}
+.student-sidebar-profile strong,
+.student-sidebar-profile small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nav-list a[href="/aluno"].active {
+  font-weight: 600;
+}

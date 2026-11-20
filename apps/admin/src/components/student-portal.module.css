@@ -1,0 +1,449 @@
+.content {
+  --student-ink: #101013;
+  --student-neutral: #f9f8f5;
+  --student-positive: #15803d;
+  display: grid;
+  gap: 24px;
+  padding: 32px;
+  color: var(--student-ink);
+}
+
+.content :is(h2, h3, p) {
+  margin: 0;
+}
+
+.content p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.welcome {
+  display: grid;
+  gap: 4px;
+  min-height: 60px;
+  align-content: start;
+}
+
+.welcome h2 {
+  font-size: 26px;
+  line-height: 38px;
+}
+
+.welcome p {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.card {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: white;
+}
+
+.card h2 {
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.week {
+  min-height: 194px;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 81px;
+  align-content: center;
+}
+
+.weekTotal {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  min-height: 144px;
+}
+
+.weekTotal .eyebrow {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.totalRow {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+}
+
+.totalRow > strong {
+  font-size: 44px;
+  line-height: 1;
+}
+
+.frequency {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.frequency::before {
+  position: absolute;
+  inset-block: 9px;
+  left: -41px;
+  width: 1px;
+  background: var(--border);
+  content: "";
+}
+
+.frequency h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.badge {
+  display: inline-grid;
+  min-height: 26px;
+  place-items: center;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--student-neutral);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.positive {
+  background: #ecfdf3;
+  color: var(--student-positive);
+}
+
+.days,
+.classList {
+  display: grid;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.days {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.days li {
+  display: flex;
+  min-height: 88px;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.days li.today {
+  border-color: var(--border);
+  background: var(--student-neutral);
+}
+
+.days strong {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--student-neutral);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.days strong.attended {
+  background: var(--student-ink);
+  color: white;
+}
+
+.days li > :last-child {
+  font-size: 10px;
+}
+
+.present {
+  color: var(--student-positive);
+}
+
+.details {
+  display: grid;
+  grid-template-columns: minmax(0, 744fr) minmax(0, 368fr);
+  gap: 24px;
+}
+
+.classes {
+  gap: 18px;
+}
+
+.classes > .between {
+  min-height: 48px;
+}
+
+.classes h2 {
+  font-size: 18px;
+}
+
+.classes .classDate {
+  margin-top: 2px;
+}
+.classDate::first-letter {
+  text-transform: uppercase;
+}
+
+.classList {
+  gap: 10px;
+}
+
+.classRow {
+  display: grid;
+  grid-template-columns: 105px minmax(0, 1fr) auto;
+  min-height: 64px;
+  align-items: center;
+  gap: 4px 16px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--student-neutral);
+  font-size: 14px;
+}
+
+.classRow strong {
+  font-weight: 600;
+}
+
+.classRow p {
+  margin-top: 2px;
+  font-size: 11px;
+}
+
+.classTime {
+  font-size: 15px;
+}
+
+.confirmButton {
+  min-width: 154px;
+  min-height: 34px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.confirmedActions {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+
+.cancelConfirmation {
+  min-height: 28px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #52525b;
+  font-size: 11px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.cancelConfirmation:hover {
+  color: var(--student-ink);
+}
+
+.cancelConfirmation:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.classRow .classError {
+  grid-column: 1 / -1;
+  color: #9f1239;
+}
+
+.sideCards {
+  display: grid;
+  align-content: start;
+  gap: 20px;
+}
+
+.graduation {
+  min-height: 226px;
+}
+
+.graduation .belt {
+  display: flex;
+  width: 100%;
+  height: 40px;
+  justify-content: flex-end;
+  overflow: hidden;
+  border-radius: 5px;
+}
+
+.graduation .belt:global(.brown) {
+  background: #79523d;
+}
+
+.rank {
+  display: flex;
+  width: clamp(100px, 32%, 146px);
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  padding: 0 12px;
+  background: var(--student-ink);
+}
+
+.rank span {
+  width: 8px;
+  height: 30px;
+  flex: 0 1 8px;
+  border-radius: 1px;
+  background: white;
+}
+
+.graduation strong {
+  font-size: 20px;
+}
+
+.payments {
+  min-height: 268px;
+  gap: 19px;
+}
+
+.payments strong {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.payments .present {
+  font-size: 12px;
+}
+
+.dueDate {
+  display: grid;
+  gap: 3px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.datePicker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.datePicker input {
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  background: white;
+}
+
+@media (max-width: 1180px) {
+  .week {
+    grid-template-columns: minmax(190px, 28%) minmax(0, 1fr);
+    gap: 40px;
+  }
+
+  .frequency::before {
+    left: -20px;
+  }
+
+  .classRow {
+    grid-template-columns: 70px minmax(0, 1fr) auto;
+    column-gap: 10px;
+  }
+}
+
+@media (max-width: 1040px) {
+  .details {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sideCards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 800px) {
+  .content {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 650px) {
+  .week,
+  .sideCards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .week {
+    gap: 16px;
+  }
+
+  .weekTotal {
+    min-height: auto;
+  }
+
+  .frequency::before {
+    display: none;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .days {
+    gap: 2px;
+  }
+}
+
+@media (max-width: 520px) {
+  .content {
+    padding: 16px;
+  }
+
+  .classRow {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .classRow > :nth-child(3) {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .days li > :last-child {
+    font-size: 8px;
+  }
+
+  .days strong {
+    width: 27px;
+    height: 27px;
+  }
+}

@@ -11,6 +11,7 @@ import {
   getCurrentPrincipal,
   getCurrentStudentByClerkId,
   requireAcademyUnitAdmin,
+  requireAdmin,
   requireStudentOrAdmin
 } from "./lib/auth";
 
@@ -125,7 +126,8 @@ export const updateStudent = mutation({
 export const getStudentById = query({
   args: { studentId: v.id("students") },
   handler: async (ctx, { studentId }) => {
-    const { gymIds } = await getAccessibleGymIds(ctx);
+    const { gymIds, principal } = await getAccessibleGymIds(ctx);
+    if (!principal.isAdmin && principal.student?._id !== studentId) return null;
     const student = await ctx.db.get(studentId);
     return student?.gymIds.some((gymId: Id<"gyms">) => gymIds.has(gymId)) ? withStudentPlan(student) : null;
   }
@@ -134,7 +136,8 @@ export const getStudentById = query({
 export const getAllStudents = query({
   args: {},
   handler: async (ctx) => {
-    const { gymIds } = await getAccessibleGymIds(ctx);
+    const principal = await requireAdmin(ctx);
+    const gymIds = new Set([...(principal.teacher?.gymIds ?? []), ...(principal.student?.gymIds ?? [])]);
     const students = await ctx.db.query("students").collect();
     return students.filter((student) => student.gymIds.some((gymId: Id<"gyms">) => gymIds.has(gymId)))
       .map(student => ({ ...student, plan: getStudentPlan(student) }));

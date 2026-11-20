@@ -4,7 +4,12 @@ import { usePortalSubscription } from "@/hooks/use-portal-subscription";
 import { LoginPage } from "@/components/login-page";
 import { api } from "@mybjj/backend/convex/_generated/api";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
-import { ConvexReactClient, useConvexAuth, useQuery } from "convex/react";
+import {
+  ConvexReactClient,
+  useAction,
+  useConvexAuth,
+  useQuery,
+} from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
@@ -16,7 +21,7 @@ import {
 } from "@/utils/checkout-plan";
 import { BrandLogo } from "@/components/brand-logo";
 
-function AdminAccessGate({ children }: { children: React.ReactNode }) {
+function PortalAccessGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -49,9 +54,51 @@ function AdminAccessGate({ children }: { children: React.ReactNode }) {
     isAuthenticated ? {} : "skip",
   );
 
+  const studentAccount =
+    onboarding?.status === "ready" &&
+    !onboarding.isAdmin &&
+    onboarding.profileType === "student";
+  const studentRoute = pathname === "/aluno" || pathname.startsWith("/aluno/");
+
+  const resolveAccount = useAction(api.onboarding.resolvePortalAccount);
+  const accountKey =
+    isAuthenticated && clerk.userId && clerk.sessionId
+      ? `${clerk.userId}:${clerk.sessionId}`
+      : null;
+  const resolveBeforeBilling =
+    onboarding?.status === "needs_academy" ||
+    (onboarding?.status === "link_required" &&
+      onboarding.profileType === "student");
+  const resolutionKey =
+    accountKey && resolveBeforeBilling
+      ? `${accountKey}:${onboarding.status}`
+      : null;
+  const [resolution, setResolution] = useState<{
+    key: string;
+    status: "linked" | "needs_academy" | "failed";
+  } | null>(null);
+  const resolutionStatus =
+    resolution?.key === resolutionKey ? resolution.status : undefined;
+
+  useEffect(() => {
+    if (!resolutionKey || resolutionStatus) return;
+    let current = true;
+    resolveAccount({})
+      .then(({ status }) => {
+        if (current) setResolution({ key: resolutionKey, status });
+      })
+      .catch(() => {
+        if (current) setResolution({ key: resolutionKey, status: "failed" });
+      });
+    return () => {
+      current = false;
+    };
+  }, [resolutionKey, resolutionStatus, resolveAccount]);
+
   const needsBilling =
     isAuthenticated &&
-    (onboarding?.status === "needs_academy" ||
+    ((onboarding?.status === "needs_academy" &&
+      resolutionStatus === "needs_academy") ||
       (onboarding?.status === "ready" && onboarding.isAdmin));
   const billing = usePortalSubscription({ enabled: needsBilling });
 
@@ -72,8 +119,17 @@ function AdminAccessGate({ children }: { children: React.ReactNode }) {
       router.replace(`/${selection}`);
     if (!isAuthenticated || onboarding === undefined) return;
     if (onboarding.status === "link_required") {
+      if (onboarding.profileType === "student") return;
       if (!pathname.startsWith("/onboarding"))
         router.replace(`/onboarding${selection}`);
+      return;
+    }
+    if (studentAccount) {
+      if (!studentRoute) router.replace("/aluno");
+      return;
+    }
+    if (needsBilling && studentRoute) {
+      router.replace("/");
       return;
     }
     if (!needsBilling || !billing) return;
@@ -97,6 +153,8 @@ function AdminAccessGate({ children }: { children: React.ReactNode }) {
     onboarding,
     billing,
     needsBilling,
+    studentAccount,
+    studentRoute,
     pathname,
     router,
     selection,
@@ -149,6 +207,39 @@ function AdminAccessGate({ children }: { children: React.ReactNode }) {
       </main>
     );
   }
+  if (resolveBeforeBilling && resolutionStatus !== "needs_academy") {
+    return resolutionStatus === "failed" ? (
+      <main className="auth-state">
+        <div className="auth-denied" role="alert">
+          <BrandLogo className="auth-brand-logo" />
+          <h1>Não foi possível verificar sua conta</h1>
+          <p>
+            Confira se você entrou com o e-mail que recebeu o convite da
+            academia.
+          </p>
+          <div className="auth-recovery">
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => window.location.reload()}
+            >
+              Tentar novamente
+            </button>
+            <SignOutButton redirectUrl="/">
+              <button className="button primary" type="button">
+                Sair
+              </button>
+            </SignOutButton>
+          </div>
+        </div>
+      </main>
+    ) : (
+      <main className="auth-state" role="status">
+        <div className="auth-spinner" />
+        <strong>Verificando seu perfil...</strong>
+      </main>
+    );
+  }
   if (onboarding?.status === "link_required") {
     return pathname.startsWith("/onboarding") ? (
       children
@@ -156,6 +247,16 @@ function AdminAccessGate({ children }: { children: React.ReactNode }) {
       <main className="auth-state">
         <div className="auth-spinner" />
         <strong>Preparando seu cadastro...</strong>
+      </main>
+    );
+  }
+  if (studentAccount || (needsBilling && studentRoute)) {
+    return studentAccount && studentRoute ? (
+      children
+    ) : (
+      <main className="auth-state">
+        <div className="auth-spinner" />
+        <strong>Abrindo o painel...</strong>
       </main>
     );
   }
@@ -226,7 +327,7 @@ export function ConvexClientProvider({
           </main>
         }
       >
-        <AdminAccessGate>{children}</AdminAccessGate>
+        <PortalAccessGate>{children}</PortalAccessGate>
       </Suspense>
     </ConvexProviderWithClerk>
   );

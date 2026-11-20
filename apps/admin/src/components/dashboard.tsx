@@ -23,12 +23,31 @@ const navItems = [
   { label: "Unidades", icon: "map-pin.svg", href: "/unidades" },
   { label: "Academia", icon: "shield.svg", href: "/academia" },
 ];
+type StudentSidebarProfile = {
+  name: string;
+  picture: string;
+  beltLabel: string;
+};
+const studentNavItems = [
+  { label: "Visão geral", icon: "layout-grid.svg", href: "/aluno" },
+  { label: "Aulas", icon: "book-open.svg", href: "/aluno/aulas" },
+  { label: "Meu Perfil", icon: "settings.svg", href: "/aluno/perfil" },
+];
+
 function Icon({ name, size = 16 }: { name: string; size?: number }) {
   return (
     <Image src={asset(name)} alt="" width={size} height={size} aria-hidden />
   );
 }
-function Sidebar({ open, close }: { open: boolean; close: () => void }) {
+function Sidebar({
+  open,
+  close,
+  student,
+}: {
+  open: boolean;
+  close: () => void;
+  student?: StudentSidebarProfile;
+}) {
   const pathname = usePathname();
   const { user } = useUser();
   return (
@@ -41,57 +60,92 @@ function Sidebar({ open, close }: { open: boolean; close: () => void }) {
         />
       )}
       <aside className={`sidebar ${open ? "sidebar-open" : ""}`}>
-        <BrandLogo className="sidebar-brand-logo" />
-        <nav className="nav-list">
-          {navItems.map((item) => (
+        {student ? (
+          <div className="brand student-brand">
+            MY<span>BJJ</span>ACADEMY
+          </div>
+        ) : (
+          <BrandLogo className="sidebar-brand-logo" />
+        )}
+        <nav className="nav-list" aria-label="Menu principal">
+          {(student ? studentNavItems : navItems).map((item) => (
             <Link
               className={pathname === item.href ? "active" : ""}
+              aria-current={pathname === item.href ? "page" : undefined}
               href={item.href}
               key={item.href}
               onClick={close}
             >
-              <Icon name={item.icon} />
+              {student ? (
+                <Image
+                  src={`/figma-student/${item.icon}`}
+                  alt=""
+                  width={16}
+                  height={16}
+                  aria-hidden
+                />
+              ) : (
+                <Icon name={item.icon} />
+              )}
               <span>{item.label}</span>
             </Link>
           ))}
         </nav>
-        <div className="sidebar-profile">
-          <UserButton
-            afterSignOutUrl="/"
-            appearance={{ elements: { avatarBox: "sidebar-user-avatar" } }}
-          />
-          <span>
-            <strong>
-              {user?.fullName ??
-                user?.primaryEmailAddress?.emailAddress ??
-                "Admin"}
-            </strong>
-            <small>Administrador</small>
-          </span>
-          <SignOutButton redirectUrl="/">
-            <button
-              className="sidebar-logout"
-              type="button"
-              title="Sair"
-              aria-label="Sair da conta"
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
+        {student ? (
+          <Link
+            href="/aluno/perfil"
+            className="sidebar-profile student-sidebar-profile"
+            onClick={close}
+          >
+            <PortalImage
+              src={student.picture}
+              className="student-sidebar-avatar"
+              fallback={student.name.trim().charAt(0).toUpperCase() || "A"}
+            />
+            <span>
+              <strong>{student.name}</strong>
+              <small>Faixa {student.beltLabel}</small>
+            </span>
+          </Link>
+        ) : (
+          <div className="sidebar-profile">
+            <UserButton
+              afterSignOutUrl="/"
+              appearance={{ elements: { avatarBox: "sidebar-user-avatar" } }}
+            />
+            <span>
+              <strong>
+                {user?.fullName ??
+                  user?.primaryEmailAddress?.emailAddress ??
+                  "Admin"}
+              </strong>
+              <small>Administrador</small>
+            </span>
+            <SignOutButton redirectUrl="/">
+              <button
+                className="sidebar-logout"
+                type="button"
+                title="Sair"
+                aria-label="Sair da conta"
               >
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <path d="m16 17 5-5-5-5M21 12H9" />
-              </svg>
-            </button>
-          </SignOutButton>
-        </div>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <path d="m16 17 5-5-5-5M21 12H9" />
+                </svg>
+              </button>
+            </SignOutButton>
+          </div>
+        )}
       </aside>
     </>
   );
@@ -102,22 +156,26 @@ export function AdminShell({
   children,
   actions,
   showActions = false,
+  student,
 }: {
   title: string;
   breadcrumb?: string;
   children?: React.ReactNode;
   actions?: React.ReactNode;
   showActions?: boolean;
+  student?: StudentSidebarProfile;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="app-shell">
-      <Sidebar open={open} close={() => setOpen(false)} />
+      <Sidebar open={open} close={() => setOpen(false)} student={student} />
       <div className="main-column">
         <header className="topbar">
           <div className="topbar-title">
             <button
               className="menu-button"
+              aria-label="Abrir menu"
+              aria-expanded={open}
               type="button"
               onClick={() => setOpen(true)}
             >

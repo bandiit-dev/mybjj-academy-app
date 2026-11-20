@@ -456,3 +456,14 @@ test("student creation counts legacy active records against the trial and Starte
   billingAccount.plan = "full";
   await create(ctx, args);
 });
+
+test("checkout resolves unlinked profiles before any Stripe purchase", async () => {
+  const ctx = context({ newUser: true });
+  ctx.runAction = async () => ({ status: "linked" });
+  await withStripe(() => {
+    throw new Error("Stripe must not be called for an invited student");
+  }, async () => {
+    await assert.rejects(handler(stripe.createCheckout)(ctx, {}), /responsável pela assinatura/);
+    assert.equal(ctx.tables.billingAccounts.length, 0);
+  });
+});

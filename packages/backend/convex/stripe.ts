@@ -1,6 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import { action, internalAction, type ActionCtx } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 import { billingConfiguration, checkoutPrice, stripeId, stripeRequest, subscriptionSnapshot, type StripeData } from "./lib/stripeApi";
 
@@ -22,6 +22,14 @@ async function portalUrl(account:Doc<"billingAccounts">) {
   return {url:String(result.url)};
 }
 
+async function assertOwnerSignup(ctx: ActionCtx, principal: { teacher: unknown; student: unknown }) {
+  if (principal.teacher || principal.student) return;
+  const resolved = await ctx.runAction(api.onboarding.resolvePortalAccount, {});
+  if (resolved.status !== "needs_academy") {
+    throw new ConvexError("Somente o responsável pela assinatura pode gerenciar o pagamento.");
+  }
+}
+
 export const createCheckout = action({
   args:{promotionCode:v.optional(v.string()),option:v.optional(checkoutOptionValidator)},handler:async(ctx,{promotionCode,option="starter"}):Promise<{url:string}>=>{
     const trial = option === "trial";
@@ -32,6 +40,7 @@ export const createCheckout = action({
     const cancelUrl = `${config.appUrl}/assinatura?checkout=cancelled${option === "starter" ? "" : `&plano=${option}`}`;
     const context=await ctx.runQuery(internal.billing.getCheckoutContext,{});
     if(!context.canManage) throw new ConvexError("Somente o responsável pela assinatura pode gerenciar o pagamento.");
+    await assertOwnerSignup(ctx, context.principal);
     const account=await ctx.runMutation(internal.billing.ensureAccount,{});
     if (!trial && account.stripeSubscriptionId && account.status !== "trialing" && !terminalStatuses.includes(account.status)) return portalUrl(account);
     const attempt=await ctx.runMutation(internal.billing.reserveCheckout,{accountId:account._id,trial});
@@ -124,6 +133,7 @@ export const createPortal = action({
     billingConfiguration();
     const context=await ctx.runQuery(internal.billing.getCheckoutContext,{gymId});
     if(!context.canManage||!context.account) throw new ConvexError("Somente o responsável pela assinatura pode gerenciar o pagamento.");
+    await assertOwnerSignup(ctx, context.principal);
     return portalUrl(context.account);
   }
 });
@@ -133,6 +143,7 @@ export const confirmCheckout = action({
     billingConfiguration();
     const context=await ctx.runQuery(internal.billing.getCheckoutContext,{});
     if(!context.canManage||!context.account?.stripeCustomerId||!/^cs_[a-zA-Z0-9_]+$/.test(sessionId)) throw new Error("Forbidden");
+    await assertOwnerSignup(ctx, context.principal);
     const session=await stripeRequest(`checkout/sessions/${encodeURIComponent(sessionId)}`);
     if(session.mode!=="subscription"||session.client_reference_id!==context.account._id||stripeId(session.customer)!==context.account.stripeCustomerId) throw new Error("Checkout ownership mismatch");
     const subscriptionId=stripeId(session.subscription);

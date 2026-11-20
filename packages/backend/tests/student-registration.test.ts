@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createStudent, createStudentWithoutAccount, updateStudent } from "../convex/students";
-import { getOnboardingStatus, linkExistingProfile } from "../convex/onboarding";
+import { getOnboardingStatus, linkExistingProfile, resolvePortalAccount, resolveVerifiedProfile } from "../convex/onboarding";
 import { assertInvitationAllowed, inviteExistingStudent, inviteStudent, inviteTeacher, updateInvitedStudent } from "../convex/provisioning";
 import { BELTS, assertDateOfBirth, beltValidator, teacherClassTypeValidator } from "../convex/lib/validators";
 
@@ -39,7 +39,7 @@ function context({ admin = true, authenticated = true, email = "owner@example.co
     },
     patch: async (id: string, patch: any) => Object.assign(await db.get(id), patch)
   };
-  return { tables, db, auth: { getUserIdentity: async () => authenticated ? { subject: "user_1", email } : null } };
+  return { tables, db, auth: { getUserIdentity: async () => authenticated ? { subject: "user_1", email, emailVerified: true } : null } };
 }
 
 test("registers a child with date of birth and no credentials or contact details", async () => {
@@ -224,4 +224,59 @@ test("failed Clerk invitations leave the original student record intact", async 
     if (originalSecret === undefined) delete process.env.CLERK_SECRET_KEY;
     else process.env.CLERK_SECRET_KEY = originalSecret;
   }
+});
+
+test("a verified Clerk invitation links automatically even when the token has no email claim", async t => {
+  const ctx = context({ admin: false });
+  ctx.auth = { getUserIdentity: async () => ({ subject: "user_1", email: undefined, emailVerified: false }) };
+  const invited = {
+    ...profile, _id: "student_1", email: "student@example.com",
+    clerkUserId: "invitation:inv_1", gymIds: ["gym_1"], userType: "Normal",
+  };
+  ctx.tables.students.push(invited);
+  const originalSecret = process.env.CLERK_SECRET_KEY;
+  process.env.CLERK_SECRET_KEY = "test-secret";
+  let verified = false;
+  t.mock.method(globalThis, "fetch", async (url: string) => {
+    assert.equal(url, "https://api.clerk.com/v1/users/user_1");
+    return Response.json({
+      id: "user_1", primary_email_address_id: "email_1",
+      email_addresses: [{
+        id: "email_1", email_address: "Student@example.com",
+        verification: { status: verified ? "verified" : "unverified" },
+      }],
+    });
+  });
+  const action = { ...ctx, runMutation: (_fn: unknown, args: unknown) => handler(resolveVerifiedProfile)(ctx, args) };
+  try {
+    assert.equal((await handler(getOnboardingStatus)(ctx, {})).status, "needs_academy");
+    await assert.rejects(handler(resolvePortalAccount)(action, {}), /verified primary email/);
+    assert.equal(invited.clerkUserId, "invitation:inv_1");
+    verified = true;
+    assert.deepEqual(await handler(resolvePortalAccount)(action, {}), { status: "linked" });
+    assert.deepEqual(await handler(getOnboardingStatus)(ctx, {}), {
+      status: "ready", profileType: "student", isAdmin: false, displayName: profile.name,
+    });
+    assert.equal(invited.clerkUserId, "user_1");
+    assert.deepEqual(invited.gymIds, ["gym_1"]);
+  } finally {
+    if (originalSecret === undefined) delete process.env.CLERK_SECRET_KEY;
+    else process.env.CLERK_SECRET_KEY = originalSecret;
+  }
+});
+
+test("verified email cannot replace a profile already linked to another account", async () => {
+  const ctx = context({ admin: false, email: "student@example.com" });
+  ctx.tables.students.push({
+    ...profile, _id: "student_1", email: "student@example.com",
+    clerkUserId: "other-user", gymIds: ["gym_1"], userType: "Normal",
+  });
+  await assert.rejects(
+    handler(resolveVerifiedProfile)(ctx, { email: "student@example.com" }),
+    /already linked/,
+  );
+  assert.equal(ctx.tables.students[0].clerkUserId, "other-user");
+  assert.deepEqual(await handler(resolveVerifiedProfile)(ctx, { email: "new-owner@example.com" }), {
+    status: "needs_academy",
+  });
 });

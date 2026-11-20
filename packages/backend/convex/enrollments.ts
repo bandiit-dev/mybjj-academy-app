@@ -1,6 +1,7 @@
-import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
+import { ConvexError, v } from "convex/values";
 
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type MutationCtx } from "./_generated/server";
 import {
   getAccessibleGymIds,
   getCurrentPrincipal,
@@ -24,58 +25,57 @@ function requireCurrentStudent(principal: Awaited<ReturnType<typeof getCurrentPr
   return principal.student;
 }
 
-export const confirmEnrollment = mutation({
-  args: {
-    classSessionId: v.id("classSessions")
-  },
-  handler: async (ctx, { classSessionId }) => {
-    const principal = await getCurrentPrincipal(ctx);
-    const student = requireCurrentStudent(principal);
+export async function confirmStudentEnrollment(
+  ctx: MutationCtx,
+  classSessionId: Id<"classSessions">,
+  studentId: Id<"students">,
+) {
+  const existing = await ctx.db
+    .query("enrollments")
+    .withIndex("by_classSessionId_studentId", (q) =>
+      q.eq("classSessionId", classSessionId).eq("studentId", studentId)
+    )
+    .unique();
+  const now = Date.now();
 
-    const session = await ctx.db.get(classSessionId);
-    if (!session) {
-      throw new Error("Class session not found");
-    }
+  if (!existing) {
+    const enrollmentId = await ctx.db.insert("enrollments", {
+      classSessionId,
+      studentId,
+      status: "Confirmed",
+      confirmedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return { enrollmentId, status: "Confirmed" as const };
+  }
 
-    if (session.status === "Cancelled") {
-      throw new Error("Cannot enroll in a cancelled session");
-    }
-
-    const existing = await ctx.db
-      .query("enrollments")
-      .withIndex("by_classSessionId_studentId", (q) =>
-        q.eq("classSessionId", classSessionId).eq("studentId", student._id)
-      )
-      .unique();
-
-    const now = Date.now();
-
-    if (!existing) {
-      const enrollmentId = await ctx.db.insert("enrollments", {
-        classSessionId,
-        studentId: student._id,
-        status: "Confirmed",
-        confirmedAt: now,
-        createdAt: now,
-        updatedAt: now
-      });
-
-      return { enrollmentId, status: "Confirmed" as const };
-    }
-
-    if (existing.status === "Confirmed") {
-      return { enrollmentId: existing._id, status: "Confirmed" as const };
-    }
-
+  if (existing.status !== "Confirmed") {
     await ctx.db.patch(existing._id, {
       status: "Confirmed",
       confirmedAt: now,
       cancelledAt: undefined,
-      updatedAt: now
+      updatedAt: now,
     });
-
-    return { enrollmentId: existing._id, status: "Confirmed" as const };
   }
+  return { enrollmentId: existing._id, status: "Confirmed" as const };
+}
+
+export const confirmEnrollment = mutation({
+  args: { classSessionId: v.id("classSessions") },
+  handler: async (ctx, { classSessionId }) => {
+    const student = requireCurrentStudent(await getCurrentPrincipal(ctx));
+    const session = await ctx.db.get(classSessionId);
+
+    if (!session || !session.gymIds.some(gymId => student.gymIds.includes(gymId))) {
+      throw new Error("Class session not found");
+    }
+    if (session.status === "Cancelled") {
+      throw new Error("Cannot enroll in a cancelled session");
+    }
+
+    return confirmStudentEnrollment(ctx, classSessionId, student._id);
+  },
 });
 
 export const cancelEnrollment = mutation({
@@ -95,6 +95,21 @@ export const cancelEnrollment = mutation({
 
     if (!existing) {
       return { enrollmentId: null, status: "Cancelled" as const };
+    }
+
+    if (existing.status === "Cancelled") {
+      return { enrollmentId: existing._id, status: "Cancelled" as const };
+    }
+
+    const attendance = await ctx.db
+      .query("attendance")
+      .withIndex("by_classSessionId_studentId", (q) =>
+        q.eq("classSessionId", classSessionId).eq("studentId", student._id)
+      )
+      .unique();
+
+    if (attendance) {
+      throw new ConvexError("A frequência desta aula já foi registrada pelo professor.");
     }
 
     const now = Date.now();
