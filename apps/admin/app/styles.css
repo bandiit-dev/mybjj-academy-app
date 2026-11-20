@@ -540,7 +540,7 @@ select:focus-visible {
 }
 .filter-select {
   gap: 3px;
-  padding: 0 8px 0 12px;
+  padding: 0 0 0 12px;
   color: var(--ink);
   font-size: 13px;
 }
@@ -2808,4 +2808,20 @@ select:focus-visible {
   gap: 8px;
   padding: 10px 0;
   border-bottom: 1px solid var(--border);
+}
+
+select:not([multiple]):is(:not([size]), [size="1"]) {
+  appearance: none;
+  padding-inline-end: 32px;
+  background-image: url("/figma-dashboard/chevron-down.svg");
+  background-position: right 12px center;
+  background-repeat: no-repeat;
+  background-size: 12px;
+}
+
+@media (forced-colors: active) {
+  select:not([multiple]):is(:not([size]), [size="1"]) {
+    appearance: auto;
+    background-image: none;
+  }
 }
