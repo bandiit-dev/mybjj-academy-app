@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import {
-  academyToday, assertPlanDate, getStudentPlan, isPlanPeriod, paymentKey,
+  academyToday, assertActiveStudentCapacity, assertPlanDate, getStudentPlan, isPlanPeriod, paymentKey,
   planTypeValidator, requireStudentPlanAdmin, scheduledPlanPeriods
 } from "./lib/studentPlans";
 
@@ -31,7 +31,9 @@ export const setPlanActive = mutation({
   args: {studentId: v.id("students"), isActive: v.boolean()},
   handler: async (ctx, {studentId, isActive}) => {
     const {student} = await requireStudentPlanAdmin(ctx, studentId);
-    await ctx.db.patch(studentId, {plan: {...getStudentPlan(student), isActive}, updatedAt: Date.now()});
+    const plan = {...getStudentPlan(student), isActive};
+    await assertActiveStudentCapacity(ctx, student.gymIds, plan, student);
+    await ctx.db.patch(studentId, {plan, updatedAt: Date.now()});
     return studentId;
   }
 });

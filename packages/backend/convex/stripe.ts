@@ -2,7 +2,10 @@ import { ConvexError, v } from "convex/values";
 import { action, internalAction, type ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
-import { billingConfiguration, stripeId, stripeRequest, subscriptionSnapshot, validPortalPrice, type StripeData } from "./lib/stripeApi";
+import { billingConfiguration, checkoutPrice, stripeId, stripeRequest, subscriptionSnapshot, type StripeData } from "./lib/stripeApi";
+
+const terminalStatuses = ["canceled", "incomplete_expired"];
+const checkoutOptionValidator = v.union(v.literal("starter"), v.literal("full"), v.literal("trial"));
 
 async function applySubscription(ctx:ActionCtx,account:Doc<"billingAccounts">,subscriptionId:string,event?:{id:string;type:string;created:number}) {
   const {billingAccountId,...snapshot}=await subscriptionSnapshot(subscriptionId);
@@ -13,23 +16,25 @@ async function applySubscription(ctx:ActionCtx,account:Doc<"billingAccounts">,su
   return snapshot;
 }
 async function portalUrl(account:Doc<"billingAccounts">) {
-  if(!account.stripeCustomerId) throw new ConvexError("Nenhuma assinatura foi encontrada para gerenciar.");
+  if (account.status === "trialing") throw new ConvexError("O teste termina automaticamente. Escolha um plano após o encerramento.");
+  if(!account.stripeCustomerId || !account.stripeSubscriptionId) throw new ConvexError("Nenhuma assinatura foi encontrada para gerenciar.");
   const result=await stripeRequest("billing_portal/sessions",{customer:account.stripeCustomerId,return_url:`${billingConfiguration().appUrl}/assinatura`});
   return {url:String(result.url)};
 }
 
 export const createCheckout = action({
-  args:{promotionCode:v.optional(v.string())},handler:async(ctx,{promotionCode}):Promise<{url:string}>=>{
-    const code=promotionCode?.trim()??"";
+  args:{promotionCode:v.optional(v.string()),option:v.optional(checkoutOptionValidator)},handler:async(ctx,{promotionCode,option="starter"}):Promise<{url:string}>=>{
+    const trial = option === "trial";
+    const code = trial ? "" : promotionCode?.trim() ?? "";
     if(code.length>100) throw new ConvexError("O cupom deve ter no máximo 100 caracteres.");
     const config=billingConfiguration();
     const successUrl=`${config.appUrl}/assinatura?checkout=success&session_id={CHECKOUT_SESSION_ID}`;
-    const cancelUrl=`${config.appUrl}/assinatura?checkout=cancelled`;
+    const cancelUrl = `${config.appUrl}/assinatura?checkout=cancelled${option === "starter" ? "" : `&plano=${option}`}`;
     const context=await ctx.runQuery(internal.billing.getCheckoutContext,{});
     if(!context.canManage) throw new ConvexError("Somente o responsável pela assinatura pode gerenciar o pagamento.");
     const account=await ctx.runMutation(internal.billing.ensureAccount,{});
-    if(account.stripeSubscriptionId && !["canceled","incomplete_expired"].includes(account.status)) return portalUrl(account);
-    const attempt=await ctx.runMutation(internal.billing.reserveCheckout,{accountId:account._id});
+    if (!trial && account.stripeSubscriptionId && account.status !== "trialing" && !terminalStatuses.includes(account.status)) return portalUrl(account);
+    const attempt=await ctx.runMutation(internal.billing.reserveCheckout,{accountId:account._id,trial});
     try {
       let customerId=account.stripeCustomerId;
       if(!customerId) {
@@ -52,10 +57,10 @@ export const createCheckout = action({
         if(!promotion) throw new ConvexError("Cupom inválido, expirado ou indisponível para sua conta.");
         promotionCodeId=promotion.id;
       }
-      const matchesPromotion=(session:StripeData)=>promotionCodeId
+      const matchesPromotion=(session:StripeData)=>trial || (promotionCodeId
         ? session.metadata?.promotionCodeId===promotionCodeId
-        : !session.metadata?.promotionCodeId && session.allow_promotion_codes===true;
-      const matchesCheckout=(session:StripeData)=>matchesPromotion(session) && session.success_url===successUrl && session.cancel_url===cancelUrl;
+        : !session.metadata?.promotionCodeId && session.allow_promotion_codes===true);
+      const matchesCheckout=(session:StripeData)=> (session.metadata?.checkoutOption ?? "starter") === option && matchesPromotion(session) && session.success_url===successUrl && session.cancel_url===cancelUrl;
       if(account.checkoutSessionId) {
         const previous=await stripeRequest(`checkout/sessions/${encodeURIComponent(account.checkoutSessionId)}`);
         if(previous.status==="open" && previous.expires_at*1000>Date.now() && previous.url) {
@@ -64,15 +69,20 @@ export const createCheckout = action({
         }
         if(previous.status==="complete" && stripeId(previous.subscription)) {
           const snapshot = await applySubscription(ctx,{...account,stripeCustomerId:customerId},stripeId(previous.subscription)!);
-          if (!["canceled", "incomplete_expired"].includes(snapshot.status)) return {url:`${config.appUrl}/assinatura?checkout=success`};
+          if (snapshot.status === "trialing" && (snapshot.trialEndsAt ?? 0) <= Date.now()) {
+            throw new ConvexError("Estamos confirmando o encerramento do teste. Tente novamente em instantes.");
+          }
+          if (!terminalStatuses.includes(snapshot.status)) return {url:`${config.appUrl}/assinatura?checkout=success`};
         }
       }
       const subscriptions=await stripeRequest(`subscriptions?customer=${encodeURIComponent(customerId!)}&status=all&limit=100`);
-      const existing=subscriptions.data?.find((sub:StripeData)=>sub.metadata?.billingAccountId===account._id && !["canceled","incomplete_expired"].includes(sub.status));
+      const ownedSubscriptions = (subscriptions.data ?? []).filter((sub: StripeData) => sub.metadata?.billingAccountId === account._id);
+      const existing = ownedSubscriptions.find((sub: StripeData) => !terminalStatuses.includes(sub.status));
       if(existing) {
-        await applySubscription(ctx,{...account,stripeCustomerId:customerId},existing.id);
-        return portalUrl({...account,stripeCustomerId:customerId});
+        const snapshot = await applySubscription(ctx,{...account,stripeCustomerId:customerId},existing.id);
+        return portalUrl({...account,...snapshot,stripeCustomerId:customerId,stripeSubscriptionId:existing.id});
       }
+      if (trial && subscriptions.data?.length) throw new ConvexError("O teste de 7 dias está disponível apenas para a primeira assinatura.");
       // Recover a session whose creation succeeded before a network timeout.
       const openSessions=await stripeRequest(`checkout/sessions?customer=${encodeURIComponent(customerId!)}&status=open&limit=100`);
       const ownedSessions=(openSessions.data??[]).filter((session:StripeData)=>session.client_reference_id===account._id && session.mode==="subscription" && session.expires_at*1000>Date.now() && session.url);
@@ -84,13 +94,19 @@ export const createCheckout = action({
         await ctx.runMutation(internal.billing.finishCheckout,{accountId:account._id,attempt,sessionId:openSession.id,expiresAt:openSession.expires_at*1000});
         return {url:openSession.url};
       }
-      const price=await stripeRequest(`prices/${encodeURIComponent(config.priceId)}`);
-      if(!price.active||!validPortalPrice(price)) throw new ConvexError("O plano de pagamento não está disponível. Entre em contato com o suporte.");
+      const priceId = await checkoutPrice(option === "full" ? "full" : "starter");
       const session=await stripeRequest("checkout/sessions",{
         mode:"subscription",customer:customerId!,client_reference_id:account._id,locale:"pt-BR",
-        ...(promotionCodeId?{"discounts[0][promotion_code]":promotionCodeId,"metadata[promotionCodeId]":promotionCodeId}:{allow_promotion_codes:"true"}),
-        "line_items[0][price]":config.priceId,"line_items[0][quantity]":"1","allowed_payment_method_types[0]":"card",
+        ...(trial ? {
+          payment_method_collection: "if_required",
+          "subscription_data[trial_period_days]": "7",
+          "subscription_data[trial_settings][end_behavior][missing_payment_method]": "cancel",
+        } : promotionCodeId ? {
+          "discounts[0][promotion_code]": promotionCodeId, "metadata[promotionCodeId]": promotionCodeId,
+        } : {allow_promotion_codes:"true"}),
+        "line_items[0][price]":priceId,"line_items[0][quantity]":"1","allowed_payment_method_types[0]":"card",
         "metadata[billingAccountId]":account._id,"subscription_data[metadata][billingAccountId]":account._id,
+        "metadata[checkoutOption]": option, "subscription_data[metadata][checkoutOption]": option,
         success_url:successUrl,
         cancel_url:cancelUrl
       },`checkout:${account._id}:${attempt}`);

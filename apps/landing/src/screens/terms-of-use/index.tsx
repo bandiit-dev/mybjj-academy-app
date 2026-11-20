@@ -59,11 +59,13 @@ const sections: LegalSection[] = [
           cancelada.
         </p>
         <p>
-          O acesso administrativo depende de uma assinatura ativa e de um
-          período de acesso confirmado. Quando o período pago termina sem a
-          confirmação da renovação, o acesso pode ficar indisponível até a
-          regularização. O responsável pela assinatura pode consultar sua
-          situação em <strong>Academia → Plano do portal</strong>.
+          O acesso administrativo depende de um teste gratuito vigente ou de um
+          período pago confirmado. O teste dura 7 dias, dispensa cartão e
+          termina sem cobrança automática. Ao fim do teste, é preciso contratar
+          um plano para continuar usando o portal. Se a renovação de um plano
+          pago não for confirmada, o acesso pode ficar indisponível até a
+          regularização. Consulte sua situação em{" "}
+          <strong>Academia → Plano do portal</strong>.
         </p>
         <p>
           Os lançamentos de pagamento dos alunos são registros feitos pela

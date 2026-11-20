@@ -1,4 +1,4 @@
-import { getStudentPlan, studentPlanValidator, validateStudentPlan } from "./lib/studentPlans";
+import { assertActiveStudentCapacity, getStudentPlan, studentPlanValidator, validateStudentPlan } from "./lib/studentPlans";
 import { v } from "convex/values";
 import { assertDateOfBirth, assertDegree, assertInvitationEmail, beltValidator, teacherClassTypeValidator } from "./lib/validators";
 
@@ -33,8 +33,19 @@ async function checkInvitationAllowed(
 }
 
 export const assertInvitationAllowed = internalQuery({
-  args: { email: v.string(), gymId: v.id("gyms"), unityId: v.id("unities"), studentId: v.optional(v.id("students")) },
-  handler: checkInvitationAllowed
+  args: {
+    email: v.string(), gymId: v.id("gyms"), unityId: v.id("unities"), studentId: v.optional(v.id("students")),
+    studentInvitation: v.optional(v.boolean()), plan: v.optional(studentPlanValidator)
+  },
+  handler: async (ctx, args) => {
+    await checkInvitationAllowed(ctx, args);
+    if (args.studentInvitation) {
+      const previous = args.studentId ? await ctx.db.get(args.studentId) : null;
+      const plan = args.plan ?? getStudentPlan(previous ?? {});
+      await assertActiveStudentCapacity(ctx, [args.gymId], plan, previous ?? undefined);
+    }
+    return true;
+  }
 });
 
 export const insertInvitedTeacher = internalMutation({
@@ -64,11 +75,12 @@ export const insertInvitedStudent = internalMutation({
     degree: v.number(), gymId: v.id("gyms"), unityId: v.id("unities"), picture: v.string()
   },
   handler: async (ctx, args) => {
-    if (args.plan) validateStudentPlan(args.plan);
+    const plan = validateStudentPlan(getStudentPlan(args));
     assertDateOfBirth(args.dateOfBirth);
     assertDegree(args.degree); const now = Date.now();
+    await assertActiveStudentCapacity(ctx, [args.gymId], plan);
     return ctx.db.insert("students", {
-      plan: validateStudentPlan(getStudentPlan(args)),
+      plan,
       clerkUserId: `invitation:${args.invitationId}`, name: args.name.trim(), email: args.email.trim().toLowerCase(),
       phone: (args.phone ?? "").trim(), dateOfBirth: args.dateOfBirth, belt: args.belt, degree: args.degree, gymIds: [args.gymId], unityIds: [args.unityId],
       picture: args.picture.trim(), userType: "Normal", createdAt: now, updatedAt: now
@@ -87,6 +99,27 @@ async function createClerkInvitation(email: string, redirectUrl: string) {
   const body = await response.json() as { id?: string; errors?: Array<{ long_message?: string; message?: string }> };
   if (!response.ok || !body.id) throw new Error(body.errors?.[0]?.long_message ?? body.errors?.[0]?.message ?? "Could not create Clerk invitation");
   return body.id;
+}
+
+async function saveStudentInvitation(
+  invitationId: string,
+  save: () => Promise<Id<"students">>
+) {
+  try {
+    return await save();
+  } catch (error) {
+    try {
+      const response = await fetch(`https://api.clerk.com/v1/invitations/${encodeURIComponent(invitationId)}/revoke`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
+        signal: AbortSignal.timeout(5000)
+      });
+      if (!response.ok) console.error("Student invitation revocation failed", response.status);
+    } catch {
+      console.error("Student invitation revocation failed");
+    }
+    throw error;
+  }
 }
 
 export const inviteTeacher = action({
@@ -113,13 +146,15 @@ export const inviteStudent = action({
   },
   handler: async (ctx, args): Promise<Id<"students">> => {
     if (!(await ctx.auth.getUserIdentity())) throw new Error("Unauthorized");
-    await ctx.runQuery(internal.provisioning.assertInvitationAllowed, { email: args.email, gymId: args.gymId, unityId: args.unityId });
+    await ctx.runQuery(internal.provisioning.assertInvitationAllowed, { email: args.email, gymId: args.gymId, unityId: args.unityId, studentInvitation: true, plan: args.plan });
     if (args.plan) validateStudentPlan(args.plan);
     assertDateOfBirth(args.dateOfBirth);
     assertDegree(args.degree);
     const invitationId = await createClerkInvitation(args.email, args.redirectUrl);
     const { redirectUrl, ...profile } = args;
-    return ctx.runMutation(internal.provisioning.insertInvitedStudent, { ...profile, invitationId });
+    return saveStudentInvitation(invitationId, () =>
+      ctx.runMutation(internal.provisioning.insertInvitedStudent, { ...profile, invitationId })
+    );
   }
 });
 
@@ -137,6 +172,8 @@ export const updateInvitedStudent = internalMutation({
     if (args.plan) validateStudentPlan(args.plan);
     assertDateOfBirth(args.dateOfBirth);
     assertDegree(args.degree);
+    const previous = (await ctx.db.get(args.studentId))!;
+    await assertActiveStudentCapacity(ctx, [args.gymId], args.plan ?? getStudentPlan(previous), previous);
     await ctx.db.patch(args.studentId, {
       ...(args.plan ? { plan: args.plan } : {}),
       name: args.name.trim(), email: args.email.trim().toLowerCase(), phone: (args.phone ?? "").trim(),
@@ -157,10 +194,12 @@ export const inviteExistingStudent = action({
     assertDegree(args.degree);
     if (!args.name.trim()) throw new Error("Student name is required");
     await ctx.runQuery(internal.provisioning.assertInvitationAllowed, {
-      studentId: args.studentId, email: args.email, gymId: args.gymId, unityId: args.unityId
+      studentId: args.studentId, email: args.email, gymId: args.gymId, unityId: args.unityId, studentInvitation: true, plan: args.plan
     });
     const invitationId = await createClerkInvitation(args.email, args.redirectUrl);
     const { redirectUrl, ...profile } = args;
-    return ctx.runMutation(internal.provisioning.updateInvitedStudent, { ...profile, invitationId });
+    return saveStudentInvitation(invitationId, () =>
+      ctx.runMutation(internal.provisioning.updateInvitedStudent, { ...profile, invitationId })
+    );
   }
 });

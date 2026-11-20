@@ -354,3 +354,105 @@ test("changing APP_URL replaces an open checkout that returns to the old domain"
     assert.equal(row.checkoutSessionId,"cs_local");
   });
 });
+
+test("trial checkout is card-free, grants time-limited access, and cannot be repeated", async () => {
+  const ctx = context();
+  const row = ctx.tables.billingAccounts[0];
+  row.status = "pending";
+  delete row.stripeSubscriptionId;
+  delete row.paidThrough;
+  const trialEnd = Math.floor(future / 1000) * 1000;
+  let subscriptionStatus = "trialing";
+  await withStripe((path, body) => {
+    if (path.startsWith("subscriptions?") || path.startsWith("checkout/sessions?")) return { data: [] };
+    if (path === "prices/price_monthly") return price;
+    if (path === "checkout/sessions") {
+      assert.equal(body.get("line_items[0][price]"), "price_monthly");
+      assert.equal(body.get("payment_method_collection"), "if_required");
+      assert.equal(body.get("subscription_data[trial_period_days]"), "7");
+      assert.equal(body.get("subscription_data[trial_settings][end_behavior][missing_payment_method]"), "cancel");
+      assert.equal(body.get("subscription_data[metadata][checkoutOption]"), "trial");
+      assert.equal(body.get("allow_promotion_codes"), null);
+      return { id: "cs_trial", url: "https://checkout.stripe.com/trial", expires_at: future / 1000 };
+    }
+    if (path === "checkout/sessions/cs_trial") return {
+      mode: "subscription", client_reference_id: row._id, customer: "cus_test", subscription: "sub_test",
+    };
+    if (path.startsWith("subscriptions/sub_test")) return subscription({
+      status: subscriptionStatus, trial_end: trialEnd / 1000, latest_invoice: null,
+      metadata: { billingAccountId: row._id, checkoutOption: "trial" },
+    });
+    throw new Error(`Unexpected Stripe request ${path}`);
+  }, async () => {
+    assert.equal((await handler(billing.getStatus)(ctx, {})).canStartTrial, true);
+    await handler(stripe.createCheckout)(ctx, { option: "trial" });
+    await handler(stripe.confirmCheckout)(ctx, { sessionId: "cs_trial" });
+    assert.equal((await handler(billing.getStatus)(ctx, {})).hasAccess, true);
+    assert.equal(row.trialEndsAt, trialEnd);
+    assert.equal(row.paidThrough, undefined);
+    assert.equal(hasPaidPortalAccess(row, trialEnd), false);
+    subscriptionStatus = "canceled";
+    await handler(stripe.confirmCheckout)(ctx, { sessionId: "cs_trial" });
+    assert.equal((await handler(billing.getStatus)(ctx, {})).hasAccess, false);
+    assert.equal((await handler(billing.getStatus)(ctx, {})).canStartTrial, false);
+    await assert.rejects(handler(stripe.createCheckout)(ctx, { option: "trial" }), /primeira assinatura/);
+  });
+});
+
+test("Full checkout uses the active default monthly price on the configured product", async () => {
+  const ctx = context();
+  const row = ctx.tables.billingAccounts[0];
+  row.status = "pending";
+  delete row.stripeSubscriptionId;
+  const product = process.env.STRIPE_FULL_PRODUCT_ID ?? "prod_Veu8nfnXHEiuWY";
+  const fullPrice = { ...price, id: "price_full", product, unit_amount: 9990 };
+  let defaultPrice = fullPrice;
+  await withStripe((path, body) => {
+    if (path.startsWith("subscriptions?") || path.startsWith("checkout/sessions?")) return { data: [] };
+    if (path === `products/${product}?expand[]=default_price`) return { active: true, default_price: defaultPrice };
+    if (path === "checkout/sessions") {
+      assert.equal(body.get("line_items[0][price]"), "price_full");
+      assert.equal(body.get("subscription_data[metadata][checkoutOption]"), "full");
+      assert.equal(body.get("subscription_data[trial_period_days]"), null);
+      return { id: "cs_full", url: "https://checkout.stripe.com/full", expires_at: future / 1000 };
+    }
+    if (path === "checkout/sessions/cs_full") return {
+      mode: "subscription", client_reference_id: row._id, customer: "cus_test", subscription: "sub_test",
+    };
+    if (path.startsWith("subscriptions/sub_test")) return subscription({
+      items: { data: [{ quantity: 1, price: fullPrice, current_period_end: future / 1000 }] },
+      latest_invoice: {
+        ...subscription().latest_invoice,
+        lines: { data: [{ amount: 9990, price: fullPrice.id, period: { end: future / 1000 } }] },
+      },
+    });
+    throw new Error(`Unexpected Stripe request ${path}`);
+  }, async () => {
+    defaultPrice = { ...fullPrice, unit_amount: 10000 };
+    await assert.rejects(handler(stripe.createCheckout)(ctx, { option: "full" }), /não está disponível/);
+    defaultPrice = fullPrice;
+    await handler(stripe.createCheckout)(ctx, { option: "full" });
+    await handler(stripe.confirmCheckout)(ctx, { sessionId: "cs_full" });
+    const status = await handler(billing.getStatus)(ctx, {});
+    assert.equal(status.hasAccess, true);
+    assert.equal(status.plan.name, "Full");
+  });
+});
+
+test("student creation counts legacy active records against the trial and Starter limits", async () => {
+  const ctx = context();
+  const billingAccount = ctx.tables.billingAccounts[0];
+  const create = handler(createStudentWithoutAccount);
+  const args = { name: "Aluno", gymId: "gym_1", unityId: "unity_1", belt: "White", degree: 0, picture: "" };
+  ctx.tables.students.push(...Array.from({ length: 24 }, (_, i) => ({ _id: `legacy_${i}`, gymIds: ["gym_1"] })));
+  billingAccount.status = "trialing";
+  billingAccount.trialEndsAt = future;
+  await create(ctx, args);
+  await assert.rejects(create(ctx, args), /até 25 alunos ativos/);
+  billingAccount.status = "active";
+  ctx.tables.students.push(...Array.from({ length: 55 }, (_, i) => ({ _id: `starter_${i}`, gymIds: ["gym_1"] })));
+  await assert.rejects(create(ctx, args), /até 80 alunos ativos/);
+  await create(ctx, { ...args, plan: { type: "Mensal", startDate: "2026-11-01", isActive: false } });
+  billingAccount.plan = "full";
+  await create(ctx, args);
+});

@@ -1,5 +1,5 @@
 import { assertAdminGymScope } from "./lib/auth";
-import { getStudentPlan, studentPlanValidator, validateStudentPlan, withStudentPlan } from "./lib/studentPlans";
+import { assertActiveStudentCapacity, getStudentPlan, studentPlanValidator, validateStudentPlan, withStudentPlan } from "./lib/studentPlans";
 import { mutationGeneric as mutation, queryGeneric as query } from "convex/server";
 import { assertDateOfBirth, assertDegree, beltValidator } from "./lib/validators";
 import { v } from "convex/values";
@@ -49,10 +49,12 @@ export const createStudent = mutation({
     assertDegree(args.degree);
 
     const now = Date.now();
+    const plan = validateStudentPlan(getStudentPlan(args));
+    await assertActiveStudentCapacity(ctx, args.gymIds, plan);
 
     return ctx.db.insert("students", {
       ...args,
-      plan: validateStudentPlan(getStudentPlan(args)),
+      plan,
       createdAt: now,
       updatedAt: now
     });
@@ -108,9 +110,11 @@ export const updateStudent = mutation({
       throw new Error("Forbidden: student belongs to another academy");
     }
 
+    const plan = patch.plan ?? getStudentPlan(authResult.targetStudent);
+    await assertActiveStudentCapacity(ctx, patch.gymIds ?? authResult.targetStudent.gymIds, plan, authResult.targetStudent);
     await ctx.db.patch(studentId, {
       ...patch,
-      plan: patch.plan ?? getStudentPlan(authResult.targetStudent),
+      plan,
       updatedAt: Date.now()
     });
 
@@ -159,8 +163,10 @@ export const createStudentWithoutAccount = mutation({
     assertDateOfBirth(args.dateOfBirth);
     if (!args.name.trim()) throw new Error("Student name is required");
     const now = Date.now();
+    const plan = validateStudentPlan(getStudentPlan(args));
+    await assertActiveStudentCapacity(ctx, [args.gymId], plan);
     return ctx.db.insert("students", {
-      plan: validateStudentPlan(getStudentPlan(args)),
+      plan,
       name: args.name.trim(), email: (args.email ?? "").trim().toLowerCase(),
       phone: (args.phone ?? "").trim(), dateOfBirth: args.dateOfBirth,
       belt: args.belt, degree: args.degree, gymIds: [args.gymId], unityIds: [args.unityId],

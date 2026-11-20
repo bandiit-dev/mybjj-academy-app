@@ -2,11 +2,18 @@ import { ConvexError } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 
-export const PORTAL_PLAN = {name:"MyBJJ Academy",amount:3990,currency:"brl",interval:"month"} as const;
+export const PORTAL_PLANS = {
+  starter: { name: "Starter", amount: 3990, currency: "brl", interval: "month", studentLimit: 80 },
+  full: { name: "Full", amount: 9990, currency: "brl", interval: "month", studentLimit: null },
+} as const;
+export type PortalPlan = keyof typeof PORTAL_PLANS;
+export type CheckoutOption = PortalPlan | "trial";
+export const TRIAL_STUDENT_LIMIT = 25;
+export const fullProductId = () => process.env.STRIPE_FULL_PRODUCT_ID ?? "prod_Veu8nfnXHEiuWY";
 export type BillingReader = Pick<QueryCtx | MutationCtx,"db">;
 
-export function hasPaidPortalAccess(account: Pick<Doc<"billingAccounts">,"status"|"paidThrough"|"priceId"> | null, now=Date.now()) {
-  return Boolean(account?.priceId && ["active","past_due"].includes(account.status) && (account.paidThrough??0)>now);
+export function hasPaidPortalAccess(account: Pick<Doc<"billingAccounts">,"status"|"paidThrough"|"priceId"|"trialEndsAt"> | null, now=Date.now()) {
+  return Boolean(account?.priceId && (account.status === "trialing" ? (account.trialEndsAt ?? 0) > now : ["active","past_due"].includes(account.status) && (account.paidThrough??0)>now));
 }
 
 export function subscriptionRequired(): never {

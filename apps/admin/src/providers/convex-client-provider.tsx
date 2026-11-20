@@ -6,8 +6,8 @@ import { api } from "@mybjj/backend/convex/_generated/api";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
 import { ConvexReactClient, useConvexAuth, useQuery } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 
 import { env } from "@/utils/env";
 import { BrandLogo } from "@/components/brand-logo";
@@ -15,6 +15,11 @@ import { BrandLogo } from "@/components/brand-logo";
 function AdminAccessGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const plan = useSearchParams().get("plano");
+  const selection =
+    plan === "trial" || plan === "starter" || plan === "full"
+      ? `?plano=${plan}`
+      : "";
   const clerk = useAuth();
   const { isLoading, isAuthenticated } = useConvexAuth();
   const [timedOut, setTimedOut] = useState(false);
@@ -42,15 +47,16 @@ function AdminAccessGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (clerk.isLoaded && !clerk.isSignedIn && pathname !== "/")
-      router.replace("/");
+      router.replace(`/${selection}`);
     if (!isAuthenticated || onboarding === undefined) return;
     if (onboarding.status === "link_required") {
-      if (!pathname.startsWith("/onboarding")) router.replace("/onboarding");
+      if (!pathname.startsWith("/onboarding"))
+        router.replace(`/onboarding${selection}`);
       return;
     }
     if (!needsBilling || !billing) return;
     if (!billing.hasAccess) {
-      if (pathname !== "/assinatura") router.replace("/assinatura");
+      if (pathname !== "/assinatura") router.replace(`/assinatura${selection}`);
     } else if (onboarding.status === "needs_academy") {
       if (!pathname.startsWith("/onboarding")) router.replace("/onboarding");
     } else if (pathname.startsWith("/onboarding") || pathname === "/assinatura")
@@ -64,9 +70,11 @@ function AdminAccessGate({ children }: { children: React.ReactNode }) {
     needsBilling,
     pathname,
     router,
+    selection,
   ]);
 
-  if (clerk.isLoaded && !clerk.isSignedIn) return <LoginPage />;
+  if (clerk.isLoaded && !clerk.isSignedIn)
+    return <LoginPage redirectUrl={`/${selection}`} />;
   if (timedOut) {
     return (
       <main className="auth-state">
@@ -175,7 +183,16 @@ export function ConvexClientProvider({
   const convex = useMemo(() => new ConvexReactClient(convexUrl), [convexUrl]);
   return (
     <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-      <AdminAccessGate>{children}</AdminAccessGate>
+      <Suspense
+        fallback={
+          <main className="auth-state">
+            <div className="auth-spinner" />
+            <strong>Validando acesso...</strong>
+          </main>
+        }
+      >
+        <AdminAccessGate>{children}</AdminAccessGate>
+      </Suspense>
     </ConvexProviderWithClerk>
   );
 }

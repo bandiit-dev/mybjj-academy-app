@@ -3,7 +3,7 @@
 import { SignIn } from "@clerk/nextjs";
 import { AuthPageLayout } from "@/components/auth-page-layout";
 
-export function LoginPage() {
+export function LoginPage({ redirectUrl }: { redirectUrl: string }) {
   return (
     <AuthPageLayout>
       <div className="login-card">
@@ -17,8 +17,8 @@ export function LoginPage() {
         <SignIn
           routing="hash"
           withSignUp
-          forceRedirectUrl="/"
-          signUpForceRedirectUrl="/"
+          forceRedirectUrl={redirectUrl}
+          signUpForceRedirectUrl={redirectUrl}
           appearance={{
             elements: {
               rootBox: "clerk-login-root",

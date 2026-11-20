@@ -26,6 +26,7 @@ function context({ admin = true, authenticated = true, email = "owner@example.co
           const expression = { field: (field: string) => field, neq: (field: string, value: any) => (row: any) => row[field] !== value };
           rows = rows.filter(apply(expression)); return chain;
         },
+        collect: async () => rows,
         first: async () => rows[0] ?? null,
         unique: async () => { assert.ok(rows.length <= 1); return rows[0] ?? null; }
       };

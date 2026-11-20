@@ -1,3 +1,4 @@
+import { adminUrl } from "@/components/atoms/action-link";
 import { PlanCard, type Plan } from "@/components/molecules/plan-card";
 
 const plans: Plan[] = [
@@ -9,7 +10,7 @@ const plans: Plan[] = [
       "Até 25 alunos ativos",
     ],
     actionLabel: "Começar agora",
-    href: "mailto:contato@mybjjacademy.com.br?subject=Teste%20por%207%20dias",
+    href: `${adminUrl}/?plano=trial`,
   },
   {
     name: "Plano Starter",
@@ -22,17 +23,18 @@ const plans: Plan[] = [
     ],
     actionLabel: "Escolher o Plano Starter!",
     featured: true,
+    href: `${adminUrl}/?plano=starter`,
   },
   {
     name: "Plano Full",
     monthlyPrice: "99,90",
     benefits: [
-      "A partir de 80 alunos ativos",
+      "Mais de 80 alunos ativos",
       "Todas as funcionalidades do Starter",
       "Suporte Dedicado 24h",
     ],
     actionLabel: "Escolher o Plano Full!",
-    href: "mailto:contato@mybjjacademy.com.br?subject=Plano%20Full",
+    href: `${adminUrl}/?plano=full`,
   },
 ];
 
@@ -61,9 +63,6 @@ export function PricingSection() {
           className="absolute inset-y-0 left-full ml-5 hidden w-[300px] rounded-[15px] border border-[#9d9d9d] [mask-image:linear-gradient(to_left,transparent_40%,black)] lg:block"
         />
       </div>
-      <p className="mt-5 text-center text-sm text-[#515151]">
-        Teste de 7 dias e plano Full sob consulta.
-      </p>
     </section>
   );
 }

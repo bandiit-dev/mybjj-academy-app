@@ -1,5 +1,5 @@
 import { ConvexError } from "convex/values";
-import { PORTAL_PLAN } from "./portalBilling";
+import { fullProductId, PORTAL_PLANS, type PortalPlan } from "./portalBilling";
 
 export const STRIPE_API_VERSION="2026-10-28.endive";
 export type StripeData=Record<string,any>;
@@ -48,9 +48,27 @@ export async function stripeRequest(path:string, body?:Record<string,string>, id
   return response.json();
 }
 export const stripeId=(value:any):string|undefined=>typeof value==="string"?value:typeof value?.id==="string"?value.id:undefined;
-export function validPortalPrice(price:StripeData) {
-  return price.id===process.env.STRIPE_MONTHLY_PRICE_ID && price.currency===PORTAL_PLAN.currency && price.unit_amount===PORTAL_PLAN.amount &&
-    price.recurring?.interval===PORTAL_PLAN.interval && price.recurring?.interval_count===1 && !price.deleted;
+export function portalPlanForPrice(price: StripeData): PortalPlan | undefined {
+  if (price.deleted || typeof price.id !== "string" || !price.id.startsWith("price_") || price.currency !== "brl" ||
+      price.recurring?.interval !== "month" || price.recurring.interval_count !== 1) return;
+  if (price.id === process.env.STRIPE_MONTHLY_PRICE_ID && price.unit_amount === PORTAL_PLANS.starter.amount) return "starter";
+  if (stripeId(price.product) === fullProductId() && price.unit_amount === PORTAL_PLANS.full.amount) return "full";
+}
+
+export function validPortalPrice(price: StripeData) {
+  return portalPlanForPrice(price) !== undefined;
+}
+
+export async function checkoutPrice(plan: PortalPlan) {
+  if (plan === "starter") {
+    const price = await stripeRequest(`prices/${encodeURIComponent(billingConfiguration().priceId)}`);
+    if (price.active && portalPlanForPrice(price) === plan) return String(price.id);
+  } else {
+    const product = await stripeRequest(`products/${encodeURIComponent(fullProductId())}?expand[]=default_price`);
+    const price = product.default_price;
+    if (product.active && price?.active && portalPlanForPrice(price) === plan) return String(price.id);
+  }
+  throw new ConvexError("O plano de pagamento não está disponível. Entre em contato com o suporte.");
 }
 
 export async function subscriptionSnapshot(subscriptionId:string) {
@@ -58,13 +76,17 @@ export async function subscriptionSnapshot(subscriptionId:string) {
   const sub=await stripeRequest(`subscriptions/${encodeURIComponent(subscriptionId)}?expand[]=latest_invoice`);
   const item=sub.items?.data?.length===1?sub.items.data[0]:null;
   const price=item && typeof item.price==="object"?item.price:null;
-  const valid=price && item.quantity===1 && validPortalPrice(price);
+  const plan = price && item.quantity === 1 ? portalPlanForPrice(price) : undefined;
+  const trialEndsAt = sub.trial_end == null ? undefined : Number(sub.trial_end) * 1000;
+  const trialUsed = sub.metadata?.checkoutOption === "trial";
+  const valid = plan && (sub.status !== "trialing" ||
+    (plan === "starter" && trialUsed && Number.isFinite(trialEndsAt)));
   const currentPeriodEnd=Number(item?.current_period_end??sub.current_period_end)*1000;
   let invoice=sub.latest_invoice;
   if(typeof invoice==="string") invoice=await stripeRequest(`invoices/${encodeURIComponent(invoice)}`);
   const invoiceSubscription=stripeId(invoice?.parent?.subscription_details?.subscription??invoice?.subscription);
   let paidThrough:number|undefined;
-  if(valid&&invoice?.status==="paid"&&invoice.currency==="brl"&&invoiceSubscription===sub.id) {
+  if(valid&&sub.status!=="trialing"&&invoice?.status==="paid"&&invoice.currency==="brl"&&invoiceSubscription===sub.id) {
     const lines=invoice.lines?.data??[];
     const ends=lines.filter((line:StripeData)=>stripeId(line.pricing?.price_details?.price??line.price)===price.id && line.amount>=0)
       .map((line:StripeData)=>Number(line.period?.end)*1000).filter((end:number)=>Number.isFinite(end)&&end>0);
@@ -73,6 +95,8 @@ export async function subscriptionSnapshot(subscriptionId:string) {
   return {
     subscriptionId:sub.id as string,customerId:stripeId(sub.customer)!,
     status:valid?String(sub.status):"invalid_plan",priceId:valid?String(price.id):undefined,
+    plan: valid ? plan : undefined, trialUsed,
+    trialEndsAt: valid && sub.status === "trialing" ? trialEndsAt : undefined,
     paidThrough,currentPeriodEnd:Number.isFinite(currentPeriodEnd)?currentPeriodEnd:undefined,
     cancelAtPeriodEnd:Boolean(sub.cancel_at_period_end),checkedAt,
     billingAccountId:sub.metadata?.billingAccountId as string|undefined

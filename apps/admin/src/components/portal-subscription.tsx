@@ -2,9 +2,11 @@
 
 import { api } from "@mybjj/backend/convex/_generated/api";
 import type { Id } from "@mybjj/backend/convex/_generated/dataModel";
+import type { CheckoutOption } from "@mybjj/backend/convex/lib/portalBilling";
 import { SignOutButton } from "@clerk/nextjs";
 import { ConvexError } from "convex/values";
 import { useAction } from "convex/react";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { usePortalSubscription } from "@/hooks/use-portal-subscription";
 import { AuthPageLayout } from "./auth-page-layout";
@@ -15,18 +17,27 @@ const date = (value: number | null) =>
         timeZone: "America/Sao_Paulo",
       }).format(value)
     : "—";
+const formatPrice = (amount: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
+    amount / 100,
+  );
+
 function usePaymentAction(gymId?: Id<"gyms">) {
   const checkout = useAction(api.stripe.createCheckout);
   const portal = useAction(api.stripe.createPortal);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  async function open(manage: boolean, promotionCode?: string) {
+  async function open(
+    manage: boolean,
+    promotionCode?: string,
+    option?: CheckoutOption,
+  ) {
     setBusy(true);
     setError("");
     try {
       const result = await (manage
         ? portal({ gymId })
-        : checkout({ promotionCode }));
+        : checkout({ promotionCode, option }));
       window.location.assign(result.url);
     } catch (error) {
       const data = error instanceof ConvexError ? error.data : undefined;
@@ -56,9 +67,19 @@ export function SubscriptionPage() {
   const started = useRef(false);
   const [confirmation, setConfirmation] = useState("");
   const [promotionCode, setPromotionCode] = useState("");
+  const requested = useSearchParams().get("plano");
+  const [selected, setSelected] = useState<CheckoutOption>(
+    requested === "full" || requested === "trial" ? requested : "starter",
+  );
+  const option =
+    selected === "trial" && billing?.canStartTrial === false
+      ? "starter"
+      : selected;
+  const trial = option === "trial";
+  const checkoutPrice = formatPrice(option === "full" ? 9990 : 3990);
   const manageSubscription = Boolean(
     billing?.hasSubscription &&
-    !["canceled", "incomplete_expired"].includes(billing.status),
+    !["canceled", "incomplete_expired", "trialing"].includes(billing.status),
   );
   useEffect(() => {
     if (!billing || started.current) return;
@@ -66,20 +87,20 @@ export function SubscriptionPage() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("checkout") === "cancelled")
       setConfirmation(
-        "Pagamento cancelado. Você pode tentar novamente quando quiser.",
+        "Operação cancelada. Você pode tentar novamente quando quiser.",
       );
     const sessionId = params.get("session_id");
     if (params.get("checkout") === "success" && sessionId) {
-      setConfirmation("Confirmando seu pagamento...");
+      setConfirmation("Confirmando sua assinatura...");
       confirm({ sessionId })
         .then(() =>
           setConfirmation(
-            "Aguardando a confirmação do pagamento. O portal abrirá automaticamente assim que ele for aprovado.",
+            "Aguardando a confirmação da assinatura. O portal abrirá automaticamente após a confirmação.",
           ),
         )
         .catch(() =>
           setConfirmation(
-            "Ainda estamos aguardando a confirmação do pagamento. Você pode tentar verificar novamente.",
+            "Ainda estamos aguardando a confirmação da assinatura. Você pode verificar novamente.",
           ),
         );
     }
@@ -101,7 +122,16 @@ export function SubscriptionPage() {
           BJJ Academy.
         </p>
         <div className="subscription-price">
-          R$ 39,90 <span>/ mês por academia</span>
+          {manageSubscription
+            ? formatPrice(billing!.plan.amount)
+            : trial
+              ? "Grátis"
+              : checkoutPrice}
+          <span>
+            {!manageSubscription && trial
+              ? " por 7 dias"
+              : " / mês por academia"}
+          </span>
         </div>
         <ul>
           <li>Gestão de alunos, planos e pagamentos</li>
@@ -128,6 +158,27 @@ export function SubscriptionPage() {
         ) : (
           <>
             {!manageSubscription && (
+              <label className="subscription-coupon">
+                <span>Escolha seu plano</span>
+                <select
+                  value={option}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setSelected(
+                      value === "trial" || value === "full" ? value : "starter",
+                    );
+                  }}
+                  disabled={payment.busy}
+                >
+                  {billing.canStartTrial && (
+                    <option value="trial">Teste grátis por 7 dias</option>
+                  )}
+                  <option value="starter">Starter · R$ 39,90/mês</option>
+                  <option value="full">Full · R$ 99,90/mês</option>
+                </select>
+              </label>
+            )}
+            {!manageSubscription && !trial && (
               <label
                 className="subscription-coupon"
                 htmlFor="subscription-promotion-code"
@@ -155,15 +206,23 @@ export function SubscriptionPage() {
               className="button primary"
               type="button"
               disabled={payment.busy}
-              onClick={() => payment.open(manageSubscription, promotionCode)}
+              onClick={() =>
+                payment.open(
+                  manageSubscription,
+                  trial ? undefined : promotionCode,
+                  option,
+                )
+              }
             >
               {payment.busy
                 ? "Abrindo pagamento..."
                 : manageSubscription
                   ? "Regularizar assinatura"
-                  : promotionCode.trim()
-                    ? "Continuar com cupom"
-                    : "Assinar por R$ 39,90/mês"}
+                  : trial
+                    ? "Iniciar teste grátis"
+                    : promotionCode.trim()
+                      ? "Continuar com cupom"
+                      : `Assinar por ${checkoutPrice}/mês`}
             </button>
             {confirmation && (
               <button
@@ -171,12 +230,13 @@ export function SubscriptionPage() {
                 type="button"
                 onClick={() => window.location.reload()}
               >
-                Verificar pagamento
+                Verificar assinatura
               </button>
             )}
             <p className="subscription-footnote">
-              Cobrança mensal recorrente. Gerencie ou cancele sua assinatura a
-              qualquer momento.
+              {trial && !manageSubscription
+                ? "Até 25 alunos ativos. Sem cartão e sem cobrança automática. Ao fim do teste, escolha um plano para continuar."
+                : "Cobrança mensal recorrente. Gerencie ou cancele sua assinatura a qualquer momento."}
             </p>
           </>
         )}
@@ -201,7 +261,11 @@ export function AcademySubscriptionTile({ gymId }: { gymId: Id<"gyms"> }) {
           <span
             className={`subscription-badge ${billing.hasAccess ? "active" : ""}`}
           >
-            {billing.hasAccess ? "Ativo" : "Pagamento pendente"}
+            {billing.status === "trialing" && billing.hasAccess
+              ? "Em teste"
+              : billing.hasAccess
+                ? "Ativo"
+                : "Pagamento pendente"}
           </span>
         )}
       </header>
@@ -212,24 +276,39 @@ export function AcademySubscriptionTile({ gymId }: { gymId: Id<"gyms"> }) {
           <div className="academy-fields">
             <div className="academy-field">
               <span>Plano</span>
-              <strong>My BJJ Academy · Mensal</strong>
+              <strong>
+                {billing.plan.name} ·{" "}
+                {billing.status === "trialing" ? "Teste de 7 dias" : "Mensal"}
+              </strong>
             </div>
             <div className="academy-field">
               <span>Valor</span>
-              <strong>R$ 39,90/mês</strong>
-            </div>
-            <div className="academy-field">
-              <span>Acesso pago até</span>
-              <strong>{date(billing.paidThrough)}</strong>
+              <strong>
+                {billing.status === "trialing"
+                  ? "Grátis"
+                  : `${formatPrice(billing.plan.amount)}/mês`}
+              </strong>
             </div>
             <div className="academy-field">
               <span>
-                {billing.cancelAtPeriodEnd
-                  ? "Encerramento previsto"
-                  : "Próxima renovação"}
+                {billing.status === "trialing"
+                  ? "Fim do teste"
+                  : "Acesso pago até"}
               </span>
-              <strong>{date(billing.currentPeriodEnd)}</strong>
+              <strong>
+                {date(billing.trialEndsAt ?? billing.paidThrough)}
+              </strong>
             </div>
+            {billing.status !== "trialing" && (
+              <div className="academy-field">
+                <span>
+                  {billing.cancelAtPeriodEnd
+                    ? "Encerramento previsto"
+                    : "Próxima renovação"}
+                </span>
+                <strong>{date(billing.currentPeriodEnd)}</strong>
+              </div>
+            )}
           </div>
           {billing.cancelAtPeriodEnd && (
             <p className="subscription-notice">
@@ -237,7 +316,11 @@ export function AcademySubscriptionTile({ gymId }: { gymId: Id<"gyms"> }) {
               pago.
             </p>
           )}
-          {billing.canManage ? (
+          {billing.status === "trialing" ? (
+            <p className="subscription-footnote">
+              Ao fim do teste, escolha um plano para continuar.
+            </p>
+          ) : billing.canManage ? (
             <button
               className="button secondary"
               type="button"

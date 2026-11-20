@@ -1,7 +1,8 @@
-import { v, type Infer } from "convex/values";
+import { ConvexError, v, type Infer } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { requireAdmin } from "./auth";
+import { PORTAL_PLANS, TRIAL_STUDENT_LIMIT } from "./portalBilling";
 
 export const PLAN_MONTHS = { Mensal: 1, Semestral: 6, Anual: 12 } as const;
 export type PlanType = keyof typeof PLAN_MONTHS;
@@ -29,6 +30,39 @@ export function validateStudentPlan(plan: StudentPlan) {
 
 export function getStudentPlan(student: { plan?: StudentPlan }, today = academyToday()): StudentPlan {
   return student.plan ?? { type: "Mensal", startDate: `${today.slice(0, 7)}-01`, isActive: true };
+}
+
+export async function assertActiveStudentCapacity(
+  ctx: QueryCtx | MutationCtx,
+  gymIds: Id<"gyms">[],
+  plan: StudentPlan,
+  previous?: Pick<Doc<"students">, "gymIds" | "plan">,
+) {
+  if (!plan.isActive) return;
+  const previousGyms = previous && getStudentPlan(previous).isActive ? previous.gymIds : [];
+  const addedGyms = [...new Set(gymIds)].filter(gymId => !previousGyms.includes(gymId));
+  const remaining = new Map<Id<"gyms">, { limit: number; slots: number }>();
+  for (const gymId of addedGyms) {
+    const billing = await ctx.db.query("billingAccounts").withIndex("by_gymId", q => q.eq("gymId", gymId)).unique();
+    if (!billing) continue;
+    const limit = billing.status === "trialing"
+      ? TRIAL_STUDENT_LIMIT
+      : PORTAL_PLANS[billing.plan ?? "starter"].studentLimit;
+    if (limit !== null) remaining.set(gymId, { limit, slots: limit });
+  }
+  if (!remaining.size) return;
+
+  for (const student of await ctx.db.query("students").collect()) {
+    if (!getStudentPlan(student).isActive) continue;
+    for (const gymId of new Set(student.gymIds)) {
+      const capacity = remaining.get(gymId);
+      if (!capacity) continue;
+      capacity.slots--;
+      if (capacity.slots === 0) {
+        throw new ConvexError(`O plano da academia permite até ${capacity.limit} alunos ativos.`);
+      }
+    }
+  }
 }
 
 export function addPlanMonths(date: string, months: number) {

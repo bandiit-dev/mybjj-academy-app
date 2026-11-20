@@ -34,6 +34,9 @@ export default defineSchema({
     checkoutSessionId: v.optional(v.string()), checkoutExpiresAt: v.optional(v.number()),
     checkoutAttempt: v.number(), checkoutLockUntil: v.optional(v.number()),
     status: v.string(), priceId: v.optional(v.string()),
+    plan: v.optional(v.union(v.literal("starter"), v.literal("full"))),
+    trialEndsAt: v.optional(v.number()), trialUsed: v.optional(v.boolean()),
+    trialCheckoutReserved: v.optional(v.boolean()),
     paidThrough: v.optional(v.number()), currentPeriodEnd: v.optional(v.number()),
     cancelAtPeriodEnd: v.boolean(), stripeSyncedAt: v.number(), lastEventCreated: v.number(),
     createdAt: v.number(), updatedAt: v.number()

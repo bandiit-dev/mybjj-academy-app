@@ -2690,7 +2690,8 @@ select:focus-visible {
   font-size: 14px;
   font-weight: 600;
 }
-.subscription-coupon input {
+.subscription-coupon input,
+.subscription-coupon select {
   width: 100%;
   min-height: 44px;
   padding: 10px 12px;
