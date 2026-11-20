@@ -1,9 +1,17 @@
 import { assertAdminGymScope } from "./lib/auth";
+import type { Doc } from "./_generated/dataModel";
 import { v } from "convex/values";
 
 import { mutation, query } from "./_generated/server";
 import { getAccessibleGymIds, requireAdmin } from "./lib/auth";
 import { assertWeekDays } from "./lib/validators";
+
+export function classTitle(template?: Pick<Doc<"classes">, "level" | "classType"> | null) {
+  if (!template) return "Aula de jiu-jitsu";
+  const level = template.level === "Advanced" ? "Avançado" : "Fundamentos";
+  const modality = template.classType === "NOGI" ? "NO-GI" : "GI";
+  return `${level} ${modality}`;
+}
 
 const classTypeValidator = v.union(v.literal("GI"), v.literal("NOGI"));
 const classLevelValidator = v.union(v.literal("Beginner"), v.literal("Advanced"));

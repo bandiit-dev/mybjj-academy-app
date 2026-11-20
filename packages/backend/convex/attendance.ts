@@ -1,10 +1,120 @@
 import { v } from "convex/values";
 
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type MutationCtx } from "./_generated/server";
-import { requireSessionTeacherOrAdmin } from "./lib/auth";
+import { classTitle } from "./classes";
+import {
+  requireSessionTeacherOrAdmin,
+  requireStudentSelfOrAdmin,
+} from "./lib/auth";
+import { academyToday } from "./lib/studentPlans";
 
-const attendanceStatusValidator = v.union(v.literal("Present"), v.literal("Absent"));
+const attendanceStatusValidator = v.union(
+  v.literal("Present"),
+  v.literal("Absent"),
+);
+
+export function isStudentPresent(
+  attendance: Doc<"attendance">["status"] | undefined,
+  enrollment: Doc<"enrollments">["status"] | undefined,
+) {
+  return attendance ? attendance === "Present" : enrollment === "Confirmed";
+}
+
+export const getStudentAttendanceHistory = query({
+  args: { studentId: v.id("students") },
+  handler: async (ctx, { studentId }) => {
+    const { isAdmin, teacher, student, targetStudent } =
+      await requireStudentSelfOrAdmin(ctx, studentId);
+    if (!isAdmin) throw new Error("Forbidden: admin role required");
+
+    const adminGyms = new Set([
+      ...(teacher?.gymIds ?? []),
+      ...(student?.gymIds ?? []),
+    ]);
+    const sharedGyms = new Set(
+      targetStudent.gymIds.filter((id) => adminGyms.has(id)),
+    );
+    const today = academyToday();
+    const [attendance, enrollments] = await Promise.all([
+      ctx.db
+        .query("attendance")
+        .withIndex("by_studentId", (q) => q.eq("studentId", studentId))
+        .collect(),
+      ctx.db
+        .query("enrollments")
+        .withIndex("by_studentId", (q) => q.eq("studentId", studentId))
+        .collect(),
+    ]);
+    const attendanceBySession = new Map(
+      attendance.map((row) => [row.classSessionId, row.status]),
+    );
+    const sessionsPresent = new Set<Id<"classSessions">>(
+      [...attendanceBySession]
+        .filter(([, status]) => status === "Present")
+        .map(([sessionId]) => sessionId),
+    );
+    for (const enrollment of enrollments) {
+      if (
+        isStudentPresent(
+          attendanceBySession.get(enrollment.classSessionId),
+          enrollment.status,
+        )
+      ) {
+        sessionsPresent.add(enrollment.classSessionId);
+      }
+    }
+
+    const sessions = (
+      await Promise.all([...sessionsPresent].map((id) => ctx.db.get(id)))
+    )
+      .filter(
+        (session): session is Doc<"classSessions"> =>
+          session !== null &&
+          session.status !== "Cancelled" &&
+          session.sessionDate <= today &&
+          session.gymIds.some((id) => sharedGyms.has(id)),
+      )
+      .sort(
+        (a, b) =>
+          b.sessionDate.localeCompare(a.sessionDate) || b.startsAt - a.startsAt,
+      );
+    const [templates, units] = await Promise.all([
+      Promise.all(
+        [...new Set(sessions.map((session) => session.classId))].map(
+          async (id) => [id, await ctx.db.get(id)] as const,
+        ),
+      ),
+      Promise.all(
+        [...new Set(sessions.flatMap((session) => session.unityIds))].map(
+          async (id) => [id, await ctx.db.get(id)] as const,
+        ),
+      ),
+    ]);
+    const templateById = new Map(templates);
+    const unitById = new Map(units);
+    const classes = sessions.map((session) => {
+      const template = templateById.get(session.classId);
+      return {
+        sessionId: session._id,
+        date: session.sessionDate,
+        startsAt: session.startsAt,
+        title: classTitle(
+          template?.gymIds.some((id) => sharedGyms.has(id))
+            ? template
+            : undefined,
+        ),
+        units: session.unityIds.flatMap((id) => {
+          const unit = unitById.get(id);
+          return unit?.gymId && sharedGyms.has(unit.gymId)
+            ? [unit.name || unit.address]
+            : [];
+        }),
+      };
+    });
+    return { total: classes.length, classes };
+  },
+});
 
 async function upsertAttendance(
   ctx: MutationCtx,

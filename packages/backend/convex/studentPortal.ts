@@ -1,6 +1,8 @@
 import { ConvexError, v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { mutation, query, type QueryCtx } from "./_generated/server";
+import { isStudentPresent } from "./attendance";
+import { classTitle } from "./classes";
 import { confirmStudentEnrollment } from "./enrollments";
 import { getCurrentPrincipal } from "./lib/auth";
 import {
@@ -130,15 +132,12 @@ async function schedule(
         const [enrollment, attendance] = entry.sessionId
           ? await participation(ctx, student._id, entry.sessionId)
           : [null, null];
-        const level =
-          entry.template?.level === "Advanced" ? "Avançado" : "Fundamentos";
-        const modality = entry.template?.classType === "NOGI" ? "NO-GI" : "GI";
         return {
           classId: entry.classId,
           sessionId: entry.sessionId,
           startsAt: entry.startsAt,
           endsAt: entry.endsAt,
-          title: entry.template ? `${level} ${modality}` : "Aula de jiu-jitsu",
+          title: classTitle(entry.template),
           teachers: entry.teacherIds.flatMap((id) => {
             const teacher = teachers.get(id);
             return teacher && sharesAcademy(student, teacher)
@@ -265,11 +264,7 @@ export const getOverview = query({
               student._id,
               session._id,
             );
-            return (
-              attendance
-                ? attendance.status === "Present"
-                : enrollment?.status === "Confirmed"
-            )
+            return isStudentPresent(attendance?.status, enrollment?.status)
               ? session.sessionDate
               : null;
           }),

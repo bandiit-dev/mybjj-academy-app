@@ -2754,3 +2754,7 @@ select:focus-visible {
 .nav-list a[href="/aluno"].active {
   font-weight: 600;
 }
+
+.payments-table.attendance-table {
+  min-width: 440px;
+}

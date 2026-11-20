@@ -16,6 +16,11 @@ import { PortalImage } from "@/components/portal-image";
 
 const dateLabel = (date?: string) =>
   date ? date.split("-").reverse().join("/") : "—";
+const attendanceTime = new Intl.DateTimeFormat("pt-BR", {
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "America/Sao_Paulo",
+});
 function lastCoveredDay(exclusiveEnd: string) {
   return new Date(new Date(`${exclusiveEnd}T00:00:00Z`).getTime() - 86400000)
     .toISOString()
@@ -242,6 +247,94 @@ function StudentBilling({ studentId }: { studentId: Id<"students"> }) {
   );
 }
 
+function StudentAttendance({ studentId }: { studentId: Id<"students"> }) {
+  const history = useQuery(api.attendance.getStudentAttendanceHistory, {
+    studentId,
+  });
+  const [page, setPage] = useState(0);
+  const pageSize = 12;
+  const pageCount = Math.max(1, Math.ceil((history?.total ?? 0) / pageSize));
+  const currentPage = Math.min(page, pageCount - 1);
+
+  return (
+    <section
+      className="academy-card student-billing"
+      aria-labelledby="student-attendance-heading"
+    >
+      <header>
+        <h2 id="student-attendance-heading">Histórico de presenças</h2>
+        {history && (
+          <span className="student-status active">
+            {history.total} {history.total === 1 ? "presença" : "presenças"}
+          </span>
+        )}
+      </header>
+      {!history ? (
+        <p role="status">Carregando histórico de presenças...</p>
+      ) : history.classes.length === 0 ? (
+        <p className="empty-copy">Nenhuma presença registrada.</p>
+      ) : (
+        <>
+          <div className="table-scroll">
+            <table className="payments-table attendance-table">
+              <thead>
+                <tr>
+                  <th>Aula</th>
+                  <th>Data</th>
+                  <th>Horário</th>
+                  <th>Unidade</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.classes
+                  .slice(currentPage * pageSize, (currentPage + 1) * pageSize)
+                  .map((entry) => (
+                    <tr key={entry.sessionId}>
+                      <td>
+                        <strong>{entry.title}</strong>
+                      </td>
+                      <td>{dateLabel(entry.date)}</td>
+                      <td>{attendanceTime.format(entry.startsAt)}</td>
+                      <td>{entry.units.join(", ") || "—"}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+          {pageCount > 1 && (
+            <div
+              className="students-pagination"
+              aria-label="Paginação do histórico de presenças"
+            >
+              <span>
+                Página {currentPage + 1} de {pageCount}
+              </span>
+              <div className="payment-actions">
+                <button
+                  className="button secondary"
+                  type="button"
+                  disabled={currentPage === 0}
+                  onClick={() => setPage(currentPage - 1)}
+                >
+                  Anterior
+                </button>
+                <button
+                  className="button secondary"
+                  type="button"
+                  disabled={currentPage + 1 >= pageCount}
+                  onClick={() => setPage(currentPage + 1)}
+                >
+                  Próxima
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 export function StudentDetailsPage({
   studentId,
 }: {
@@ -371,6 +464,7 @@ export function StudentDetailsPage({
                 pagamentos é mantido ao alterar o plano ou desativar o aluno.
               </p>
             </section>
+            <StudentAttendance key={studentId} studentId={studentId} />
             <StudentBilling studentId={studentId} />
           </>
         )}

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { getStudentAttendanceHistory } from "../convex/attendance";
 import { cancelEnrollment } from "../convex/enrollments";
 import { getAllStudents, getStudentById } from "../convex/students";
 import {
@@ -369,5 +370,80 @@ test("students can undo their confirmation until a teacher records attendance", 
   assert.equal(
     (await handler(getSchedule)(ctx, { date: today }))[0].confirmed,
     true,
+  );
+});
+
+test("admin attendance history counts present sessions once, scoped to the student's accessible academies", async (t) => {
+  t.mock.method(Date, "now", () => clock);
+  const { ctx, tables, friday } = fixture("admin-login");
+  tables.teachers.push({
+    _id: "admin",
+    clerkUserId: "admin-login",
+    userType: "Admin",
+    gymIds: ["gym"],
+  });
+  tables.billingAccounts = [
+    {
+      gymId: "gym",
+      status: "active",
+      priceId: "price_test",
+      paidThrough: clock + 86_400_000,
+    },
+  ];
+  tables.students[0].gymIds.push("elsewhere");
+  tables.classSessions.push(
+    { ...friday, _id: "teacher-present" },
+    { ...friday, _id: "canceled", status: "Cancelled" },
+    { ...friday, _id: "future", sessionDate: "2026-11-27" },
+  );
+  tables.attendance.push({
+    classSessionId: "teacher-present",
+    studentId: "student",
+    status: "Present",
+  });
+  tables.enrollments.push(
+    ...[
+      "monday",
+      "teacher-present",
+      "outside-scope",
+      "canceled",
+      "future",
+      "missing",
+    ].map((classSessionId) => ({
+      classSessionId,
+      studentId: "student",
+      status: "Confirmed",
+    })),
+  );
+
+  const history = await handler(getStudentAttendanceHistory)(ctx, {
+    studentId: "student",
+  });
+  assert.equal(history.total, 2);
+  assert.deepEqual(
+    history.classes.map((entry: { sessionId: string }) => entry.sessionId),
+    ["teacher-present", "monday"],
+  );
+  assert.equal(history.classes[0].title, "Fundamentos GI");
+  assert.deepEqual(history.classes[0].units, ["Centro"]);
+  assert.deepEqual(
+    await handler(getStudentAttendanceHistory)(ctx, {
+      studentId: "other-student",
+    }),
+    {
+      total: 0,
+      classes: [],
+    },
+  );
+  await assert.rejects(
+    handler(getStudentAttendanceHistory)(fixture().ctx, {
+      studentId: "student",
+    }),
+    /admin role required/,
+  );
+  tables.students[1].gymIds = ["elsewhere"];
+  await assert.rejects(
+    handler(getStudentAttendanceHistory)(ctx, { studentId: "other-student" }),
+    /student belongs to another/,
   );
 });
