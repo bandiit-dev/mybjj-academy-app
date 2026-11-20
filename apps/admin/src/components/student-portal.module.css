@@ -293,16 +293,14 @@
 }
 
 .graduation .belt {
+  --belt-rank-width: 0%;
+
   display: flex;
   width: 100%;
   height: 40px;
   justify-content: flex-end;
   overflow: hidden;
   border-radius: 5px;
-}
-
-.graduation .belt:global(.brown) {
-  background: #79523d;
 }
 
 .rank {
@@ -312,7 +310,7 @@
   justify-content: flex-start;
   gap: 7px;
   padding: 0 12px;
-  background: var(--student-ink);
+  background: var(--belt-rank, #18181b);
 }
 
 .rank span {

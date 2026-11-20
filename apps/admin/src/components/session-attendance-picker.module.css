@@ -113,23 +113,23 @@
 }
 
 .row .belt {
+  --belt-rank-offset: 2px;
+
   display: flex;
   flex: none;
   justify-content: flex-end;
   width: 56px;
   height: 16px;
   overflow: hidden;
-  border-color: #a1a1aa;
-  background-color: white;
 }
 
 .stripes {
   display: flex;
   justify-content: flex-end;
   gap: 2px;
-  width: 26px;
+  width: 44%;
+  margin-right: var(--belt-rank-offset);
   padding: 0 2px;
-  background: #18181b;
 }
 
 .stripes i {

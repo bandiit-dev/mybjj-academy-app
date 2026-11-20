@@ -655,23 +655,14 @@ select:focus-visible {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  border: 1px solid transparent;
-}
-.belt-dot.white {
-  border-color: #71717a;
-  background: white;
-}
-.belt-dot.blue {
-  background: #2563eb;
-}
-.belt-dot.purple {
-  background: #9333ea;
-}
-.belt-dot.brown {
-  background: #78350f;
-}
-.belt-dot.black {
-  background: linear-gradient(90deg, #09090b 0 70%, #dc2626 70%);
+  border: 1px solid #a1a1aa;
+  background:
+    linear-gradient(
+        var(--belt-stripe, transparent),
+        var(--belt-stripe, transparent)
+      )
+      center / 100% 34% no-repeat,
+    var(--belt-fabric, #fff);
 }
 .member-badge,
 .student-status {
@@ -1245,23 +1236,17 @@ select:focus-visible {
   width: 32px;
   height: 7px;
   border-radius: 4px;
-  border: 1px solid transparent;
-}
-.belt-line.white {
-  border-color: #71717a;
-  background: white;
-}
-.belt-line.blue {
-  background: #2563eb;
-}
-.belt-line.purple {
-  background: #6d3db3;
-}
-.belt-line.brown {
-  background: #7c3f20;
-}
-.belt-line.black {
-  background: #09090b;
+  border: 1px solid #a1a1aa;
+  background:
+    linear-gradient(var(--belt-rank, #18181b), var(--belt-rank, #18181b)) right
+      var(--belt-rank-offset, 1px) center / var(--belt-rank-width, 44%) 100%
+      no-repeat,
+    linear-gradient(
+        var(--belt-stripe, transparent),
+        var(--belt-stripe, transparent)
+      )
+      center / 100% 34% no-repeat,
+    var(--belt-fabric, #fff);
 }
 .professor-email {
   overflow: hidden;
@@ -2196,61 +2181,56 @@ select:focus-visible {
   color: var(--muted);
   font-size: 13px;
 }
-.belt-dot.gray,
-.belt-line.gray {
-  background: #9ca3af;
+:is(.belt-dot, .belt-line):is(.gray, .gray-white, .gray-black) {
+  --belt-fabric: #9ca3af;
 }
-.belt-dot.gray-white,
-.belt-line.gray-white {
-  background: linear-gradient(90deg, #9ca3af 0 65%, #fff 65%);
+:is(.belt-dot, .belt-line):is(.yellow, .yellow-white, .yellow-black) {
+  --belt-fabric: #ffc400;
 }
-.belt-dot.gray-black,
-.belt-line.gray-black {
-  background: linear-gradient(90deg, #9ca3af 0 65%, #09090b 65%);
+:is(.belt-dot, .belt-line):is(.orange, .orange-white, .orange-black) {
+  --belt-fabric: #ff8900;
 }
-.belt-dot.yellow,
-.belt-line.yellow {
-  background: #facc15;
+:is(.belt-dot, .belt-line):is(.green, .green-white, .green-black) {
+  --belt-fabric: #10b981;
 }
-.belt-dot.yellow-white,
-.belt-line.yellow-white {
-  background: linear-gradient(90deg, #facc15 0 65%, #fff 65%);
+:is(.belt-dot, .belt-line):is(
+  .gray-white,
+  .yellow-white,
+  .orange-white,
+  .green-white
+) {
+  --belt-stripe: #fff;
 }
-.belt-dot.yellow-black,
-.belt-line.yellow-black {
-  background: linear-gradient(90deg, #facc15 0 65%, #09090b 65%);
+:is(.belt-dot, .belt-line):is(
+  .gray-black,
+  .yellow-black,
+  .orange-black,
+  .green-black
+) {
+  --belt-stripe: #18181b;
 }
-.belt-dot.orange,
-.belt-line.orange {
-  background: #f97316;
+:is(.belt-dot, .belt-line).blue {
+  --belt-fabric: #3278b5;
 }
-.belt-dot.orange-white,
-.belt-line.orange-white {
-  background: linear-gradient(90deg, #f97316 0 65%, #fff 65%);
+:is(.belt-dot, .belt-line).purple {
+  --belt-fabric: #774cb0;
 }
-.belt-dot.orange-black,
-.belt-line.orange-black {
-  background: linear-gradient(90deg, #f97316 0 65%, #09090b 65%);
+:is(.belt-dot, .belt-line).brown {
+  --belt-fabric: #79523d;
 }
-.belt-dot.green,
-.belt-line.green {
-  background: #22c55e;
+:is(.belt-dot, .belt-line).black {
+  --belt-fabric: #18181b;
+  --belt-rank: #b41238;
 }
-.belt-dot.green-white,
-.belt-line.green-white {
-  background: linear-gradient(90deg, #22c55e 0 65%, #fff 65%);
+:is(.belt-dot, .belt-line).coral {
+  --belt-fabric: repeating-linear-gradient(
+    90deg,
+    #dc2626 0 5px,
+    #09090b 5px 10px
+  );
 }
-.belt-dot.green-black,
-.belt-line.green-black {
-  background: linear-gradient(90deg, #22c55e 0 65%, #09090b 65%);
-}
-.belt-dot.coral,
-.belt-line.coral {
-  background: repeating-linear-gradient(90deg, #dc2626 0 5px, #09090b 5px 10px);
-}
-.belt-dot.red,
-.belt-line.red {
-  background: #dc2626;
+:is(.belt-dot, .belt-line).red {
+  --belt-fabric: #dc2626;
 }
 
 .image-file-field input[type="file"] {
