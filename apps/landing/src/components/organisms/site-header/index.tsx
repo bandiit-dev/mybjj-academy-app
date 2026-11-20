@@ -12,8 +12,8 @@ export function SiteHeader({ home = false }: { home?: boolean }) {
         className="order-last flex w-full justify-center gap-8 text-base lg:absolute lg:left-1/2 lg:order-none lg:w-auto lg:-translate-x-1/2"
       >
         <Link href={`${homePath}#recursos`}>Recursos</Link>
-        <Link href={`${homePath}#planos`}>Preço</Link>
-        <a href="#contato">Contato</a>
+        <Link href={`${homePath}#planos`}>Planos</Link>
+        <Link href={`${homePath}#faq`}>FAQ</Link>
       </nav>
       <div className="flex gap-3.5">
         <ActionLink subtle className="min-w-[100px]">

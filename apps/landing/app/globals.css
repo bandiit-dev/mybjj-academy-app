@@ -5,6 +5,10 @@
 }
 
 @layer base {
+  html {
+    scroll-padding-block-start: 1.5rem;
+  }
+
   body {
     @apply bg-white font-sans text-black antialiased;
   }

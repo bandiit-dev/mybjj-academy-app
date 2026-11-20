@@ -7,7 +7,7 @@ import { SiteFooter } from "@/components/organisms/site-footer";
 
 export function HomePage() {
   return (
-    <RevealScope className="mx-[10px] my-[12px]">
+    <RevealScope className="mx-[10px] my-[12px]" centerAnchors>
       <main>
         <HeroSection />
         <FeaturesSection />

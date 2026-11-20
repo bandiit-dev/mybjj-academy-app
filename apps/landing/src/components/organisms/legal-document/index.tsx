@@ -49,7 +49,7 @@ export function LegalDocument({
               key={id}
               id={id}
               aria-labelledby={`${id}-titulo`}
-              className="scroll-mt-6 border-t border-neutral-200 pt-7"
+              className="border-t border-neutral-200 pt-7"
             >
               <h2 id={`${id}-titulo`} className="text-2xl font-semibold">
                 {index + 1}. {title}
