@@ -12,7 +12,7 @@ import type { Doc, Id } from "@mybjj/backend/convex/_generated/dataModel";
 import { useAction, useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, ReactNode, useEffect, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useId, useState } from "react";
 import {
   StudentPlanFields,
   readStudentPlan,
@@ -80,6 +80,50 @@ function Field({
     </label>
   );
 }
+function HexColorField({
+  name,
+  label,
+  defaultValue = "",
+  fallbackColor,
+}: {
+  name: string;
+  label: string;
+  defaultValue?: string;
+  fallbackColor: string;
+}) {
+  const id = useId();
+  const [value, setValue] = useState(defaultValue);
+  const hexPattern = "#[0-9a-fA-F]{6}";
+  const pickerValue = new RegExp(`^${hexPattern}$`).test(value)
+    ? value
+    : fallbackColor;
+
+  return (
+    <div className="management-field">
+      <label htmlFor={id}>{label}</label>
+      <div className="management-color-field">
+        <input
+          type="color"
+          aria-label={`Selecionar ${label.toLowerCase()}`}
+          value={pickerValue}
+          onChange={(event) => setValue(event.target.value.toUpperCase())}
+        />
+        <input
+          id={id}
+          name={name}
+          type="text"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          pattern={value === defaultValue ? undefined : hexPattern}
+          placeholder="#RRGGBB"
+          title="Use o formato #RRGGBB, por exemplo #1A2B3C."
+          spellCheck={false}
+        />
+      </div>
+    </div>
+  );
+}
+
 function Section({
   title,
   children,
@@ -1215,15 +1259,17 @@ export function EditAcademyForm() {
           label="Logo"
           currentUrl={gym.branding.logoUrl}
         />
-        <Field
+        <HexColorField
           name="primaryColor"
           label="Cor primária"
           defaultValue={gym.branding.primaryColor}
+          fallbackColor="#09090B"
         />
-        <Field
+        <HexColorField
           name="secondaryColor"
           label="Cor secundária"
           defaultValue={gym.branding.secondaryColor}
+          fallbackColor="#9E9E9E"
         />
       </Section>
     </Shell>
