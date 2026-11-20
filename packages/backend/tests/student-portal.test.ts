@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { getStudentAttendanceHistory } from "../convex/attendance";
+import { getStaffClasses } from "../convex/classes";
+import {
+  getClassSessionById,
+  getStaffClassHistory,
+  getStaffSessionLog,
+  recordClassDate,
+  saveStaffSessionLog,
+} from "../convex/classSessions";
 import { cancelEnrollment } from "../convex/enrollments";
 import { getAllStudents, getStudentById } from "../convex/students";
 import {
@@ -68,6 +76,7 @@ function fixture(subject = "student-login") {
         userType: "Normal",
       },
     ],
+    classSessionLogs: [],
     classes: [
       template,
       { ...template, _id: "different-gym", gymIds: ["elsewhere"] },
@@ -168,6 +177,9 @@ function fixture(subject = "student-login") {
             return chain;
           },
           collect: async () => rows,
+          async *[Symbol.asyncIterator]() {
+            yield* rows;
+          },
           unique: async () => {
             assert.ok(rows.length <= 1);
             return rows[0] ?? null;
@@ -445,5 +457,151 @@ test("admin attendance history counts present sessions once, scoped to the stude
   await assert.rejects(
     handler(getStudentAttendanceHistory)(ctx, { studentId: "other-student" }),
     /student belongs to another/,
+  );
+});
+
+test("class history and notes are scoped to assigned teachers and academy admins", async (t) => {
+  t.mock.method(Date, "now", () => clock);
+  const { ctx, tables, friday } = fixture("teacher-login");
+  tables.teachers.push(
+    {
+      _id: "other-teacher",
+      clerkUserId: "substitute",
+      name: "Ana Costa",
+      gymIds: ["gym"],
+      userType: "Normal",
+    },
+    {
+      _id: "admin",
+      clerkUserId: "admin-login",
+      userType: "Admin",
+      gymIds: ["gym"],
+    },
+    {
+      _id: "outside-teacher",
+      name: "Outro professor",
+      gymIds: ["elsewhere"],
+      userType: "Normal",
+    },
+  );
+  tables.billingAccounts = [
+    {
+      gymId: "gym",
+      status: "active",
+      priceId: "price_test",
+      paidThrough: clock + 86_400_000,
+    },
+  ];
+  tables.classSessions.push(
+    { ...friday, _id: "covered", teacherIds: ["other-teacher"] },
+    { ...friday, _id: "future", startsAt: clock + 60_000 },
+    { ...friday, _id: "cancelled", status: "Cancelled" },
+  );
+  tables.students[1].name = "Ana";
+  tables.attendance.push({
+    classSessionId: "monday",
+    studentId: "other-student",
+    status: "Present",
+  });
+
+  assert.equal((await handler(getStaffClasses)(ctx, {})).classes.length, 1);
+  const history = await handler(getStaffClassHistory)(ctx, {
+    classId: "class-intro",
+  });
+  assert.deepEqual(
+    history.sessions.map((row: { _id: string }) => row._id),
+    ["tuesday", "monday"],
+  );
+  assert.equal(history.canRecord, true);
+  const session = await handler(getStaffSessionLog)(ctx, {
+    sessionId: "monday",
+  });
+  assert.deepEqual(
+    session.students.map((row: { status: string }) => row.status),
+    ["Present", "Confirmed"],
+  );
+
+  await handler(saveStaffSessionLog)(ctx, {
+    sessionId: "monday",
+    notes: "  Revisamos a guarda.  ",
+  });
+  const updated = await handler(getStaffSessionLog)(ctx, {
+    sessionId: "monday",
+  });
+  assert.equal(updated.leadTeacher.name, "Carlos Silva");
+  assert.equal(updated.notes, "Revisamos a guarda.");
+  await assert.rejects(
+    handler(saveStaffSessionLog)(ctx, {
+      sessionId: "covered",
+      notes: "Aula de outro professor.",
+    }),
+    /não está disponível/,
+  );
+
+  const identity = (subject: string) => ({
+    ...ctx,
+    auth: { getUserIdentity: async () => ({ subject }) },
+  });
+  const admin = identity("admin-login");
+  assert.equal(
+    (await handler(getStaffClassHistory)(admin, { classId: "class-intro" }))
+      .sessions.length,
+    3,
+  );
+  await assert.rejects(
+    handler(saveStaffSessionLog)(admin, {
+      sessionId: "monday",
+      ledByTeacherId: "outside-teacher",
+      notes: "",
+    }),
+    /Selecione o professor/,
+  );
+  await handler(saveStaffSessionLog)(admin, {
+    sessionId: "monday",
+    ledByTeacherId: "other-teacher",
+    notes: "",
+  });
+  assert.equal(
+    (
+      await handler(getStaffSessionLog)(identity("substitute"), {
+        sessionId: "monday",
+      })
+    ).leadTeacher.name,
+    "Ana Costa",
+  );
+
+  const student = identity("student-login");
+  await assert.rejects(
+    handler(getStaffClassHistory)(student, { classId: "class-intro" }),
+    /teacher or admin/,
+  );
+  await assert.rejects(
+    handler(getStaffSessionLog)(student, { sessionId: "monday" }),
+    /teacher or admin/,
+  );
+  assert.equal(
+    (await handler(getClassSessionById)(student, { classSessionId: "monday" }))
+      .notes,
+    undefined,
+  );
+});
+
+test("assigned staff can register a past recurring class without creating duplicate occurrences", async (t) => {
+  t.mock.method(Date, "now", () => clock);
+  const { ctx, tables } = fixture("teacher-login");
+  const args = { classId: "class-intro", date: "2026-11-13" };
+  const sessionId = await handler(recordClassDate)(ctx, args);
+  assert.equal(await handler(recordClassDate)(ctx, args), sessionId);
+  assert.equal(
+    tables.classSessions.filter((row) => row.sessionDate === args.date).length,
+    1,
+  );
+  const saved = await handler(getStaffSessionLog)(ctx, { sessionId });
+  assert.equal(saved.leadTeacher.name, "Carlos Silva");
+  assert.deepEqual(saved.students, []);
+  assert.equal(saved.notes, "");
+  await assert.rejects(
+    handler(recordClassDate)(ctx, { ...args, date: "2026-11-27" }),
+    /já realizada/,
   );
 });

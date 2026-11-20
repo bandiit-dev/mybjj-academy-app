@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import { isStudentPresent } from "./attendance";
-import { classTitle } from "./classes";
+import { classTitle, recurringTime } from "./classes";
 import { confirmStudentEnrollment } from "./enrollments";
 import { getCurrentPrincipal } from "./lib/auth";
 import {
@@ -12,7 +12,7 @@ import {
   periodAt,
   PLAN_MONTHS,
 } from "./lib/studentPlans";
-import { WEEK_DAYS, toIsoDate } from "./lib/validators";
+import { toIsoDate } from "./lib/validators";
 
 const DAY_MS = 86_400_000;
 const unavailable = () =>
@@ -28,37 +28,6 @@ async function currentStudent(ctx: Pick<QueryCtx, "db" | "auth">) {
 
 function offsetDate(date: string, days: number) {
   return toIsoDate(new Date(Date.parse(`${date}T00:00:00Z`) + days * DAY_MS));
-}
-
-function recurringTime(template: Doc<"classes">, date: string) {
-  const day = WEEK_DAYS[new Date(`${date}T00:00:00Z`).getUTCDay()];
-  const start = template.startHour.trim();
-  if (
-    date < academyToday(template.createdAt) ||
-    !template.weekDays.includes(day) ||
-    !/^([01]\d|2[0-3]):[0-5]\d$/.test(start)
-  )
-    return null;
-
-  const startsAt = Date.parse(`${date}T${start}:00-03:00`);
-  const label = template.duration.trim().toLowerCase();
-  const minutes = label.match(/^(\d+)\s*(?:min(?:utos?)?)?$/);
-  const hours = label.match(
-    /^(\d+)\s*(?:h|horas?)\s*(?:(\d{1,2})\s*(?:min)?)?$/,
-  );
-  const clock = label.match(/^(\d{1,2}):([0-5]\d)$/);
-  const duration = minutes
-    ? Number(minutes[1])
-    : hours
-      ? Number(hours[1]) * 60 + Number(hours[2] ?? 0)
-      : clock
-        ? Number(clock[1]) * 60 + Number(clock[2])
-        : 0;
-  return {
-    startsAt,
-    endsAt:
-      duration > 0 && duration <= 1440 ? startsAt + duration * 60_000 : null,
-  };
 }
 
 const sharesAcademy = (

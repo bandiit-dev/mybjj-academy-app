@@ -2,15 +2,50 @@ import { assertAdminGymScope } from "./lib/auth";
 import type { Doc } from "./_generated/dataModel";
 import { v } from "convex/values";
 
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type QueryCtx } from "./_generated/server";
 import { getAccessibleGymIds, requireAdmin } from "./lib/auth";
-import { assertWeekDays } from "./lib/validators";
+import { assertWeekDays, WEEK_DAYS } from "./lib/validators";
 
-export function classTitle(template?: Pick<Doc<"classes">, "level" | "classType"> | null) {
+import { academyToday } from "./lib/studentPlans";
+
+export function classTitle(
+  template?: Pick<Doc<"classes">, "level" | "classType"> | null,
+) {
   if (!template) return "Aula de jiu-jitsu";
   const level = template.level === "Advanced" ? "Avançado" : "Fundamentos";
   const modality = template.classType === "NOGI" ? "NO-GI" : "GI";
   return `${level} ${modality}`;
+}
+
+export function recurringTime(template: Doc<"classes">, date: string) {
+  const day = WEEK_DAYS[new Date(`${date}T00:00:00Z`).getUTCDay()];
+  const start = template.startHour.trim();
+  if (
+    date < academyToday(template.createdAt) ||
+    !template.weekDays.includes(day) ||
+    !/^([01]\d|2[0-3]):[0-5]\d$/.test(start)
+  )
+    return null;
+
+  const startsAt = Date.parse(`${date}T${start}:00-03:00`);
+  const label = template.duration.trim().toLowerCase();
+  const minutes = label.match(/^(\d+)\s*(?:min(?:utos?)?)?$/);
+  const hours = label.match(
+    /^(\d+)\s*(?:h|horas?)\s*(?:(\d{1,2})\s*(?:min)?)?$/,
+  );
+  const clock = label.match(/^(\d{1,2}):([0-5]\d)$/);
+  const duration = minutes
+    ? Number(minutes[1])
+    : hours
+      ? Number(hours[1]) * 60 + Number(hours[2] ?? 0)
+      : clock
+        ? Number(clock[1]) * 60 + Number(clock[2])
+        : 0;
+  return {
+    startsAt,
+    endsAt:
+      duration > 0 && duration <= 1440 ? startsAt + duration * 60_000 : null,
+  };
 }
 
 const classTypeValidator = v.union(v.literal("GI"), v.literal("NOGI"));
@@ -105,4 +140,61 @@ export const getAllClasses = query({
     const classes = await ctx.db.query("classes").collect();
     return classes.filter((classDoc) => classDoc.gymIds.some((gymId) => gymIds.has(gymId)));
   }
+});
+
+export async function getClassStaff(ctx: Pick<QueryCtx, "db" | "auth">) {
+  const { principal, gymIds } = await getAccessibleGymIds(ctx);
+  if (!principal.isAdmin && !principal.teacher)
+    throw new Error("Forbidden: teacher or admin role required");
+  return { ...principal, gymIds };
+}
+
+export function staffClassSessions(
+  ctx: Pick<QueryCtx, "db">,
+  classId: Doc<"classes">["_id"],
+) {
+  return ctx.db
+    .query("classSessions")
+    .withIndex("by_classId", (q) => q.eq("classId", classId));
+}
+
+export function staffHasClassScope(
+  staff: Awaited<ReturnType<typeof getClassStaff>>,
+  entry: Pick<Doc<"classes">, "gymIds">,
+) {
+  return entry.gymIds.some((id) => staff.gymIds.has(id));
+}
+
+export function staffCanManageSession(
+  staff: Awaited<ReturnType<typeof getClassStaff>>,
+  session: Doc<"classSessions">,
+) {
+  return (
+    staffHasClassScope(staff, session) &&
+    (staff.isAdmin ||
+      session.teacherIds.some((id) => id === staff.teacher?._id))
+  );
+}
+
+export const getStaffClasses = query({
+  args: {},
+  handler: async (ctx) => {
+    const staff = await getClassStaff(ctx);
+    const classes = (await ctx.db.query("classes").collect()).filter((item) =>
+      staffHasClassScope(staff, item),
+    );
+    if (staff.isAdmin) return { isAdmin: true, classes };
+
+    const visible = await Promise.all(
+      classes.map(async (item) => {
+        if (item.teacherIds.some((id) => id === staff.teacher?._id))
+          return item;
+        for await (const session of staffClassSessions(ctx, item._id)) {
+          if (staffCanManageSession(staff, session)) return item;
+        }
+        return null;
+      }),
+    );
+    return { isAdmin: false, classes: visible.filter((item) => item !== null) };
+  },
 });

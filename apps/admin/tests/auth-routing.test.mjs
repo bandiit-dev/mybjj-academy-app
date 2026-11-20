@@ -22,6 +22,7 @@ for (const path of [
   "/aluno/aulas",
   "/aluno/perfil",
   "/alunos",
+  "/aulas/example-class",
   "/academia",
   "/onboarding",
   "/professores",

@@ -58,6 +58,12 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
     onboarding?.status === "ready" &&
     !onboarding.isAdmin &&
     onboarding.profileType === "student";
+  const teacherAccount =
+    onboarding?.status === "ready" &&
+    !onboarding.isAdmin &&
+    onboarding.profileType === "teacher";
+  const teacherRoute =
+    /^\/aulas(?:\/[^/]+)?$/.test(pathname) && pathname !== "/aulas/nova";
   const studentRoute = pathname === "/aluno" || pathname.startsWith("/aluno/");
 
   const resolveAccount = useAction(api.onboarding.resolvePortalAccount);
@@ -128,6 +134,10 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
       if (!studentRoute) router.replace("/aluno");
       return;
     }
+    if (teacherAccount) {
+      if (!teacherRoute) router.replace("/aulas");
+      return;
+    }
     if (needsBilling && studentRoute) {
       router.replace("/");
       return;
@@ -155,6 +165,8 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
     needsBilling,
     studentAccount,
     studentRoute,
+    teacherAccount,
+    teacherRoute,
     pathname,
     router,
     selection,
@@ -257,6 +269,16 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
       <main className="auth-state">
         <div className="auth-spinner" />
         <strong>Abrindo o painel...</strong>
+      </main>
+    );
+  }
+  if (teacherAccount) {
+    return teacherRoute ? (
+      children
+    ) : (
+      <main className="auth-state" role="status">
+        <div className="auth-spinner" />
+        <strong>Abrindo as aulas...</strong>
       </main>
     );
   }

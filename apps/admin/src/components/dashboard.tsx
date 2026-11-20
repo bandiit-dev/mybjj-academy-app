@@ -43,13 +43,20 @@ function Sidebar({
   open,
   close,
   student,
+  teacher = false,
 }: {
   open: boolean;
   close: () => void;
   student?: StudentSidebarProfile;
+  teacher?: boolean;
 }) {
   const pathname = usePathname();
   const { user } = useUser();
+  const items = student
+    ? studentNavItems
+    : teacher
+      ? navItems.filter((item) => item.href === "/aulas")
+      : navItems;
   return (
     <>
       {open && (
@@ -68,9 +75,16 @@ function Sidebar({
           <BrandLogo className="sidebar-brand-logo" />
         )}
         <nav className="nav-list" aria-label="Menu principal">
-          {(student ? studentNavItems : navItems).map((item) => (
+          {items.map((item) => (
             <Link
-              className={pathname === item.href ? "active" : ""}
+              className={
+                pathname === item.href ||
+                (!student &&
+                  item.href !== "/" &&
+                  pathname.startsWith(`${item.href}/`))
+                  ? "active"
+                  : ""
+              }
               aria-current={pathname === item.href ? "page" : undefined}
               href={item.href}
               key={item.href}
@@ -117,9 +131,9 @@ function Sidebar({
               <strong>
                 {user?.fullName ??
                   user?.primaryEmailAddress?.emailAddress ??
-                  "Admin"}
+                  (teacher ? "Professor" : "Admin")}
               </strong>
-              <small>Administrador</small>
+              <small>{teacher ? "Professor" : "Administrador"}</small>
             </span>
             <SignOutButton redirectUrl="/">
               <button
@@ -157,6 +171,7 @@ export function AdminShell({
   actions,
   showActions = false,
   student,
+  teacher = false,
 }: {
   title: string;
   breadcrumb?: string;
@@ -164,11 +179,17 @@ export function AdminShell({
   actions?: React.ReactNode;
   showActions?: boolean;
   student?: StudentSidebarProfile;
+  teacher?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="app-shell">
-      <Sidebar open={open} close={() => setOpen(false)} student={student} />
+      <Sidebar
+        open={open}
+        close={() => setOpen(false)}
+        student={student}
+        teacher={teacher}
+      />
       <div className="main-column">
         <header className="topbar">
           <div className="topbar-title">

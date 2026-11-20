@@ -1078,9 +1078,6 @@ select:focus-visible {
   font-weight: 600;
   text-align: left;
 }
-.classes-table th:first-child {
-  width: 20%;
-}
 .classes-table th:nth-child(2) {
   width: 7%;
 }
@@ -1088,23 +1085,23 @@ select:focus-visible {
   width: 9%;
 }
 .classes-table th:nth-child(4) {
-  width: 15%;
+  width: 14%;
 }
 .classes-table th:nth-child(5) {
   width: 10%;
 }
 .classes-table th:nth-child(6) {
-  width: 15%;
+  width: 13%;
 }
 .classes-table th:nth-child(7) {
   width: 8%;
 }
 .classes-table th:nth-child(8) {
-  width: 8%;
+  width: 7%;
 }
 .classes-table th:last-child {
-  width: 76px;
-  text-align: center;
+  width: 88px;
+  padding-inline-start: 17px;
 }
 .classes-table td {
   height: 49px;
@@ -1115,6 +1112,16 @@ select:focus-visible {
 }
 .classes-table td:first-child strong {
   font-size: 14px;
+}
+.classes-table td:last-child {
+  padding-inline: 8px;
+}
+.classes-table .row-actions {
+  justify-content: flex-start;
+  gap: 8px;
+}
+.classes-table .row-actions a {
+  flex: 0 0 32px;
 }
 .class-type {
   display: inline-flex;
@@ -2757,4 +2764,48 @@ select:focus-visible {
 
 .payments-table.attendance-table {
   min-width: 440px;
+}
+
+.class-history-picker {
+  max-width: 340px;
+}
+.class-history-record {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+.class-history-form {
+  display: grid;
+  justify-items: start;
+  gap: 14px;
+}
+.class-history-form .management-field {
+  width: 100%;
+}
+.class-history-form select {
+  max-width: 340px;
+}
+.class-history-form textarea {
+  resize: vertical;
+}
+.class-session-roster {
+  margin-top: 24px;
+}
+.class-session-roster h3 {
+  font-size: 15px;
+}
+.class-session-students {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.class-session-students li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
 }

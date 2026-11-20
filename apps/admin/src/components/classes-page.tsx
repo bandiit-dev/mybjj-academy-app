@@ -28,7 +28,8 @@ function Icon({ name }: { name: string }) {
   );
 }
 export function ClassesPage() {
-  const classes = useQuery(api.classes.getAllClasses);
+  const staff = useQuery(api.classes.getStaffClasses);
+  const classes = staff?.classes;
   const teachers = useQuery(api.teachers.getAllTeachers);
   const unities = useQuery(api.unities.getAllUnities);
   const [type, setType] = useState("all");
@@ -50,16 +51,21 @@ export function ClassesPage() {
       (teacherId === "all" || item.teacherIds.some((id) => id === teacherId)) &&
       (unitId === "all" || item.unityIds.some((id) => id === unitId)),
   );
-  const action = (
+  const action = staff?.isAdmin ? (
     <>
       <Link className="button primary" href="/aulas/nova">
         <Icon name="plus.svg" />
         Criar Aula
       </Link>
     </>
-  );
+  ) : undefined;
   return (
-    <AdminShell title="Gestão de Aulas" breadcrumb="Aulas" actions={action}>
+    <AdminShell
+      title={staff?.isAdmin === false ? "Aulas" : "Gestão de Aulas"}
+      breadcrumb="Aulas"
+      actions={action}
+      teacher={staff?.isAdmin === false}
+    >
       <main className="classes-content">
         <section className="filters-bar">
           <label className="filter-select">
@@ -163,11 +169,21 @@ export function ClassesPage() {
                     <td>
                       <div className="row-actions">
                         <Link
-                          href={`/aulas/${item._id}/editar`}
-                          title="Editar aula"
+                          href={`/aulas/${item._id}`}
+                          title="Ver histórico da aula"
+                          aria-label="Ver histórico da aula"
                         >
-                          <Icon name="edit.svg" />
+                          <Icon name="file-list.svg" />
                         </Link>
+                        {staff?.isAdmin && (
+                          <Link
+                            href={`/aulas/${item._id}/editar`}
+                            title="Editar aula"
+                            aria-label="Editar aula"
+                          >
+                            <Icon name="edit.svg" />
+                          </Link>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -184,7 +200,11 @@ export function ClassesPage() {
           ) : filtered.length === 0 ? (
             <div className="students-empty">
               <strong>Nenhuma aula encontrada</strong>
-              <span>Crie a primeira aula recorrente.</span>
+              <span>
+                {staff?.isAdmin
+                  ? "Crie a primeira aula recorrente."
+                  : "As aulas atribuídas a você aparecerão aqui."}
+              </span>
             </div>
           ) : (
             <div className="students-pagination">

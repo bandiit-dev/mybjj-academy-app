@@ -1,16 +1,30 @@
 import { assertAdminGymScope } from "./lib/auth";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 
-import type { Id } from "./_generated/dataModel";
-import { mutation, query } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
+import { mutation, query, type QueryCtx } from "./_generated/server";
 import {
   getAuthUserIdentity,
   getAccessibleGymIds,
   getCurrentPrincipal,
   requireSessionTeacherOrAdmin,
-  requireTeacherOrAdminPrincipal
+  requireTeacherOrAdminPrincipal,
 } from "./lib/auth";
-import { assertSessionDate, assertTimeRange, toIsoDate } from "./lib/validators";
+import {
+  assertSessionDate,
+  assertTimeRange,
+  toIsoDate,
+} from "./lib/validators";
+
+import {
+  classTitle,
+  getClassStaff,
+  recurringTime,
+  staffCanManageSession,
+  staffClassSessions,
+  staffHasClassScope,
+} from "./classes";
+import { academyToday, assertPlanDate } from "./lib/studentPlans";
 
 const classSessionStatusValidator = v.union(
   v.literal("Scheduled"),
@@ -298,4 +312,267 @@ export const getClassSessionDetail = query({
           : enrollments.find((enrollment) => enrollment.studentId === currentStudentId) ?? null
     };
   }
+});
+
+export const getStaffClassHistory = query({
+  args: { classId: v.id("classes") },
+  handler: async (ctx, { classId }) => {
+    const staff = await getClassStaff(ctx);
+    const template = await ctx.db.get(classId);
+    if (!template || !staffHasClassScope(staff, template)) return null;
+
+    const accessibleSessions = (
+      await staffClassSessions(ctx, classId).collect()
+    ).filter((session) => staffCanManageSession(staff, session));
+    const assigned = template.teacherIds.some(
+      (id) => id === staff.teacher?._id,
+    );
+    if (!staff.isAdmin && !assigned && !accessibleSessions.length) return null;
+
+    const now = Date.now();
+    const today = academyToday(now);
+    const sessions = accessibleSessions
+      .filter(
+        (session) =>
+          session.sessionDate <= today &&
+          session.startsAt <= now &&
+          session.status !== "Cancelled",
+      )
+      .sort(
+        (a, b) =>
+          b.sessionDate.localeCompare(a.sessionDate) || b.startsAt - a.startsAt,
+      )
+      .map(({ _id, sessionDate, startsAt, status }) => ({
+        _id,
+        sessionDate,
+        startsAt,
+        status,
+      }));
+
+    return {
+      title: classTitle(template),
+      isAdmin: staff.isAdmin,
+      canRecord: staff.isAdmin || assigned,
+      sessions,
+      today,
+    };
+  },
+});
+
+function sessionLog(ctx: Pick<QueryCtx, "db">, sessionId: Id<"classSessions">) {
+  return ctx.db
+    .query("classSessionLogs")
+    .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+    .unique();
+}
+
+async function staffHistorySession(
+  ctx: Pick<QueryCtx, "db" | "auth">,
+  sessionId: Id<"classSessions">,
+) {
+  const staff = await getClassStaff(ctx);
+  const session = await ctx.db.get(sessionId);
+  const template = session && (await ctx.db.get(session.classId));
+  if (
+    !session ||
+    !template ||
+    !staffHasClassScope(staff, template) ||
+    !staffCanManageSession(staff, session) ||
+    session.status === "Cancelled" ||
+    session.sessionDate > academyToday() ||
+    session.startsAt > Date.now()
+  ) {
+    throw new ConvexError("Esta sessão não está disponível no histórico.");
+  }
+  const sessionGyms = new Set(
+    session.gymIds.filter((id) => staff.gymIds.has(id)),
+  );
+  return { staff, session, sessionGyms };
+}
+
+export const getStaffSessionLog = query({
+  args: { sessionId: v.id("classSessions") },
+  handler: async (ctx, { sessionId }) => {
+    const { staff, session, sessionGyms } = await staffHistorySession(
+      ctx,
+      sessionId,
+    );
+    const [log, assignedTeachers, availableTeachers, enrollments, attendance] =
+      await Promise.all([
+        sessionLog(ctx, sessionId),
+        Promise.all(session.teacherIds.map((id) => ctx.db.get(id))),
+        staff.isAdmin ? ctx.db.query("teachers").collect() : [],
+        ctx.db
+          .query("enrollments")
+          .withIndex("by_classSessionId", (q) =>
+            q.eq("classSessionId", sessionId),
+          )
+          .collect(),
+        ctx.db
+          .query("attendance")
+          .withIndex("by_classSessionId", (q) =>
+            q.eq("classSessionId", sessionId),
+          )
+          .collect(),
+      ]);
+    const teacherInScope = (
+      teacher: Doc<"teachers"> | null,
+    ): teacher is Doc<"teachers"> =>
+      teacher !== null && teacher.gymIds.some((id) => sessionGyms.has(id));
+    const toName = (teacher: Doc<"teachers">) => ({
+      id: teacher._id,
+      name: teacher.name,
+    });
+    const roster = new Map<
+      Id<"students">,
+      "Confirmed" | "Present" | "Absent"
+    >();
+    for (const enrollment of enrollments) {
+      if (enrollment.status === "Confirmed")
+        roster.set(enrollment.studentId, "Confirmed");
+    }
+    for (const row of attendance) roster.set(row.studentId, row.status);
+    const students = (
+      await Promise.all(
+        [...roster].map(async ([id, status]) => {
+          const student = await ctx.db.get(id);
+          return student?.gymIds.some((gymId) => sessionGyms.has(gymId))
+            ? { id, name: student.name, status }
+            : null;
+        }),
+      )
+    )
+      .filter((student) => student !== null)
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    const leadTeacher = log ? await ctx.db.get(log.ledByTeacherId) : null;
+    return {
+      students,
+      teachers: assignedTeachers.filter(teacherInScope).map(toName),
+      eligibleTeachers: availableTeachers
+        .filter(teacherInScope)
+        .map(toName)
+        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
+      leadTeacher: teacherInScope(leadTeacher) ? toName(leadTeacher) : null,
+      notes: log?.notes ?? "",
+      viewerTeacherId: staff.teacher?._id ?? null,
+      isAdmin: staff.isAdmin,
+    };
+  },
+});
+
+export const recordClassDate = mutation({
+  args: { classId: v.id("classes"), date: v.string() },
+  handler: async (ctx, { classId, date }) => {
+    const staff = await getClassStaff(ctx);
+    const template = await ctx.db.get(classId);
+    if (
+      !template ||
+      !staffHasClassScope(staff, template) ||
+      (!staff.isAdmin &&
+        !template.teacherIds.some((id) => id === staff.teacher?._id))
+    ) {
+      throw new ConvexError("Você não tem permissão para registrar esta aula.");
+    }
+    assertPlanDate(date);
+    if (date > academyToday())
+      throw new ConvexError("Selecione a data de uma aula já realizada.");
+
+    const sessions = await staffClassSessions(ctx, classId)
+      .filter((q) => q.eq(q.field("sessionDate"), date))
+      .collect();
+    if (sessions.length) {
+      const available = sessions.filter(
+        (session) =>
+          session.status !== "Cancelled" &&
+          session.startsAt <= Date.now() &&
+          staffCanManageSession(staff, session),
+      );
+      if (available.length === 1 && sessions.length === 1)
+        return available[0]._id;
+      throw new ConvexError(
+        "Já existe um registro para esta data. Selecione uma sessão disponível no histórico.",
+      );
+    }
+
+    if (!template.gymIds.every((id) => staff.gymIds.has(id))) {
+      throw new ConvexError(
+        "Você não tem permissão para registrar esta aula em todas as suas academias.",
+      );
+    }
+    const time = recurringTime(template, date);
+    if (!time || time.endsAt === null) {
+      throw new ConvexError(
+        "Selecione um dia da programação da aula e confira o horário e a duração no cadastro.",
+      );
+    }
+    const now = Date.now();
+    if (time.startsAt > now)
+      throw new ConvexError("Selecione uma aula que já começou.");
+    const sessionId = await ctx.db.insert("classSessions", {
+      classId,
+      sessionDate: date,
+      startsAt: time.startsAt,
+      endsAt: time.endsAt,
+      teacherIds: template.teacherIds,
+      gymIds: template.gymIds,
+      unityIds: template.unityIds,
+      status: "Completed",
+      createdAt: now,
+      updatedAt: now,
+    });
+    const leadId = staff.isAdmin
+      ? template.teacherIds.length === 1
+        ? template.teacherIds[0]
+        : undefined
+      : staff.teacher?._id;
+    const lead = leadId && (await ctx.db.get(leadId));
+    if (lead && lead.gymIds.some((id) => template.gymIds.includes(id))) {
+      await ctx.db.insert("classSessionLogs", {
+        sessionId,
+        ledByTeacherId: lead._id,
+        notes: "",
+        updatedAt: now,
+      });
+    }
+    return sessionId;
+  },
+});
+
+export const saveStaffSessionLog = mutation({
+  args: {
+    sessionId: v.id("classSessions"),
+    ledByTeacherId: v.optional(v.id("teachers")),
+    notes: v.string(),
+  },
+  handler: async (ctx, { sessionId, ledByTeacherId, notes }) => {
+    const { staff, session, sessionGyms } = await staffHistorySession(
+      ctx,
+      sessionId,
+    );
+    const previous = await sessionLog(ctx, sessionId);
+    const teacherId = staff.isAdmin
+      ? ledByTeacherId
+      : (previous?.ledByTeacherId ?? staff.teacher?._id);
+    const teacher = teacherId && (await ctx.db.get(teacherId));
+    if (!teacher || !teacher.gymIds.some((id) => sessionGyms.has(id))) {
+      throw new ConvexError("Selecione o professor responsável pela aula.");
+    }
+    const content = notes.trim();
+    if (content.length > 3000)
+      throw new ConvexError("A observação deve ter até 3.000 caracteres.");
+    const now = Date.now();
+    const log = {
+      sessionId,
+      ledByTeacherId: teacher._id,
+      notes: content,
+      updatedAt: now,
+    };
+    if (previous) await ctx.db.patch(previous._id, log);
+    else await ctx.db.insert("classSessionLogs", log);
+    await ctx.db.patch(sessionId, {
+      status: "Completed",
+      teacherIds: [...new Set([...session.teacherIds, teacher._id])],
+      updatedAt: now,
+    });
+  },
 });

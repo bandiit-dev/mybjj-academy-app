@@ -177,6 +177,13 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_sessionDate_status", ["sessionDate", "status"]),
 
+  classSessionLogs: defineTable({
+    sessionId: v.id("classSessions"),
+    ledByTeacherId: v.id("teachers"),
+    notes: v.string(),
+    updatedAt: v.number()
+  }).index("by_sessionId", ["sessionId"]),
+
   enrollments: defineTable({
     classSessionId: v.id("classSessions"),
     studentId: v.id("students"),
