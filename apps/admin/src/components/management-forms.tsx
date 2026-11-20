@@ -2,6 +2,7 @@
 
 import { api } from "@mybjj/backend/convex/_generated/api";
 import {
+  assertInvitationEmail,
   BELTS,
   BELT_LABELS,
   formatUnityAddress,
@@ -461,10 +462,13 @@ export function AddStudentForm() {
       {...submit}
       onSubmit={async (d) =>
         submit.run(async () => {
+          const email = String(d.get("email") ?? "").trim();
+          if (createAccount) assertInvitationEmail(email);
+
           const profile = {
             plan: readStudentPlan(d),
             name: String(d.get("name")),
-            email: String(d.get("email") ?? ""),
+            email,
             phone: String(d.get("phone") ?? ""),
             dateOfBirth: String(d.get("dateOfBirth") ?? "") || undefined,
             belt: String(d.get("belt")) as Belt,
