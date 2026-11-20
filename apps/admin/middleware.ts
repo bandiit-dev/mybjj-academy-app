@@ -1,3 +1,4 @@
+import { parseCheckoutPlan } from "./src/utils/checkout-plan";
 import { NextResponse } from "next/server";
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
@@ -12,9 +13,12 @@ export default clerkMiddleware(
       return NextResponse.redirect(url);
     }
     if (!isPublicRoute(request)) {
-      await auth.protect({
-        unauthenticatedUrl: new URL("/", request.url).toString(),
-      });
+      const signIn = new URL("/", request.url);
+      const plan = parseCheckoutPlan(request.nextUrl.searchParams.get("plano"));
+      if (request.nextUrl.pathname === "/assinatura" && plan) {
+        signIn.searchParams.set("plano", plan);
+      }
+      await auth.protect({ unauthenticatedUrl: signIn.toString() });
     }
   },
   { signInUrl: "/", signUpUrl: "/" },

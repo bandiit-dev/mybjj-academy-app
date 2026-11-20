@@ -49,3 +49,14 @@ test("legacy invitation URLs preserve ticket parameters when redirected to the r
   assert.equal(target.searchParams.get("__clerk_ticket"), "regression-ticket");
   assert.equal(target.searchParams.get("__clerk_status"), "sign_up");
 });
+
+test("a signed-out checkout link keeps the plan through the login redirect", async () => {
+  const response = await fetch(new URL("/assinatura?plano=trial", base), {
+    redirect: "manual",
+  });
+  assert.ok([302, 303, 307, 308].includes(response.status));
+  const target = new URL(response.headers.get("location"), base);
+  assert.equal(target.origin, base.origin);
+  assert.equal(target.pathname, "/");
+  assert.equal(target.searchParams.get("plano"), "trial");
+});

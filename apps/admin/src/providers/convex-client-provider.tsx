@@ -10,16 +10,37 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 
 import { env } from "@/utils/env";
+import {
+  parseCheckoutPlan,
+  pendingCheckoutPlanKey,
+} from "@/utils/checkout-plan";
 import { BrandLogo } from "@/components/brand-logo";
 
 function AdminAccessGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const plan = useSearchParams().get("plano");
-  const selection =
-    plan === "trial" || plan === "starter" || plan === "full"
-      ? `?plano=${plan}`
-      : "";
+  const searchParams = useSearchParams();
+  const queryPlan = parseCheckoutPlan(searchParams.get("plano"));
+  const [pendingPlan, setPendingPlan] =
+    useState<ReturnType<typeof parseCheckoutPlan>>();
+  const plan = queryPlan ?? pendingPlan;
+  const selectionReady = plan !== undefined;
+  const selection = plan ? `?plano=${plan}` : "";
+  const restoreCheckoutPlan =
+    pathname === "/assinatura" &&
+    plan &&
+    !queryPlan &&
+    !searchParams.has("checkout");
+
+  useEffect(() => {
+    // Clerk can return to the root without its original query string after signup.
+    if (queryPlan) sessionStorage.setItem(pendingCheckoutPlanKey, queryPlan);
+    setPendingPlan(
+      queryPlan ??
+        parseCheckoutPlan(sessionStorage.getItem(pendingCheckoutPlanKey)),
+    );
+  }, [queryPlan]);
+
   const clerk = useAuth();
   const { isLoading, isAuthenticated } = useConvexAuth();
   const [timedOut, setTimedOut] = useState(false);
@@ -46,6 +67,7 @@ function AdminAccessGate({ children }: { children: React.ReactNode }) {
   }, [clerk.isLoaded, clerk.isSignedIn, isLoading, isAuthenticated]);
 
   useEffect(() => {
+    if (!selectionReady) return;
     if (clerk.isLoaded && !clerk.isSignedIn && pathname !== "/")
       router.replace(`/${selection}`);
     if (!isAuthenticated || onboarding === undefined) return;
@@ -56,8 +78,15 @@ function AdminAccessGate({ children }: { children: React.ReactNode }) {
     }
     if (!needsBilling || !billing) return;
     if (!billing.hasAccess) {
-      if (pathname !== "/assinatura") router.replace(`/assinatura${selection}`);
-    } else if (onboarding.status === "needs_academy") {
+      if (pathname !== "/assinatura" || restoreCheckoutPlan) {
+        router.replace(`/assinatura${selection}`);
+      }
+      return;
+    }
+
+    sessionStorage.removeItem(pendingCheckoutPlanKey);
+    setPendingPlan(null);
+    if (onboarding.status === "needs_academy") {
       if (!pathname.startsWith("/onboarding")) router.replace("/onboarding");
     } else if (pathname.startsWith("/onboarding") || pathname === "/assinatura")
       router.replace("/");
@@ -71,9 +100,11 @@ function AdminAccessGate({ children }: { children: React.ReactNode }) {
     pathname,
     router,
     selection,
+    selectionReady,
+    restoreCheckoutPlan,
   ]);
 
-  if (clerk.isLoaded && !clerk.isSignedIn)
+  if (selectionReady && clerk.isLoaded && !clerk.isSignedIn)
     return <LoginPage redirectUrl={`/${selection}`} />;
   if (timedOut) {
     return (
@@ -105,6 +136,7 @@ function AdminAccessGate({ children }: { children: React.ReactNode }) {
     );
   }
   if (
+    !selectionReady ||
     !clerk.isLoaded ||
     isLoading ||
     !isAuthenticated ||
@@ -143,7 +175,10 @@ function AdminAccessGate({ children }: { children: React.ReactNode }) {
       </main>
     );
   }
-  if (!billing || (!billing.hasAccess && pathname !== "/assinatura"))
+  if (
+    !billing ||
+    (!billing.hasAccess && (pathname !== "/assinatura" || restoreCheckoutPlan))
+  )
     return (
       <main className="auth-state">
         <div className="auth-spinner" />

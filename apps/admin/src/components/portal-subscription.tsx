@@ -8,6 +8,10 @@ import { ConvexError } from "convex/values";
 import { useAction } from "convex/react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import {
+  parseCheckoutPlan,
+  pendingCheckoutPlanKey,
+} from "@/utils/checkout-plan";
 import { usePortalSubscription } from "@/hooks/use-portal-subscription";
 import { AuthPageLayout } from "./auth-page-layout";
 
@@ -69,7 +73,7 @@ export function SubscriptionPage() {
   const [promotionCode, setPromotionCode] = useState("");
   const requested = useSearchParams().get("plano");
   const [selected, setSelected] = useState<CheckoutOption>(
-    requested === "full" || requested === "trial" ? requested : "starter",
+    () => parseCheckoutPlan(requested) ?? "starter",
   );
   const option =
     selected === "trial" && billing?.canStartTrial === false
@@ -111,7 +115,11 @@ export function SubscriptionPage() {
         <div className="subscription-card-heading">
           <span className="subscription-eyebrow">PLANO DO PORTAL</span>
           <SignOutButton redirectUrl="/">
-            <button className="button secondary" type="button">
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => sessionStorage.removeItem(pendingCheckoutPlanKey)}
+            >
               Sair
             </button>
           </SignOutButton>
@@ -150,7 +158,8 @@ export function SubscriptionPage() {
             A assinatura desta academia precisa ser regularizada. Peça ao
             responsável pela assinatura para realizar o pagamento.
           </p>
-        ) : !billing.configured ? (
+        ) : !billing.configured ||
+          typeof billing.canStartTrial !== "boolean" ? (
           <p className="subscription-notice">
             Os pagamentos ainda não estão disponíveis. Tente novamente mais
             tarde.
