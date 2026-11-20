@@ -5,6 +5,7 @@ import type { Id } from "@mybjj/backend/convex/_generated/dataModel";
 import { useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { AdminShell } from "@/components/dashboard";
 
@@ -213,10 +214,12 @@ function SessionRecord({
 export function ClassDetailsPage({ classId }: { classId: Id<"classes"> }) {
   const history = useQuery(api.classSessions.getStaffClassHistory, { classId });
   const profile = useQuery(api.onboarding.getOnboardingStatus);
+  const requestedSession = useSearchParams().get("sessao");
   const [selectedId, setSelectedId] = useState<Id<"classSessions">>();
   const session =
-    history?.sessions.find((item) => item._id === selectedId) ??
-    history?.sessions[0];
+    history?.sessions.find(
+      (item) => item._id === (selectedId ?? requestedSession),
+    ) ?? history?.sessions[0];
   const teacher = profile?.status === "ready" && !profile.isAdmin;
   const actions = (
     <>

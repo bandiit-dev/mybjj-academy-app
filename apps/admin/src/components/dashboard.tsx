@@ -6,6 +6,7 @@ import {
   getStudentPlan,
 } from "@mybjj/backend/convex/lib/studentPlans";
 import { api } from "@mybjj/backend/convex/_generated/api";
+import type { Doc } from "@mybjj/backend/convex/_generated/dataModel";
 import { SignOutButton, UserButton, useUser } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
 import Image from "next/image";
@@ -34,6 +35,15 @@ const studentNavItems = [
   { label: "Meu Perfil", icon: "settings.svg", href: "/aluno/perfil" },
 ];
 
+const teacherNavItems = [
+  { label: "Aulas", icon: "book-open.svg", href: "/aulas" },
+  {
+    label: "Meu histórico",
+    icon: "graduation-cap.svg",
+    href: "/professores/meu-historico",
+  },
+];
+
 function Icon({ name, size = 16 }: { name: string; size?: number }) {
   return (
     <Image src={asset(name)} alt="" width={size} height={size} aria-hidden />
@@ -55,7 +65,7 @@ function Sidebar({
   const items = student
     ? studentNavItems
     : teacher
-      ? navItems.filter((item) => item.href === "/aulas")
+      ? teacherNavItems
       : navItems;
   return (
     <>
@@ -244,6 +254,58 @@ const weekDayLabels = {
   Friday: "Sex",
   Saturday: "Sáb",
 } as const;
+
+function MonthlyTeachingPanel({
+  month,
+  monthLabel,
+  teachers,
+}: {
+  month: string;
+  monthLabel: string;
+  teachers: Pick<Doc<"teachers">, "_id" | "name">[] | undefined;
+}) {
+  const counts = useQuery(api.classSessions.getMonthlyTeachingCounts, {
+    month,
+  });
+  const byTeacher = new Map(
+    counts?.map((item) => [item.teacherId, item.total]),
+  );
+  const rows = teachers
+    ?.map((teacher) => ({ ...teacher, total: byTeacher.get(teacher._id) ?? 0 }))
+    .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, "pt-BR"));
+  return (
+    <section
+      className="panel monthly-teaching-panel"
+      aria-labelledby="monthly-teaching-heading"
+    >
+      <header>
+        <h2 id="monthly-teaching-heading">Aulas ministradas no mês</h2>
+      </header>
+      <p className="monthly-presence-month">{monthLabel}</p>
+      {rows === undefined || counts === undefined ? (
+        <p role="status">Carregando aulas...</p>
+      ) : rows.length ? (
+        <ul className="monthly-teaching-list">
+          {rows.map((teacher) => (
+            <li key={teacher._id}>
+              <Link
+                className="teacher-history-link"
+                href={`/professores/${teacher._id}`}
+              >
+                {teacher.name}
+              </Link>
+              <strong>
+                {teacher.total} {teacher.total === 1 ? "aula" : "aulas"}
+              </strong>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>Nenhum professor cadastrado.</p>
+      )}
+    </section>
+  );
+}
 
 export function Dashboard() {
   const students = useQuery(api.students.getAllStudents);
@@ -462,49 +524,56 @@ export function Dashboard() {
               )}
             </section>
           </div>
-          <section className="panel attendance-panel">
-            <header>
-              <h2>Resumo Operacional</h2>
-            </header>
-            <div className="academy-stats">
-              <div>
-                <span>Alunos ativos</span>
-                <strong className="summary-active-count">
-                  {activeStudents ?? "—"}
-                </strong>
+          <div className="dashboard-list-column">
+            <section className="panel attendance-panel">
+              <header>
+                <h2>Resumo Operacional</h2>
+              </header>
+              <div className="academy-stats">
+                <div>
+                  <span>Alunos ativos</span>
+                  <strong className="summary-active-count">
+                    {activeStudents ?? "—"}
+                  </strong>
+                </div>
+                <div>
+                  <span>Alunos inativos</span>
+                  <strong className="summary-inactive-count">
+                    {inactiveStudents ?? "—"}
+                  </strong>
+                </div>
               </div>
-              <div>
-                <span>Alunos inativos</span>
-                <strong className="summary-inactive-count">
-                  {inactiveStudents ?? "—"}
-                </strong>
+              <div className="monthly-presence">
+                <div className="monthly-presence-heading">
+                  <h3>Presença mensal</h3>
+                  <p className="monthly-presence-month">{monthLabel}</p>
+                </div>
+                <div className="monthly-presence-metric">
+                  <strong className="monthly-presence-total">
+                    {monthlyPresence?.totalEnrollments ?? "—"}
+                  </strong>
+                  <span>
+                    {monthlyPresence?.totalEnrollments === 1
+                      ? "presença no mês"
+                      : "presenças no mês"}
+                  </span>
+                </div>
+                <p className="monthly-presence-students">
+                  {monthlyPresence === undefined
+                    ? "Carregando presenças..."
+                    : `${monthlyPresence.studentCount} ${monthlyPresence.studentCount === 1 ? "aluno com presença" : "alunos com presença"}`}
+                </p>
+                <small>
+                  Presenças confirmadas nas aulas do mês, sem cancelamentos.
+                </small>
               </div>
-            </div>
-            <div className="monthly-presence">
-              <div className="monthly-presence-heading">
-                <h3>Presença mensal</h3>
-                <p className="monthly-presence-month">{monthLabel}</p>
-              </div>
-              <div className="monthly-presence-metric">
-                <strong className="monthly-presence-total">
-                  {monthlyPresence?.totalEnrollments ?? "—"}
-                </strong>
-                <span>
-                  {monthlyPresence?.totalEnrollments === 1
-                    ? "presença no mês"
-                    : "presenças no mês"}
-                </span>
-              </div>
-              <p className="monthly-presence-students">
-                {monthlyPresence === undefined
-                  ? "Carregando presenças..."
-                  : `${monthlyPresence.studentCount} ${monthlyPresence.studentCount === 1 ? "aluno com presença" : "alunos com presença"}`}
-              </p>
-              <small>
-                Presenças confirmadas nas aulas do mês, sem cancelamentos.
-              </small>
-            </div>
-          </section>
+            </section>
+            <MonthlyTeachingPanel
+              month={month}
+              monthLabel={monthLabel}
+              teachers={teachers}
+            />
+          </div>
         </div>
       </main>
     </AdminShell>

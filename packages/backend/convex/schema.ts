@@ -182,7 +182,8 @@ export default defineSchema({
     ledByTeacherId: v.id("teachers"),
     notes: v.string(),
     updatedAt: v.number()
-  }).index("by_sessionId", ["sessionId"]),
+  }).index("by_sessionId", ["sessionId"])
+    .index("by_ledByTeacherId", ["ledByTeacherId"]),
 
   enrollments: defineTable({
     classSessionId: v.id("classSessions"),

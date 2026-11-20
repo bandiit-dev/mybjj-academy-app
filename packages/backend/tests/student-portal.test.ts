@@ -6,6 +6,8 @@ import {
   getClassSessionById,
   getStaffClassHistory,
   getStaffSessionLog,
+  getTeacherClassHistory,
+  getMonthlyTeachingCounts,
   recordClassDate,
   saveStaffSessionLog,
 } from "../convex/classSessions";
@@ -156,6 +158,10 @@ function fixture(subject = "student-login") {
               },
               gte(field: string, value: string) {
                 rows = rows.filter((row) => row[field] >= value);
+                return q;
+              },
+              lt(field: string, value: string) {
+                rows = rows.filter((row) => row[field] < value);
                 return q;
               },
               lte(field: string, value: string) {
@@ -603,5 +609,132 @@ test("assigned staff can register a past recurring class without creating duplic
   await assert.rejects(
     handler(recordClassDate)(ctx, { ...args, date: "2026-11-27" }),
     /já realizada/,
+  );
+});
+
+test("teacher history and monthly totals count only completed sessions for the recorded lead in scope", async (t) => {
+  t.mock.method(Date, "now", () => clock);
+  const { ctx, tables, friday } = fixture("teacher-login");
+  tables.teachers.push(
+    {
+      _id: "other-teacher",
+      clerkUserId: "substitute",
+      name: "Ana Costa",
+      gymIds: ["gym"],
+      userType: "Normal",
+    },
+    {
+      _id: "admin",
+      clerkUserId: "admin-login",
+      userType: "Admin",
+      gymIds: ["gym"],
+    },
+    {
+      _id: "outside",
+      clerkUserId: "outside-login",
+      gymIds: ["elsewhere"],
+      userType: "Normal",
+    },
+  );
+  tables.billingAccounts = [
+    {
+      gymId: "gym",
+      status: "active",
+      priceId: "price_test",
+      paidThrough: clock + 86_400_000,
+    },
+  ];
+  tables.classSessions.push(
+    {
+      ...friday,
+      _id: "previous-month",
+      sessionDate: "2026-10-30",
+      status: "Completed",
+    },
+    {
+      ...friday,
+      _id: "covered",
+      teacherIds: ["teacher", "other-teacher"],
+      status: "Completed",
+    },
+    { ...friday, _id: "cancelled", status: "Cancelled" },
+    { ...friday, _id: "pending" },
+    {
+      ...friday,
+      _id: "future",
+      sessionDate: "2026-11-27",
+      status: "Completed",
+    },
+    {
+      ...friday,
+      _id: "out-of-scope",
+      gymIds: ["elsewhere"],
+      status: "Completed",
+    },
+  );
+  tables.classSessionLogs.push(
+    ...[
+      "monday",
+      "previous-month",
+      "cancelled",
+      "pending",
+      "future",
+      "out-of-scope",
+    ].map((sessionId) => ({ sessionId, ledByTeacherId: "teacher" })),
+    { sessionId: "covered", ledByTeacherId: "other-teacher" },
+  );
+  const identity = (subject: string) => ({
+    ...ctx,
+    auth: { getUserIdentity: async () => ({ subject }) },
+  });
+  const teacherHistory = await handler(getTeacherClassHistory)(ctx, {});
+  assert.deepEqual(
+    teacherHistory.classes.map((item: { sessionId: string }) => item.sessionId),
+    ["monday", "previous-month"],
+  );
+  assert.deepEqual(teacherHistory.classes[0].units, ["Centro"]);
+  assert.equal(
+    await handler(getTeacherClassHistory)(ctx, { teacherId: "other-teacher" }),
+    null,
+  );
+  await assert.rejects(
+    handler(getMonthlyTeachingCounts)(ctx, { month: "2026-11" }),
+    /admin role required/,
+  );
+  await assert.rejects(
+    handler(getTeacherClassHistory)(identity("student-login"), {}),
+    /teacher or admin role/,
+  );
+
+  const admin = identity("admin-login");
+  assert.equal(
+    await handler(getTeacherClassHistory)(admin, { teacherId: "outside" }),
+    null,
+  );
+  assert.equal(
+    (
+      await handler(getTeacherClassHistory)(admin, {
+        teacherId: "other-teacher",
+      })
+    ).classes[0].sessionId,
+    "covered",
+  );
+  assert.deepEqual(
+    new Map(
+      (
+        await handler(getMonthlyTeachingCounts)(admin, { month: "2026-11" })
+      ).map((row: { teacherId: string; total: number }) => [
+        row.teacherId,
+        row.total,
+      ]),
+    ),
+    new Map([
+      ["teacher", 1],
+      ["other-teacher", 1],
+    ]),
+  );
+  assert.deepEqual(
+    await handler(getMonthlyTeachingCounts)(admin, { month: "2026-10" }),
+    [{ teacherId: "teacher", total: 1 }],
   );
 });

@@ -26,6 +26,8 @@ for (const path of [
   "/academia",
   "/onboarding",
   "/professores",
+  "/professores/example-teacher",
+  "/professores/meu-historico",
   "/sign-in",
   "/sign-up",
 ]) {

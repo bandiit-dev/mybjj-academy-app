@@ -1194,7 +1194,7 @@ select:focus-visible {
   text-align: left;
 }
 .professors-table th:last-child {
-  text-align: center;
+  padding-inline-start: 17px;
 }
 .professors-table td {
   height: 64px;
@@ -2438,6 +2438,13 @@ select:focus-visible {
 .professors-table .row-actions a {
   flex: 0 0 32px;
 }
+.professors-table .row-actions {
+  justify-content: flex-start;
+  gap: 8px;
+}
+.professors-table td:last-child {
+  padding-inline: 8px;
+}
 .professors-table td {
   overflow-wrap: anywhere;
 }
@@ -2824,4 +2831,35 @@ select:not([multiple]):is(:not([size]), [size="1"]) {
     appearance: auto;
     background-image: none;
   }
+}
+
+.teacher-history-link {
+  color: var(--ink);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.teacher-history-link:hover {
+  text-decoration: underline;
+}
+.monthly-teaching-panel > p {
+  margin: 6px 0 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.monthly-teaching-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.monthly-teaching-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.monthly-teaching-list strong {
+  flex: none;
 }

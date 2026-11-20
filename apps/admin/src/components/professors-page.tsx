@@ -138,7 +138,7 @@ export function ProfessorsPage() {
           <div className="table-scroll">
             <table className="professors-table">
               <colgroup>
-                {[20, 14, 12, 12, 6, 18, 12, 6].map((width, index) => (
+                {[19, 13, 12, 12, 6, 18, 12, 8].map((width, index) => (
                   <col key={index} style={{ width: `${width}%` }} />
                 ))}
               </colgroup>
@@ -165,7 +165,13 @@ export function ProfessorsPage() {
                           fallback={initials(item.name)}
                         />
                         <div>
-                          <strong>{item.name}</strong>
+                          <Link
+                            className="teacher-history-link"
+                            href={`/professores/${item._id}`}
+                            title="Ver histórico do professor"
+                          >
+                            <strong>{item.name}</strong>
+                          </Link>
                           <small>Professor</small>
                         </div>
                       </div>
@@ -194,6 +200,19 @@ export function ProfessorsPage() {
                     </td>
                     <td>
                       <div className="row-actions">
+                        <Link
+                          href={`/professores/${item._id}`}
+                          title="Ver histórico do professor"
+                          aria-label={`Ver histórico de ${item.name}`}
+                        >
+                          <Image
+                            src="/figma-classes/file-list.svg"
+                            alt=""
+                            width={16}
+                            height={16}
+                            aria-hidden
+                          />
+                        </Link>
                         <Link
                           href={`/professores/${item._id}/editar`}
                           title="Editar professor"

@@ -63,7 +63,8 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
     !onboarding.isAdmin &&
     onboarding.profileType === "teacher";
   const teacherRoute =
-    /^\/aulas(?:\/[^/]+)?$/.test(pathname) && pathname !== "/aulas/nova";
+    pathname === "/professores/meu-historico" ||
+    (/^\/aulas(?:\/[^/]+)?$/.test(pathname) && pathname !== "/aulas/nova");
   const studentRoute = pathname === "/aluno" || pathname.startsWith("/aluno/");
 
   const resolveAccount = useAction(api.onboarding.resolvePortalAccount);

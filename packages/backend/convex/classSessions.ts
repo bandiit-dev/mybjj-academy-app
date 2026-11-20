@@ -24,7 +24,7 @@ import {
   staffClassSessions,
   staffHasClassScope,
 } from "./classes";
-import { academyToday, assertPlanDate } from "./lib/studentPlans";
+import { academyToday, addPlanMonths, assertPlanDate } from "./lib/studentPlans";
 
 const classSessionStatusValidator = v.union(
   v.literal("Scheduled"),
@@ -574,5 +574,134 @@ export const saveStaffSessionLog = mutation({
       teacherIds: [...new Set([...session.teacherIds, teacher._id])],
       updatedAt: now,
     });
+  },
+});
+
+function wasTaught(
+  session: Doc<"classSessions"> | null,
+  today: string,
+): session is Doc<"classSessions"> {
+  return (
+    session !== null &&
+    session.status === "Completed" &&
+    session.sessionDate <= today &&
+    session.startsAt <= Date.now()
+  );
+}
+
+export const getTeacherClassHistory = query({
+  args: { teacherId: v.optional(v.id("teachers")) },
+  handler: async (ctx, { teacherId }) => {
+    const staff = await getClassStaff(ctx);
+    const targetId = teacherId ?? staff.teacher?._id;
+    if (!targetId || (!staff.isAdmin && targetId !== staff.teacher?._id))
+      return null;
+
+    const teacher = await ctx.db.get(targetId);
+    if (!teacher) return null;
+    const sharedGyms = new Set(
+      teacher.gymIds.filter((id) => staff.gymIds.has(id)),
+    );
+    if (!sharedGyms.size) return null;
+
+    const logs = await ctx.db
+      .query("classSessionLogs")
+      .withIndex("by_ledByTeacherId", (q) => q.eq("ledByTeacherId", targetId))
+      .collect();
+    const today = academyToday();
+    const sessions = (
+      await Promise.all(logs.map((log) => ctx.db.get(log.sessionId)))
+    )
+      .filter(
+        (session): session is Doc<"classSessions"> =>
+          wasTaught(session, today) &&
+          session.gymIds.some((id) => sharedGyms.has(id)),
+      )
+      .sort(
+        (a, b) =>
+          b.sessionDate.localeCompare(a.sessionDate) || b.startsAt - a.startsAt,
+      );
+    const [templates, units] = await Promise.all([
+      Promise.all(
+        [...new Set(sessions.map((session) => session.classId))].map(
+          async (id) => [id, await ctx.db.get(id)] as const,
+        ),
+      ),
+      Promise.all(
+        [...new Set(sessions.flatMap((session) => session.unityIds))].map(
+          async (id) => [id, await ctx.db.get(id)] as const,
+        ),
+      ),
+    ]);
+    const templatesById = new Map(templates);
+    const unitsById = new Map(units);
+    const classes = sessions.map((session) => {
+      const template = templatesById.get(session.classId);
+      const visibleTemplate =
+        template && staffHasClassScope(staff, template) ? template : null;
+      return {
+        sessionId: session._id,
+        classId:
+          visibleTemplate && staffCanManageSession(staff, session)
+            ? session.classId
+            : null,
+        title: classTitle(visibleTemplate),
+        date: session.sessionDate,
+        startsAt: session.startsAt,
+        units: session.unityIds.flatMap((id) => {
+          const unit = unitsById.get(id);
+          return unit?.gymId && sharedGyms.has(unit.gymId)
+            ? [unit.name || unit.address]
+            : [];
+        }),
+      };
+    });
+    return {
+      isAdmin: staff.isAdmin,
+      teacher: {
+        id: teacher._id,
+        name: teacher.name,
+        picture: teacher.picture,
+        belt: teacher.belt,
+        role: teacher.role,
+      },
+      classes,
+    };
+  },
+});
+
+export const getMonthlyTeachingCounts = query({
+  args: { month: v.string() },
+  handler: async (ctx, { month }) => {
+    const staff = await getClassStaff(ctx);
+    if (!staff.isAdmin) throw new Error("Forbidden: admin role required");
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))
+      throw new Error("Invalid month. Expected YYYY-MM.");
+    const start = `${month}-01`;
+    const end = addPlanMonths(start, 1);
+    const today = academyToday();
+    const sessions = await ctx.db
+      .query("classSessions")
+      .withIndex("by_sessionDate", (q) =>
+        q.gte("sessionDate", start).lt("sessionDate", end),
+      )
+      .collect();
+    const logs = await Promise.all(
+      sessions
+        .filter(
+          (session) =>
+            wasTaught(session, today) && staffHasClassScope(staff, session),
+        )
+        .map((session) => sessionLog(ctx, session._id)),
+    );
+    const counts = new Map<Id<"teachers">, number>();
+    for (const log of logs) {
+      if (log)
+        counts.set(
+          log.ledByTeacherId,
+          (counts.get(log.ledByTeacherId) ?? 0) + 1,
+        );
+    }
+    return [...counts].map(([teacherId, total]) => ({ teacherId, total }));
   },
 });
