@@ -16,7 +16,7 @@ export function ActionLink({
   return (
     <a
       href={href}
-      className={`inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-center text-sm transition-colors ${subtle ? "bg-[#f0f0f0] text-black hover:bg-neutral-200" : "bg-black text-white hover:bg-neutral-800"} ${className}`}
+      className={`inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-center text-sm font-semibold transition-colors ${subtle ? "bg-[#f0f0f0] text-black hover:bg-neutral-200" : "bg-black text-white hover:bg-neutral-800"} ${className}`}
     >
       {children}
     </a>
