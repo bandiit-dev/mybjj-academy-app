@@ -443,7 +443,13 @@ export const getStaffSessionLog = query({
     for (const row of attendance) roster.set(row.studentId, row.status);
     const eligibleStudents = academyStudents
       .filter((student) => student.gymIds.some((id) => sessionGyms.has(id)))
-      .map(({ _id: id, name, belt, degree }) => ({ id, name, belt, degree }))
+      .map(({ _id: id, name, belt, degree, picture }) => ({
+        id,
+        name,
+        belt,
+        degree,
+        picture,
+      }))
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
     const students = eligibleStudents.flatMap((student) => {
       const status = roster.get(student.id);
@@ -452,9 +458,9 @@ export const getStaffSessionLog = query({
     const leadTeacher = log ? await ctx.db.get(log.ledByTeacherId) : null;
     return {
       students,
-      availableStudents: eligibleStudents.filter(
-        ({ id }) => roster.get(id) !== "Present",
-      ),
+      availableStudents: eligibleStudents
+        .filter(({ id }) => roster.get(id) !== "Present")
+        .map(({ id, name, belt, degree }) => ({ id, name, belt, degree })),
       teachers: assignedTeachers.filter(teacherInScope).map(toName),
       eligibleTeachers: availableTeachers
         .filter(teacherInScope)

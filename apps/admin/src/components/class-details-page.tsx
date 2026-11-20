@@ -2,12 +2,17 @@
 
 import { api } from "@mybjj/backend/convex/_generated/api";
 import type { Id } from "@mybjj/backend/convex/_generated/dataModel";
+import {
+  BELT_CLASSES,
+  BELT_LABELS,
+} from "@mybjj/backend/convex/lib/validators";
 import { useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { AdminShell } from "@/components/dashboard";
+import { PortalImage } from "@/components/portal-image";
 import { SessionAttendancePicker } from "@/components/session-attendance-picker";
 
 const hour = new Intl.DateTimeFormat("pt-BR", {
@@ -206,7 +211,39 @@ function SessionRecord({
           <ul className="class-session-students">
             {data.students.map((student) => (
               <li key={student.id}>
-                <span>{student.name}</span>
+                <div className="student-identity">
+                  <PortalImage
+                    src={student.picture}
+                    className="professor-avatar"
+                    fallback={
+                      <span aria-hidden="true">
+                        {student.name
+                          .trim()
+                          .split(/\s+/)
+                          .slice(0, 2)
+                          .map((part) => part.charAt(0))
+                          .join("")
+                          .toLocaleUpperCase("pt-BR")}
+                      </span>
+                    }
+                  />
+                  <div className="class-session-student-info">
+                    <strong>{student.name}</strong>
+                    <div className="class-session-student-belt">
+                      <span className="belt-badge">
+                        <i
+                          className={`belt-dot ${BELT_CLASSES[student.belt]}`}
+                          aria-hidden="true"
+                        />
+                        {BELT_LABELS[student.belt]}
+                      </span>
+                      <small>
+                        {student.degree}{" "}
+                        {student.degree === 1 ? "Grau" : "Graus"}
+                      </small>
+                    </div>
+                  </div>
+                </div>
                 <span
                   className={`student-status ${student.status === "Present" ? "active" : student.status === "Absent" ? "inactive" : "pending"}`}
                 >

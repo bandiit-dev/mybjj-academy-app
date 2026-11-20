@@ -2815,6 +2815,25 @@ select:focus-visible {
   padding: 10px 0;
   border-bottom: 1px solid var(--border);
 }
+.class-session-student-info {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+.class-session-student-info strong {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.class-session-student-belt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.class-session-student-belt small {
+  color: var(--muted);
+  font-size: 11px;
+}
 
 select:not([multiple]):is(:not([size]), [size="1"]) {
   appearance: none;

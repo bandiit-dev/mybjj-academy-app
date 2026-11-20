@@ -76,6 +76,7 @@ function fixture(subject = "student-login") {
       {
         _id: "other-student",
         name: "Ana",
+        picture: "https://example.com/ana.jpg",
         belt: "White",
         degree: 0,
         clerkUserId: "other-login",
@@ -654,6 +655,7 @@ test("assigned teachers can mark students from the session academy present witho
     {
       id: "other-student",
       name: "Ana",
+      picture: "https://example.com/ana.jpg",
       belt: "White",
       degree: 0,
       status: "Present",
@@ -661,6 +663,7 @@ test("assigned teachers can mark students from the session academy present witho
     {
       id: "student",
       name: "Igor Miguel",
+      picture: "",
       belt: "Brown",
       degree: 2,
       status: "Confirmed",
