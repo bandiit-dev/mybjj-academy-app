@@ -2818,6 +2818,9 @@ select:focus-visible {
 .class-session-roster h3 {
   font-size: 15px;
 }
+.class-session-roster > .button {
+  margin-bottom: 8px;
+}
 .class-session-students {
   margin: 0;
   padding: 0;

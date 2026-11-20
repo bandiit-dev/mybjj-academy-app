@@ -2,7 +2,12 @@ import { assertAdminGymScope } from "./lib/auth";
 import { ConvexError, v } from "convex/values";
 
 import type { Doc, Id } from "./_generated/dataModel";
-import { mutation, query, type QueryCtx } from "./_generated/server";
+import {
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import {
   getAuthUserIdentity,
   getAccessibleGymIds,
@@ -25,6 +30,7 @@ import {
   staffHasClassScope,
 } from "./classes";
 import { academyToday, addPlanMonths, assertPlanDate } from "./lib/studentPlans";
+import { writeAttendance } from "./attendance";
 
 const classSessionStatusValidator = v.union(
   v.literal("Scheduled"),
@@ -397,24 +403,27 @@ export const getStaffSessionLog = query({
       ctx,
       sessionId,
     );
-    const [log, assignedTeachers, availableTeachers, enrollments, attendance] =
-      await Promise.all([
-        sessionLog(ctx, sessionId),
-        Promise.all(session.teacherIds.map((id) => ctx.db.get(id))),
-        staff.isAdmin ? ctx.db.query("teachers").collect() : [],
-        ctx.db
-          .query("enrollments")
-          .withIndex("by_classSessionId", (q) =>
-            q.eq("classSessionId", sessionId),
-          )
-          .collect(),
-        ctx.db
-          .query("attendance")
-          .withIndex("by_classSessionId", (q) =>
-            q.eq("classSessionId", sessionId),
-          )
-          .collect(),
-      ]);
+    const [
+      log,
+      assignedTeachers,
+      availableTeachers,
+      enrollments,
+      attendance,
+      academyStudents,
+    ] = await Promise.all([
+      sessionLog(ctx, sessionId),
+      Promise.all(session.teacherIds.map((id) => ctx.db.get(id))),
+      staff.isAdmin ? ctx.db.query("teachers").collect() : [],
+      ctx.db
+        .query("enrollments")
+        .withIndex("by_classSessionId", (q) => q.eq("classSessionId", sessionId))
+        .collect(),
+      ctx.db
+        .query("attendance")
+        .withIndex("by_classSessionId", (q) => q.eq("classSessionId", sessionId))
+        .collect(),
+      ctx.db.query("students").collect(),
+    ]);
     const teacherInScope = (
       teacher: Doc<"teachers"> | null,
     ): teacher is Doc<"teachers"> =>
@@ -432,21 +441,20 @@ export const getStaffSessionLog = query({
         roster.set(enrollment.studentId, "Confirmed");
     }
     for (const row of attendance) roster.set(row.studentId, row.status);
-    const students = (
-      await Promise.all(
-        [...roster].map(async ([id, status]) => {
-          const student = await ctx.db.get(id);
-          return student?.gymIds.some((gymId) => sessionGyms.has(gymId))
-            ? { id, name: student.name, status }
-            : null;
-        }),
-      )
-    )
-      .filter((student) => student !== null)
+    const eligibleStudents = academyStudents
+      .filter((student) => student.gymIds.some((id) => sessionGyms.has(id)))
+      .map(({ _id: id, name, belt, degree }) => ({ id, name, belt, degree }))
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    const students = eligibleStudents.flatMap((student) => {
+      const status = roster.get(student.id);
+      return status ? [{ ...student, status }] : [];
+    });
     const leadTeacher = log ? await ctx.db.get(log.ledByTeacherId) : null;
     return {
       students,
+      availableStudents: eligibleStudents.filter(
+        ({ id }) => roster.get(id) !== "Present",
+      ),
       teachers: assignedTeachers.filter(teacherInScope).map(toName),
       eligibleTeachers: availableTeachers
         .filter(teacherInScope)
@@ -458,6 +466,56 @@ export const getStaffSessionLog = query({
       isAdmin: staff.isAdmin,
     };
   },
+});
+
+async function markSessionStudentsPresent(
+  ctx: MutationCtx,
+  sessionId: Id<"classSessions">,
+  studentIds: Id<"students">[],
+) {
+  const { staff, session, sessionGyms } = await staffHistorySession(
+    ctx,
+    sessionId,
+  );
+  const uniqueIds = [...new Set(studentIds)];
+  const students = await Promise.all(uniqueIds.map((id) => ctx.db.get(id)));
+  if (
+    students.some((student) => !student?.gymIds.some((id) => sessionGyms.has(id)))
+  ) {
+    throw new ConvexError("Selecione apenas alunos da academia desta aula.");
+  }
+  const markedByTeacherId =
+    staff.teacher?._id ??
+    (await sessionLog(ctx, sessionId))?.ledByTeacherId ??
+    session.teacherIds[0];
+  if (!markedByTeacherId) {
+    throw new ConvexError("Defina o professor responsável pela aula primeiro.");
+  }
+  await Promise.all(
+    uniqueIds.map((studentId) =>
+      writeAttendance(ctx, {
+        classSessionId: sessionId,
+        studentId,
+        status: "Present",
+        markedByTeacherId,
+      }),
+    ),
+  );
+}
+
+export const markStaffSessionPresence = mutation({
+  args: { sessionId: v.id("classSessions"), studentId: v.id("students") },
+  handler: (ctx, { sessionId, studentId }) =>
+    markSessionStudentsPresent(ctx, sessionId, [studentId]),
+});
+
+export const markStaffSessionPresences = mutation({
+  args: {
+    sessionId: v.id("classSessions"),
+    studentIds: v.array(v.id("students")),
+  },
+  handler: (ctx, { sessionId, studentIds }) =>
+    markSessionStudentsPresent(ctx, sessionId, studentIds),
 });
 
 export const recordClassDate = mutation({

@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { AdminShell } from "@/components/dashboard";
+import { SessionAttendancePicker } from "@/components/session-attendance-picker";
 
 const hour = new Intl.DateTimeFormat("pt-BR", {
   hour: "2-digit",
@@ -86,9 +87,13 @@ function RegisterClassDate({
 function SessionRecord({
   sessionId,
   date,
+  title,
+  startsAt,
 }: {
   sessionId: Id<"classSessions">;
   date: string;
+  title: string;
+  startsAt: number;
 }) {
   const data = useQuery(api.classSessions.getStaffSessionLog, { sessionId });
   const save = useMutation(api.classSessions.saveStaffSessionLog);
@@ -190,6 +195,13 @@ function SessionRecord({
       </form>
       <div className="class-session-roster">
         <h3>Alunos da aula ({data.students.length})</h3>
+        <SessionAttendancePicker
+          sessionId={sessionId}
+          title={title}
+          schedule={`${dateLabel(date)}, ${hour.format(startsAt)}`}
+          roster={data.students}
+          availableStudents={data.availableStudents}
+        />
         {data.students.length ? (
           <ul className="class-session-students">
             {data.students.map((student) => (
@@ -283,6 +295,8 @@ export function ClassDetailsPage({ classId }: { classId: Id<"classes"> }) {
                 key={session._id}
                 sessionId={session._id}
                 date={session.sessionDate}
+                title={history.title}
+                startsAt={session.startsAt}
               />
             )}
             {history.canRecord && (

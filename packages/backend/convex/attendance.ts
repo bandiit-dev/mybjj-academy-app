@@ -134,6 +134,31 @@ async function upsertAttendance(
     throw new Error("markedByTeacherId is required when admin marks attendance for a session without teachers");
   }
 
+  const student = await ctx.db.get(args.studentId);
+  const academyIds = new Set([
+    ...(authResult.teacher?.gymIds ?? []),
+    ...(authResult.isAdmin ? (authResult.student?.gymIds ?? []) : []),
+  ]);
+  if (
+    !student?.gymIds.some(
+      (id) => academyIds.has(id) && authResult.session.gymIds.includes(id),
+    )
+  ) {
+    throw new Error(
+      "Forbidden: student does not belong to this session's academy",
+    );
+  }
+
+  return writeAttendance(ctx, { ...args, markedByTeacherId: markerTeacherId });
+}
+
+export async function writeAttendance(
+  ctx: MutationCtx,
+  args: Pick<
+    Doc<"attendance">,
+    "classSessionId" | "studentId" | "status" | "markedByTeacherId"
+  >,
+) {
   const now = Date.now();
 
   const existing = await ctx.db
@@ -148,7 +173,7 @@ async function upsertAttendance(
       classSessionId: args.classSessionId,
       studentId: args.studentId,
       status: args.status,
-      markedByTeacherId: markerTeacherId,
+      markedByTeacherId: args.markedByTeacherId,
       markedAt: now,
       createdAt: now,
       updatedAt: now
@@ -157,7 +182,7 @@ async function upsertAttendance(
 
   await ctx.db.patch(existing._id, {
     status: args.status,
-    markedByTeacherId: markerTeacherId,
+    markedByTeacherId: args.markedByTeacherId,
     markedAt: now,
     updatedAt: now
   });

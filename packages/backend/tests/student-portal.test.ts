@@ -8,6 +8,8 @@ import {
   getStaffSessionLog,
   getTeacherClassHistory,
   getMonthlyTeachingCounts,
+  markStaffSessionPresence,
+  markStaffSessionPresences,
   recordClassDate,
   saveStaffSessionLog,
 } from "../convex/classSessions";
@@ -73,6 +75,9 @@ function fixture(subject = "student-login") {
       },
       {
         _id: "other-student",
+        name: "Ana",
+        belt: "White",
+        degree: 0,
         clerkUserId: "other-login",
         gymIds: ["gym"],
         userType: "Normal",
@@ -119,7 +124,12 @@ function fixture(subject = "student-login") {
       },
     ],
     attendance: [
-      { classSessionId: "tuesday", studentId: "student", status: "Absent" },
+      {
+        _id: "attendance-tuesday",
+        classSessionId: "tuesday",
+        studentId: "student",
+        status: "Absent",
+      },
     ],
     studentPayments: [
       {
@@ -503,7 +513,6 @@ test("class history and notes are scoped to assigned teachers and academy admins
     { ...friday, _id: "future", startsAt: clock + 60_000 },
     { ...friday, _id: "cancelled", status: "Cancelled" },
   );
-  tables.students[1].name = "Ana";
   tables.attendance.push({
     classSessionId: "monday",
     studentId: "other-student",
@@ -590,6 +599,86 @@ test("class history and notes are scoped to assigned teachers and academy admins
       .notes,
     undefined,
   );
+});
+
+test("assigned teachers can mark students from the session academy present without a confirmation", async (t) => {
+  t.mock.method(Date, "now", () => clock);
+  const { ctx, tables, friday } = fixture("teacher-login");
+  tables.students.push({ _id: "outside", name: "Paulo", gymIds: ["elsewhere"] });
+  tables.classSessions.push(
+    { ...friday, _id: "other-teacher", teacherIds: ["substitute"] },
+    { ...friday, _id: "cancelled", status: "Cancelled" },
+    { ...friday, _id: "future", startsAt: clock + 60_000 },
+  );
+  const getLog = () => handler(getStaffSessionLog)(ctx, { sessionId: "monday" });
+  const mark = (studentId: string, sessionId = "monday") =>
+    handler(markStaffSessionPresence)(ctx, { studentId, sessionId });
+  const markBatch = (studentIds: string[]) =>
+    handler(markStaffSessionPresences)(ctx, { studentIds, sessionId: "monday" });
+
+  assert.deepEqual((await getLog()).availableStudents, [
+    { id: "other-student", name: "Ana", belt: "White", degree: 0 },
+    { id: "student", name: "Igor Miguel", belt: "Brown", degree: 2 },
+  ]);
+  await assert.rejects(
+    markBatch(["other-student", "outside"]),
+    /alunos da academia/,
+  );
+  assert.equal(tables.attendance.length, 1);
+  for (const sessionId of ["other-teacher", "cancelled", "future"]) {
+    await assert.rejects(mark("other-student", sessionId), /não está disponível/);
+  }
+  await assert.rejects(
+    handler(markStaffSessionPresence)(
+      {
+        ...ctx,
+        auth: { getUserIdentity: async () => ({ subject: "student-login" }) },
+      },
+      { sessionId: "monday", studentId: "student" },
+    ),
+    /teacher or admin/,
+  );
+
+  await mark("other-student");
+  await mark("other-student");
+  const marks = tables.attendance.filter(
+    (row) => row.classSessionId === "monday",
+  );
+  assert.equal(marks.length, 1);
+  assert.equal(marks[0].markedByTeacherId, "teacher");
+  assert.equal(
+    tables.enrollments.some((row) => row.studentId === "other-student"),
+    false,
+  );
+  assert.deepEqual((await getLog()).students, [
+    {
+      id: "other-student",
+      name: "Ana",
+      belt: "White",
+      degree: 0,
+      status: "Present",
+    },
+    {
+      id: "student",
+      name: "Igor Miguel",
+      belt: "Brown",
+      degree: 2,
+      status: "Confirmed",
+    },
+  ]);
+  assert.deepEqual((await getLog()).availableStudents, [
+    { id: "student", name: "Igor Miguel", belt: "Brown", degree: 2 },
+  ]);
+  await markBatch(["other-student", "student", "student"]);
+  assert.equal(
+    (await getLog()).students.filter(
+      (row: { status: string }) => row.status === "Present",
+    ).length,
+    2,
+  );
+  await mark("student", "tuesday");
+  assert.equal(tables.attendance[0].status, "Present");
+  assert.equal(tables.attendance[0].markedByTeacherId, "teacher");
 });
 
 test("assigned staff can register a past recurring class without creating duplicate occurrences", async (t) => {
