@@ -8,7 +8,7 @@ export function HeroSection() {
       id="inicio"
       className="relative overflow-hidden rounded-[37px] bg-linear-to-b from-white to-[#d9d9d9] lg:min-h-[920px]"
     >
-      <SiteHeader />
+      <SiteHeader home />
       <div
         id="sobre"
         data-hero-copy
@@ -26,7 +26,7 @@ export function HeroSection() {
           Organize sua operação, gerencie alunos, professores,
           <br className="hidden sm:block" /> turmas e aulas em um só lugar.
         </p>
-        <ActionLink className="mt-[34px] w-[190px]">Começar agora</ActionLink>
+        <ActionLink className="mt-[34px] w-[190px]">Teste grátis por 7 dias</ActionLink>
       </div>
       <HeroPreview />
     </section>

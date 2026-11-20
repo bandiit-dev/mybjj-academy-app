@@ -4,7 +4,8 @@ import { DesignImage } from "@/components/atoms/design-image";
 
 const contactUrl = "mailto:contato@mybjjacademy.com.br";
 
-export function SiteFooter() {
+export function SiteFooter({ home = false }: { home?: boolean }) {
+  const homePath = home ? "" : "/";
   return (
     <footer
       data-scroll-reveal="pending"
@@ -21,14 +22,14 @@ export function SiteFooter() {
             aria-label="Navegação do rodapé"
             className="flex flex-wrap gap-x-6 gap-y-[18px] text-lg leading-tight md:mt-8 md:flex-col md:items-start"
           >
-            <Link href="/#recursos">Recursos</Link>
-            <Link href="/#planos">Planos</Link>
-            <Link href="/#sobre">Sobre</Link>
+            <Link href={`${homePath}#recursos`}>Recursos</Link>
+            <Link href={`${homePath}#planos`}>Planos</Link>
+            <Link href={`${homePath}#sobre`}>Sobre</Link>
             <a href={contactUrl}>Contato</a>
           </nav>
         </div>
         <div className="mt-10 flex lg:mt-[47px]">
-          <BrandLogo footer href="/#inicio" />
+          <BrandLogo footer href={`${homePath}#inicio`} />
         </div>
         <DesignImage
           asset="2d02d.svg"

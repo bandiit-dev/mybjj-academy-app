@@ -14,7 +14,7 @@ export function HomePage() {
         <PricingSection />
         <FaqSection />
       </main>
-      <SiteFooter />
+      <SiteFooter home />
     </RevealScope>
   );
 }

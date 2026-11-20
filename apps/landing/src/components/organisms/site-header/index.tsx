@@ -2,16 +2,17 @@ import Link from "next/link";
 import { ActionLink } from "@/components/atoms/action-link";
 import { BrandLogo } from "@/components/atoms/brand-logo";
 
-export function SiteHeader() {
+export function SiteHeader({ home = false }: { home?: boolean }) {
+  const homePath = home ? "" : "/";
   return (
-    <header className="mx-auto flex max-w-[1262px] flex-wrap items-center justify-center gap-x-6 gap-y-4 px-4 pt-8 sm:justify-between lg:relative lg:pl-[71px] lg:pr-0">
-      <BrandLogo href="/#inicio" />
+    <header className="mx-auto flex max-w-[1262px] flex-wrap items-center justify-center gap-x-6 gap-y-4 px-4 pt-4 sm:justify-between lg:relative lg:pl-[71px] lg:pr-0">
+      <BrandLogo href={`${homePath}#inicio`} />
       <nav
         aria-label="Navegação principal"
         className="order-last flex w-full justify-center gap-8 text-base lg:absolute lg:left-1/2 lg:order-none lg:w-auto lg:-translate-x-1/2"
       >
-        <Link href="/#recursos">Recursos</Link>
-        <Link href="/#planos">Preço</Link>
+        <Link href={`${homePath}#recursos`}>Recursos</Link>
+        <Link href={`${homePath}#planos`}>Preço</Link>
         <a href="#contato">Contato</a>
       </nav>
       <div className="flex gap-3.5">

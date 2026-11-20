@@ -21,7 +21,7 @@ const plans: Plan[] = [
       "Gestão de aulas e professores",
       "Controle de unidades",
     ],
-    actionLabel: "Escolher o Plano Starter!",
+    actionLabel: "Escolher o Plano Starter",
     featured: true,
     href: `${adminUrl}/?plano=starter`,
   },
@@ -33,7 +33,7 @@ const plans: Plan[] = [
       "Todas as funcionalidades do Starter",
       "Suporte Dedicado 24h",
     ],
-    actionLabel: "Escolher o Plano Full!",
+    actionLabel: "Escolher o Plano Full",
     href: `${adminUrl}/?plano=full`,
   },
 ];
