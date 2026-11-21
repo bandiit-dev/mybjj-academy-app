@@ -144,8 +144,9 @@
   gap: 10px;
 }
 
-.days li {
+.days button {
   display: flex;
+  width: 100%;
   min-height: 88px;
   flex-direction: column;
   align-items: center;
@@ -153,13 +154,16 @@
   padding: 6px 0;
   border: 1px solid transparent;
   border-radius: 8px;
+  background: transparent;
   color: var(--muted);
   font-size: 11px;
   font-weight: 500;
   line-height: 16px;
+  cursor: pointer;
 }
 
-.days li.today {
+.days button.today,
+.days button:hover {
   border-color: var(--border);
   background: var(--student-neutral);
 }
@@ -180,7 +184,7 @@
   color: white;
 }
 
-.days li > :last-child {
+.days button > :last-child {
   font-size: 10px;
 }
 
@@ -209,6 +213,32 @@
 .classes .classDate {
   margin-top: 2px;
 }
+
+.attendanceDialog {
+  width: min(760px, calc(100% - 24px));
+  max-width: none;
+  max-height: calc(100vh - 24px);
+  max-height: calc(100dvh - 24px);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: white;
+  color: var(--student-ink);
+  overscroll-behavior-y: contain;
+}
+
+.attendanceDialog::backdrop {
+  background: rgb(9 9 11 / 58%);
+}
+
+.attendanceDialog .classes {
+  border: 0;
+}
+
+.attendanceDialog .classRow {
+  grid-template-columns: 70px minmax(0, 1fr) auto;
+}
+
 .classDate::first-letter {
   text-transform: uppercase;
 }
@@ -436,7 +466,11 @@
     justify-self: start;
   }
 
-  .days li > :last-child {
+  .attendanceDialog .classRow {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .days button > :last-child {
     font-size: 8px;
   }
 

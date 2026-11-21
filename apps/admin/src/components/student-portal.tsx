@@ -10,7 +10,7 @@ import {
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { ConvexError } from "convex/values";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { AdminShell } from "@/components/dashboard";
 import styles from "./student-portal.module.css";
 
@@ -54,6 +54,7 @@ function formatPaymentDate(date: string | null) {
 }
 
 function WeeklySummary({ week, today }: Pick<Overview, "week" | "today">) {
+  const [selectedDate, setSelectedDate] = useState<string>();
   const trainedDays = week.days.filter((day) => day.attended).length;
   const range = new Intl.DateTimeFormat("pt-BR", {
     day: "numeric",
@@ -92,22 +93,38 @@ function WeeklySummary({ week, today }: Pick<Overview, "week" | "today">) {
         </div>
         <ol className={styles.days}>
           {week.days.map((day, index) => (
-            <li
-              key={day.date}
-              className={day.date === today ? styles.today : undefined}
-              aria-current={day.date === today ? "date" : undefined}
-            >
-              <span>{weekdays[index]}</span>
-              <strong className={day.attended ? styles.attended : undefined}>
-                {Number(day.date.slice(-2))}
-              </strong>
-              <span className={day.attended ? styles.present : undefined}>
-                {day.attended ? "Presente" : day.date === today ? "Hoje" : "—"}
-              </span>
+            <li key={day.date}>
+              <button
+                type="button"
+                className={day.date === today ? styles.today : undefined}
+                aria-current={day.date === today ? "date" : undefined}
+                aria-haspopup="dialog"
+                aria-label={`Ver aulas de ${longDate.format(dateOnly(day.date))}${day.attended ? ", presença registrada" : ""}`}
+                onClick={() => setSelectedDate(day.date)}
+              >
+                <span>{weekdays[index]}</span>
+                <strong className={day.attended ? styles.attended : undefined}>
+                  {Number(day.date.slice(-2))}
+                </strong>
+                <span className={day.attended ? styles.present : undefined}>
+                  {day.attended
+                    ? "Presente"
+                    : day.date === today
+                      ? "Hoje"
+                      : "—"}
+                </span>
+              </button>
             </li>
           ))}
         </ol>
       </div>
+      {selectedDate && (
+        <DateAttendanceDialog
+          date={selectedDate}
+          today={today}
+          onClose={() => setSelectedDate(undefined)}
+        />
+      )}
     </section>
   );
 }
@@ -224,27 +241,36 @@ function ClassList({
   entries,
   date,
   today,
+  onClose,
 }: {
   entries: ClassEntry[] | undefined;
   date: string;
   today: string;
+  onClose?: () => void;
 }) {
+  const headingId = useId();
   return (
     <section
       className={`${styles.card} ${styles.classes}`}
-      aria-labelledby="student-classes-heading"
+      aria-labelledby={headingId}
     >
       <div className={styles.between}>
         <div>
-          <h2 id="student-classes-heading">
+          <h2 id={headingId}>
             {date === today ? "Aulas de hoje" : "Aulas do dia"}
           </h2>
           <p className={styles.classDate}>{longDate.format(dateOnly(date))}</p>
         </div>
-        {entries && (
-          <span className={styles.badge}>
-            {entries.length} {entries.length === 1 ? "aula" : "aulas"}
-          </span>
+        {onClose ? (
+          <button className="button secondary" type="button" onClick={onClose}>
+            Fechar
+          </button>
+        ) : (
+          entries && (
+            <span className={styles.badge}>
+              {entries.length} {entries.length === 1 ? "aula" : "aulas"}
+            </span>
+          )
         )}
       </div>
       {entries === undefined ? (
@@ -261,14 +287,48 @@ function ClassList({
               />
             ))}
           </ul>
-          {date === today && (
-            <p>Treinou hoje? Confirme sua presença na aula correspondente.</p>
+          {date === today && <p>Treinou hoje? Confirme sua presença!</p>}
+          {onClose && date > today && (
+            <p>A confirmação de presença fica disponível no dia da aula.</p>
           )}
         </>
       ) : (
         <p>Nenhuma aula agendada para este dia.</p>
       )}
     </section>
+  );
+}
+
+function DateAttendanceDialog({
+  date,
+  today,
+  onClose,
+}: {
+  date: string;
+  today: string;
+  onClose: () => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const entries = useQuery(api.studentPortal.getSchedule, { date });
+
+  useEffect(() => {
+    if (dialog.current && !dialog.current.open) dialog.current.showModal();
+  }, []);
+
+  return (
+    <dialog
+      ref={dialog}
+      className={styles.attendanceDialog}
+      aria-label={`Aulas de ${longDate.format(dateOnly(date))}`}
+      onClose={onClose}
+    >
+      <ClassList
+        entries={entries}
+        date={date}
+        today={today}
+        onClose={() => dialog.current?.close()}
+      />
+    </dialog>
   );
 }
 
@@ -395,7 +455,10 @@ export function StudentPortal({ section = "home" }: { section?: Section }) {
         {section === "home" && (
           <>
             <div className={styles.welcome}>
-              <h2>{name ? `Olá, ${name}.` : "Olá!"} Vamos ao tatame?</h2>
+              <h2>
+                {name ? `Olá, ${name}.` : "Olá!"}
+                <br /> Vamos treinar?
+              </h2>
               <p>
                 Acompanhe seus treinos, confirme suas presenças e continue
                 evoluindo.

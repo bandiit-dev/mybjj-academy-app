@@ -77,13 +77,7 @@ function Sidebar({
         />
       )}
       <aside className={`sidebar ${open ? "sidebar-open" : ""}`}>
-        {student ? (
-          <div className="brand student-brand">
-            MY<span>BJJ</span>ACADEMY
-          </div>
-        ) : (
-          <BrandLogo className="sidebar-brand-logo" />
-        )}
+        <BrandLogo className="sidebar-brand-logo" />
         <nav className="nav-list" aria-label="Menu principal">
           {items.map((item) => (
             <Link

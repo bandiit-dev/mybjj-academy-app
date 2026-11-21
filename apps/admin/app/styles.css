@@ -63,15 +63,6 @@ select:focus-visible {
   color: white;
   z-index: 20;
 }
-.brand {
-  padding: 0 8px;
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-}
-.brand span {
-  color: var(--green);
-}
 .academy-selector {
   width: 100%;
   display: flex;
@@ -2734,12 +2725,6 @@ select:focus-visible {
   pointer-events: none;
 }
 
-.student-brand {
-  letter-spacing: normal;
-}
-.student-brand span {
-  color: #22c55e;
-}
 .student-sidebar-profile {
   color: white;
   text-decoration: none;
