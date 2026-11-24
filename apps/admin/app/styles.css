@@ -2819,6 +2819,27 @@ select:focus-visible {
   white-space: normal;
   overflow-wrap: anywhere;
 }
+.student-graduation-history {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.student-graduation-history li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.student-graduation-history p {
+  margin: 4px 0 0;
+}
+.student-graduation-history :is(p, time) {
+  color: var(--muted);
+  font-size: 12px;
+}
 .class-session-student-belt {
   display: flex;
   flex-wrap: wrap;

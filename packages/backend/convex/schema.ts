@@ -142,6 +142,15 @@ export default defineSchema({
     .index("by_clerkUserId", ["clerkUserId"])
     .index("by_email", ["email"]),
 
+  studentGraduations: defineTable({
+    studentId: v.id("students"),
+    previousBelt: beltValidator,
+    previousDegree: v.number(),
+    belt: beltValidator,
+    degree: v.number(),
+    recordedAt: v.number(),
+  }).index("by_studentId", ["studentId"]),
+
   studentPayments: defineTable({
     studentId: v.id("students"), planType: planTypeValidator,
     periodStart: v.string(), periodEnd: v.string(), paid: v.boolean(),

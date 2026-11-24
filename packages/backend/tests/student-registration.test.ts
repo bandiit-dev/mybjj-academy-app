@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createStudent, createStudentWithoutAccount, updateStudent } from "../convex/students";
+import { createStudent, createStudentWithoutAccount, getGraduationHistory, getStudentDetailsForStaff, updateStudent } from "../convex/students";
 import { getOnboardingStatus, listAcademyAccess, selectAcademy, linkExistingProfile, resolvePortalAccount, resolveVerifiedProfile } from "../convex/onboarding";
 import { assertInvitationAllowed, insertInvitedStudent, insertInvitedTeacher, inviteExistingStudent, inviteStudent, inviteTeacher, updateInvitedStudent } from "../convex/provisioning";
 import { getCurrentPrincipal, requireAdmin } from "../convex/lib/auth";
@@ -14,7 +14,7 @@ function context({ admin = true, authenticated = true, email = "owner@example.co
     billingAccounts: [{_id:"billing_1",gymId:"gym_1",status:"active",priceId:"price_test",paidThrough:Date.UTC(2199,0,1)}],
     teachers: admin ? [{ _id: "teacher_1", clerkUserId: "user_1", userType: "Admin", gymIds: ["gym_1"] }] : [],
     academySelections: [], gyms: [{ _id: "gym_1", name: "Academia A", teacherIds: [] }],
-    students: [], unities: [{ _id: "unity_1", gymId: "gym_1" }]
+    students: [], studentGraduations: [], unities: [{ _id: "unity_1", gymId: "gym_1" }]
   };
   const db = {
     query(table: string) {
@@ -27,6 +27,10 @@ function context({ admin = true, authenticated = true, email = "owner@example.co
         filter(apply: any) {
           const expression = { field: (field: string) => field, neq: (field: string, value: any) => (row: any) => row[field] !== value };
           rows = rows.filter(apply(expression)); return chain;
+        },
+        order(direction: string) {
+          if (direction === "desc") rows = [...rows].reverse();
+          return chain;
         },
         collect: async () => rows,
         first: async () => rows[0] ?? null,
@@ -122,6 +126,51 @@ test("editing a student without an account keeps contact details optional", asyn
   assert.equal(ctx.tables.students[0].clerkUserId, undefined);
 });
 
+test("student rank changes are recorded once and visible only to the student and academy staff", async (t) => {
+  const now = Date.parse("2026-11-24T15:00:00Z");
+  t.mock.method(Date, "now", () => now);
+  const ctx = context();
+  const studentId = await handler(createStudentWithoutAccount)(ctx, profile);
+  const student = ctx.tables.students[0];
+  student.clerkUserId = "student_user";
+  const view = (subject: string) => ({
+    ...ctx,
+    auth: { getUserIdentity: async () => ({ subject }) },
+  });
+  ctx.tables.teachers.push(
+    { _id: "teacher_2", clerkUserId: "local_teacher", gymIds: ["gym_1"], userType: "Normal" },
+    { _id: "teacher_3", clerkUserId: "outside_teacher", gymIds: ["gym_2"], userType: "Normal" },
+  );
+  const history = handler(getGraduationHistory);
+  const update = handler(updateStudent);
+  assert.deepEqual(await history(ctx, { studentId }), []);
+  await update(ctx, { studentId, degree: 1 });
+  await update(ctx, { studentId, degree: 1, phone: "123" });
+  await update(ctx, { studentId, belt: "Gray", degree: 0 });
+
+  const events = await history(ctx, { studentId });
+  assert.equal(events.length, 2);
+  assert.equal(events[0].previousBelt, "GrayWhite");
+  assert.equal(events[0].previousDegree, 1);
+  assert.equal(events[0].belt, "Gray");
+  assert.equal(events[0].degree, 0);
+  assert.equal(events[0].recordedAt, now);
+  assert.equal(events[1].degree, 1);
+  assert.deepEqual(await history(view("student_user"), {}), events);
+  assert.deepEqual(await history(view("local_teacher"), { studentId }), events);
+  assert.deepEqual(await history(view("outside_teacher"), { studentId }), []);
+  const peerId = await handler(createStudentWithoutAccount)(ctx, { ...profile, name: "Outro aluno" });
+  assert.deepEqual(await history(view("student_user"), { studentId: peerId }), []);
+
+  const details = handler(getStudentDetailsForStaff);
+  assert.deepEqual(await details(view("local_teacher"), { studentId }), {
+    role: "teacher",
+    student: { name: profile.name, picture: profile.picture, belt: "Gray", degree: 0 },
+  });
+  assert.equal(await details(view("outside_teacher"), { studentId }), null);
+  assert.equal(await details(view("student_user"), { studentId }), null);
+});
+
 test("self-service student creation cannot assign admin privileges", async () => {
   await assert.rejects(handler(createStudent)(context({ admin: false }), { ...profile, clerkUserId: "user_1", userType: "Admin" }), /cannot assign admin/);
 });
@@ -162,7 +211,7 @@ test("inviting an existing student updates the same record with the edited detai
     };
     const result = await handler(inviteExistingStudent)(actionCtx, {
       ...profile, studentId, email: " STUDENT@example.com ", phone: "", name: "Nome atualizado",
-      dateOfBirth: "2019-07-14", redirectUrl: "https://example.com/sign-in"
+      dateOfBirth: "2019-07-14", degree: 1, redirectUrl: "https://example.com/sign-in"
     });
     assert.equal(result, studentId);
     assert.equal(ctx.tables.students.length, 1);
@@ -172,6 +221,8 @@ test("inviting an existing student updates the same record with the edited detai
     assert.equal(ctx.tables.students[0].email, "student@example.com");
     assert.equal(ctx.tables.students[0].dateOfBirth, "2019-07-14");
     assert.equal(ctx.tables.students[0].name, "Nome atualizado");
+    assert.equal(ctx.tables.studentGraduations.length, 1);
+    assert.equal(ctx.tables.studentGraduations[0].degree, 1);
     assert.equal(sent, 1);
   } finally {
     globalThis.fetch = originalFetch;

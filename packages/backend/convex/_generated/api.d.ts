@@ -20,6 +20,7 @@ import type * as lib_auth from "../lib/auth.js";
 import type * as lib_imageValidation from "../lib/imageValidation.js";
 import type * as lib_portalBilling from "../lib/portalBilling.js";
 import type * as lib_stripeApi from "../lib/stripeApi.js";
+import type * as lib_studentGraduation from "../lib/studentGraduation.js";
 import type * as lib_studentPlans from "../lib/studentPlans.js";
 import type * as lib_validators from "../lib/validators.js";
 import type * as onboarding from "../onboarding.js";
@@ -52,6 +53,7 @@ declare const fullApi: ApiFromModules<{
   "lib/imageValidation": typeof lib_imageValidation;
   "lib/portalBilling": typeof lib_portalBilling;
   "lib/stripeApi": typeof lib_stripeApi;
+  "lib/studentGraduation": typeof lib_studentGraduation;
   "lib/studentPlans": typeof lib_studentPlans;
   "lib/validators": typeof lib_validators;
   onboarding: typeof onboarding;

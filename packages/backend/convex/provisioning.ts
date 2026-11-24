@@ -6,6 +6,7 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { action, internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { getProfilesByClerkId, requireAcademyUnitAdmin } from "./lib/auth";
+import { recordStudentGraduation } from "./lib/studentGraduation";
 
 const userTypeValidator = v.union(v.literal("Normal"), v.literal("Admin"));
 
@@ -225,12 +226,14 @@ export const updateInvitedStudent = internalMutation({
     assertDegree(args.degree);
     const previous = (await ctx.db.get(args.studentId))!;
     await assertActiveStudentCapacity(ctx, [args.gymId], args.plan ?? getStudentPlan(previous), previous);
+    const updatedAt = Date.now();
+    await recordStudentGraduation(ctx, previous, args, updatedAt);
     await ctx.db.patch(args.studentId, {
       ...(args.plan ? { plan: args.plan } : {}),
       name: args.name.trim(), email: args.email.trim().toLowerCase(), phone: (args.phone ?? "").trim(),
       dateOfBirth: args.dateOfBirth, belt: args.belt, degree: args.degree,
       gymIds: [args.gymId], unityIds: [args.unityId], picture: args.picture.trim(),
-      clerkUserId: invitedClerkUserId(args), updatedAt: Date.now()
+      clerkUserId: invitedClerkUserId(args), updatedAt
     });
     return args.studentId;
   }

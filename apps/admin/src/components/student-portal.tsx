@@ -12,6 +12,7 @@ import type { FunctionReturnType } from "convex/server";
 import { ConvexError } from "convex/values";
 import { useEffect, useId, useRef, useState } from "react";
 import { AdminShell } from "@/components/dashboard";
+import { StudentGraduationHistory } from "@/components/student-graduation-history";
 import styles from "./student-portal.module.css";
 
 type Overview = FunctionReturnType<typeof api.studentPortal.getOverview>;
@@ -468,6 +469,7 @@ export function StudentPortal({ section = "home" }: { section?: Section }) {
               <div className={styles.sideCards}>
                 <Graduation profile={profile} />
                 <PaymentSummary payments={overview.payments} />
+                <StudentGraduationHistory className={styles.card} />
               </div>
             </div>
           </>

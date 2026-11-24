@@ -1,6 +1,7 @@
 import { assertAdminGymScope } from "./lib/auth";
 import { academyStudentDueDay, academyToday, assertActiveStudentCapacity, currentPlanPeriod, getStudentPlan, monthlyPaymentDueDate, studentPlanValidator, validateStudentPlan, withStudentPlan } from "./lib/studentPlans";
 import { mutation, query } from "./_generated/server";
+import { recordStudentGraduation } from "./lib/studentGraduation";
 import { assertDateOfBirth, assertDegree, beltValidator } from "./lib/validators";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
@@ -117,10 +118,12 @@ export const updateStudent = mutation({
 
     const plan = patch.plan ?? getStudentPlan(authResult.targetStudent);
     await assertActiveStudentCapacity(ctx, patch.gymIds ?? authResult.targetStudent.gymIds, plan, authResult.targetStudent);
+    const updatedAt = Date.now();
+    await recordStudentGraduation(ctx, authResult.targetStudent, patch, updatedAt);
     await ctx.db.patch(studentId, {
       ...patch,
       plan,
-      updatedAt: Date.now()
+      updatedAt,
     });
 
     return studentId;
@@ -135,6 +138,38 @@ export const getStudentById = query({
     const student = await ctx.db.get(studentId);
     return student?.gymIds.some((gymId: Id<"gyms">) => gymIds.has(gymId)) ? withStudentPlan(student) : null;
   }
+});
+
+export const getStudentDetailsForStaff = query({
+  args: { studentId: v.id("students") },
+  handler: async (ctx, { studentId }) => {
+    const { gymIds, principal } = await getAccessibleGymIds(ctx);
+    if (!principal.isAdmin && !principal.teacher) return null;
+    const student = await ctx.db.get(studentId);
+    if (!student?.gymIds.some(gymId => gymIds.has(gymId))) return null;
+    if (principal.isAdmin) {
+      return { role: "admin" as const, student };
+    }
+    const { name, picture, belt, degree } = student;
+    return { role: "teacher" as const, student: { name, picture, belt, degree } };
+  },
+});
+
+export const getGraduationHistory = query({
+  args: { studentId: v.optional(v.id("students")) },
+  handler: async (ctx, { studentId }) => {
+    const { gymIds, principal } = await getAccessibleGymIds(ctx);
+    const id = studentId ?? principal.student?._id;
+    if (!id) return [];
+    const isStaff = principal.isAdmin || Boolean(principal.teacher);
+    if (!isStaff && id !== principal.student?._id) return [];
+    const student = await ctx.db.get(id);
+    if (!student?.gymIds.some(gymId => gymIds.has(gymId))) return [];
+    return ctx.db.query("studentGraduations")
+      .withIndex("by_studentId", q => q.eq("studentId", id))
+      .order("desc")
+      .collect();
+  },
 });
 
 export const getAllStudents = query({

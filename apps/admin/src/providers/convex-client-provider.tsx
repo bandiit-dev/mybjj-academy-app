@@ -111,6 +111,7 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
     onboarding.profileType === "teacher";
   const teacherRoute =
     pathname === "/professores/meu-historico" ||
+    (/^\/alunos\/[^/]+$/.test(pathname) && pathname !== "/alunos/novo") ||
     (/^\/aulas(?:\/[^/]+)?$/.test(pathname) && pathname !== "/aulas/nova");
   const studentRoute = pathname === "/aluno" || pathname.startsWith("/aluno/");
 

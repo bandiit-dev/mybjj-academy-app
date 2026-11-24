@@ -228,7 +228,9 @@ function SessionRecord({
                     }
                   />
                   <div className="class-session-student-info">
-                    <strong>{student.name}</strong>
+                    <Link href={`/alunos/${student.id}`}>
+                      <strong>{student.name}</strong>
+                    </Link>
                     <div className="class-session-student-belt">
                       <span className="belt-badge">
                         <i

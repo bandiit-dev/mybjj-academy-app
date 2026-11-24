@@ -13,6 +13,7 @@ import {
 } from "@mybjj/backend/convex/lib/studentPlans";
 import { AdminShell } from "@/components/dashboard";
 import { PortalImage } from "@/components/portal-image";
+import { StudentGraduationHistory } from "@/components/student-graduation-history";
 import { useAcademyDay } from "@/hooks/use-academy-day";
 
 const dateLabel = (date?: string) =>
@@ -356,21 +357,34 @@ export function StudentDetailsPage({
 }: {
   studentId: Id<"students">;
 }) {
-  const student = useQuery(api.students.getStudentById, { studentId });
-  const units = useQuery(api.unities.getAllUnities);
+  const details = useQuery(api.students.getStudentDetailsForStaff, {
+    studentId,
+  });
+  const profile = useQuery(api.onboarding.getOnboardingStatus);
+  const teacher =
+    profile?.status === "ready" &&
+    !profile.isAdmin &&
+    profile.profileType === "teacher";
+  const student = details?.role === "admin" ? details.student : null;
+  const units = useQuery(api.unities.getAllUnities, student ? {} : "skip");
   const setActive = useMutation(api.studentPlans.setPlanActive);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const actions = (
-    <>
-      <Link className="button secondary" href="/alunos">
-        ← Voltar
+  const actions =
+    details?.role === "teacher" || teacher ? (
+      <Link className="button secondary" href="/aulas">
+        ← Voltar para aulas
       </Link>
-      <Link className="button primary" href={`/alunos/${studentId}/editar`}>
-        Editar aluno
-      </Link>
-    </>
-  );
+    ) : (
+      <>
+        <Link className="button secondary" href="/alunos">
+          ← Voltar
+        </Link>
+        <Link className="button primary" href={`/alunos/${studentId}/editar`}>
+          Editar aluno
+        </Link>
+      </>
+    );
   const plan = student ? getStudentPlan(student) : null;
   async function toggle() {
     if (!plan) return;
@@ -389,6 +403,7 @@ export function StudentDetailsPage({
       title="Detalhes do Aluno"
       breadcrumb="Alunos / Detalhes"
       actions={actions}
+      teacher={teacher}
     >
       <main className="academy-content">
         {error && (
@@ -396,8 +411,27 @@ export function StudentDetailsPage({
             {error}
           </div>
         )}
-        {student === undefined ? (
+        {details === undefined ? (
           <p>Carregando aluno...</p>
+        ) : details?.role === "teacher" ? (
+          <>
+            <section className="academy-card">
+              <header className="student-detail-heading">
+                <PortalImage
+                  src={details.student.picture}
+                  className="professor-avatar"
+                  fallback={details.student.name.slice(0, 2).toUpperCase()}
+                />
+                <h2>{details.student.name}</h2>
+              </header>
+              <p>
+                Faixa {BELT_LABELS[details.student.belt]} ·{" "}
+                {details.student.degree}{" "}
+                {details.student.degree === 1 ? "grau" : "graus"}
+              </p>
+            </section>
+            <StudentGraduationHistory studentId={studentId} />
+          </>
         ) : !student || !plan ? (
           <p>Aluno não encontrado.</p>
         ) : (
@@ -480,6 +514,7 @@ export function StudentDetailsPage({
                 histórico de pagamentos.
               </p>
             </section>
+            <StudentGraduationHistory studentId={studentId} />
             <StudentAttendance key={studentId} studentId={studentId} />
             <StudentBilling studentId={studentId} />
           </>
