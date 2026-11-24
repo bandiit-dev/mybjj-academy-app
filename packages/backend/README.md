@@ -175,7 +175,7 @@ Scheduled cancellation preserves the paid remainder; terminal cancellation,
 trial grants access through Stripe's trial end timestamp. Stripe cancels the
 card-free subscription when the trial ends without a payment method, and the
 owner can then select a paid plan. The trial allows 25 active students, Starter
-allows 80, and Full has no active-student limit. Administrators'
+allows 50, and Full has no active-student limit. Administrators'
 backend domain operations enforce the paid academy scope; the UI refreshes its
 access check every 30 seconds. Billing routes remain available for recovery.
 Regular student/teacher mobile access retains its existing role rules.

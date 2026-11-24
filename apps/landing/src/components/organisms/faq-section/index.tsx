@@ -20,7 +20,7 @@ const questions = [
     question: "Qual plano faz sentido para minha academia?",
     answer: (
       <p>
-        O Starter atende academias com até 80 alunos ativos. O Full atende
+        O Starter atende academias com até 50 alunos ativos. O Full atende
         academias que precisam de mais vagas e permite alunos ativos ilimitados.
         Se você já assina e precisa mudar de plano,{" "}
         <a href={whatsappUrl} className={linkStyle}>

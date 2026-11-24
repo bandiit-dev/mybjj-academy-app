@@ -16,7 +16,7 @@ const plans: Plan[] = [
     name: "Plano Starter",
     monthlyPrice: "39,90",
     benefits: [
-      "Até 80 alunos ativos",
+      "Até 50 alunos ativos",
       "Controle de alunos e presença",
       "Gestão de aulas e professores",
       "Controle de unidades",
@@ -29,7 +29,7 @@ const plans: Plan[] = [
     name: "Plano Full",
     monthlyPrice: "99,90",
     benefits: [
-      "Mais de 80 alunos ativos",
+      "Mais de 50 alunos ativos",
       "Todas as funcionalidades do Starter",
       "Suporte Dedicado 24h",
     ],

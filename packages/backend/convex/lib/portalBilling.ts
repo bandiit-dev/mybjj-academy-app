@@ -3,7 +3,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 
 export const PORTAL_PLANS = {
-  starter: { name: "Starter", amount: 3990, currency: "brl", interval: "month", studentLimit: 80 },
+  starter: { name: "Starter", amount: 3990, currency: "brl", interval: "month", studentLimit: 50 },
   full: { name: "Full", amount: 9990, currency: "brl", interval: "month", studentLimit: null },
 } as const;
 export type PortalPlan = keyof typeof PORTAL_PLANS;

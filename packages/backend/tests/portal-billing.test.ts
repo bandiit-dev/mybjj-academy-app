@@ -450,8 +450,9 @@ test("student creation counts legacy active records against the trial and Starte
   await create(ctx, args);
   await assert.rejects(create(ctx, args), /até 25 alunos ativos/);
   billingAccount.status = "active";
-  ctx.tables.students.push(...Array.from({ length: 55 }, (_, i) => ({ _id: `starter_${i}`, gymIds: ["gym_1"] })));
-  await assert.rejects(create(ctx, args), /até 80 alunos ativos/);
+  ctx.tables.students.push(...Array.from({ length: 24 }, (_, i) => ({ _id: `starter_${i}`, gymIds: ["gym_1"] })));
+  await create(ctx, args);
+  await assert.rejects(create(ctx, args), /até 50 alunos ativos/);
   await create(ctx, { ...args, plan: { type: "Mensal", startDate: "2026-11-01", isActive: false } });
   billingAccount.plan = "full";
   await create(ctx, args);
