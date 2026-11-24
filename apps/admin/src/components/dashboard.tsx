@@ -14,6 +14,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
 import { BrandLogo } from "@/components/brand-logo";
+import { AcademySwitcher } from "@/components/academy-switcher";
 
 const asset = (name: string) => `/figma-dashboard/${name}`;
 const navItems = [
@@ -78,6 +79,7 @@ function Sidebar({
       )}
       <aside className={`sidebar ${open ? "sidebar-open" : ""}`}>
         <BrandLogo className="sidebar-brand-logo" />
+        <AcademySwitcher />
         <nav className="nav-list" aria-label="Menu principal">
           {items.map((item) => (
             <Link

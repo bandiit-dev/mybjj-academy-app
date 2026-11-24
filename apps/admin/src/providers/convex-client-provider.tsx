@@ -3,11 +3,13 @@
 import { usePortalSubscription } from "@/hooks/use-portal-subscription";
 import { LoginPage } from "@/components/login-page";
 import { api } from "@mybjj/backend/convex/_generated/api";
+import type { Id } from "@mybjj/backend/convex/_generated/dataModel";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
 import {
   ConvexReactClient,
   useAction,
   useConvexAuth,
+  useMutation,
   useQuery,
 } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
@@ -20,6 +22,7 @@ import {
   pendingCheckoutPlanKey,
 } from "@/utils/checkout-plan";
 import { BrandLogo } from "@/components/brand-logo";
+import { AcademySwitchContext } from "@/components/academy-switcher";
 
 function PortalAccessGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -52,6 +55,47 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
   const onboarding = useQuery(
     api.onboarding.getOnboardingStatus,
     isAuthenticated ? {} : "skip",
+  );
+  const activeGymId =
+    onboarding?.status === "ready" ? onboarding.activeGymId : undefined;
+  const selectAcademy = useMutation(api.onboarding.selectAcademy);
+  const [switching, setSwitching] = useState<{
+    gymId: Id<"gyms">;
+    route: string;
+  }>();
+  const [switchError, setSwitchError] = useState("");
+
+  async function switchAcademy(
+    gymId: Id<"gyms">,
+    role: "admin" | "teacher" | "student",
+  ) {
+    if (switching || gymId === activeGymId) return;
+    const route =
+      role === "student" ? "/aluno" : role === "teacher" ? "/aulas" : "/";
+    setSwitchError("");
+    setSwitching({ gymId, route });
+    try {
+      await selectAcademy({ gymId });
+      router.replace(route);
+    } catch {
+      setSwitchError("Não foi possível trocar de academia. Tente novamente.");
+      setSwitching(undefined);
+    }
+  }
+
+  useEffect(() => {
+    if (switching?.gymId === activeGymId && switching?.route === pathname) {
+      setSwitching(undefined);
+    }
+  }, [activeGymId, pathname, switching]);
+
+  const scopedChildren = (
+    <AcademySwitchContext.Provider
+      key={activeGymId}
+      value={{ activeGymId, switchAcademy, error: switchError }}
+    >
+      {children}
+    </AcademySwitchContext.Provider>
   );
 
   const studentAccount =
@@ -107,7 +151,10 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
     ((onboarding?.status === "needs_academy" &&
       resolutionStatus === "needs_academy") ||
       (onboarding?.status === "ready" && onboarding.isAdmin));
-  const billing = usePortalSubscription({ enabled: needsBilling });
+  const billing = usePortalSubscription({
+    enabled: needsBilling,
+    gymId: activeGymId,
+  });
 
   useEffect(() => {
     if (
@@ -124,7 +171,7 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
     if (!selectionReady) return;
     if (clerk.isLoaded && !clerk.isSignedIn && pathname !== "/")
       router.replace(`/${selection}`);
-    if (!isAuthenticated || onboarding === undefined) return;
+    if (!isAuthenticated || onboarding === undefined || switching) return;
     if (onboarding.status === "link_required") {
       if (onboarding.profileType === "student") return;
       if (!pathname.startsWith("/onboarding"))
@@ -173,6 +220,7 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
     selection,
     selectionReady,
     restoreCheckoutPlan,
+    switching,
   ]);
 
   if (selectionReady && clerk.isLoaded && !clerk.isSignedIn)
@@ -211,7 +259,8 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
     !clerk.isLoaded ||
     isLoading ||
     !isAuthenticated ||
-    onboarding === undefined
+    onboarding === undefined ||
+    switching
   ) {
     return (
       <main className="auth-state">
@@ -255,7 +304,7 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
   }
   if (onboarding?.status === "link_required") {
     return pathname.startsWith("/onboarding") ? (
-      children
+      scopedChildren
     ) : (
       <main className="auth-state">
         <div className="auth-spinner" />
@@ -265,7 +314,7 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
   }
   if (studentAccount || (needsBilling && studentRoute)) {
     return studentAccount && studentRoute ? (
-      children
+      scopedChildren
     ) : (
       <main className="auth-state">
         <div className="auth-spinner" />
@@ -275,7 +324,7 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
   }
   if (teacherAccount) {
     return teacherRoute ? (
-      children
+      scopedChildren
     ) : (
       <main className="auth-state" role="status">
         <div className="auth-spinner" />
@@ -309,10 +358,10 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
         <strong>Verificando assinatura...</strong>
       </main>
     );
-  if (!billing.hasAccess) return children;
+  if (!billing.hasAccess) return scopedChildren;
   if (onboarding.status === "needs_academy")
     return pathname.startsWith("/onboarding") ? (
-      children
+      scopedChildren
     ) : (
       <main className="auth-state">
         <strong>Preparando sua academia...</strong>
@@ -324,7 +373,7 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
         <strong>Abrindo o portal...</strong>
       </main>
     );
-  return children;
+  return scopedChildren;
 }
 
 export function ConvexClientProvider({

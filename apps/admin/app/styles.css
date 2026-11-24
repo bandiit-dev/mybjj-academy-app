@@ -76,6 +76,16 @@ select:focus-visible {
   text-align: left;
   cursor: pointer;
 }
+.academy-switcher select {
+  display: block;
+  color: var(--ink);
+  background-color: white;
+  font-size: 13px;
+}
+.academy-switcher p {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
 .academy-selector > span:nth-child(2),
 .sidebar-profile span {
   display: flex;

@@ -502,7 +502,7 @@ export function AddStudentForm() {
       title="Adicionar Aluno"
       breadcrumb="Alunos / Adicionar Aluno"
       backHref="/alunos"
-      saveLabel={createAccount ? "Salvar e convidar aluno" : "Salvar aluno"}
+      saveLabel={createAccount ? "Salvar e liberar acesso" : "Salvar aluno"}
       {...submit}
       onSubmit={async (d) =>
         submit.run(async () => {
@@ -574,11 +574,11 @@ export function AddStudentForm() {
             onChange={(event) => setCreateAccount(event.target.checked)}
             aria-describedby="account-access-help"
           />
-          Criar conta para o aluno acessar o aplicativo
+          Liberar acesso ao aplicativo
         </label>
         <p className="account-access-help" id="account-access-help">
           {createAccount
-            ? "Informe um e-mail para enviar o convite de acesso ao aluno."
+            ? "Informe o e-mail de acesso. Se já houver uma conta, ela receberá acesso a esta academia. Caso contrário, enviaremos um convite."
             : "O aluno será cadastrado sem acesso ao aplicativo. E-mail e telefone são opcionais."}
         </p>
       </Section>
@@ -744,7 +744,7 @@ export function EditStudentForm({ studentId }: { studentId: Id<"students"> }) {
       title="Editar Aluno"
       breadcrumb="Alunos / Editar Aluno"
       backHref="/alunos"
-      saveLabel={shouldInvite ? "Salvar e convidar aluno" : "Salvar alterações"}
+      saveLabel={shouldInvite ? "Salvar e liberar acesso" : "Salvar alterações"}
       {...submit}
       onSubmit={async (data) =>
         submit.run(async () => {
@@ -853,11 +853,11 @@ export function EditStudentForm({ studentId }: { studentId: Id<"students"> }) {
                 onChange={(event) => setCreateAccount(event.target.checked)}
                 aria-describedby="edit-account-access-help"
               />
-              Criar conta para o aluno acessar o aplicativo
+              Liberar acesso ao aplicativo
             </label>
             <p className="account-access-help" id="edit-account-access-help">
               {createAccount
-                ? "Informe um e-mail para enviar o convite de acesso ao aluno."
+                ? "Informe o e-mail de acesso. Se já houver uma conta, ela receberá acesso a esta academia. Caso contrário, enviaremos um convite."
                 : "O aluno continuará sem acesso ao aplicativo. E-mail e telefone são opcionais."}
             </p>
           </>

@@ -14,6 +14,7 @@ import {
   saveStaffSessionLog,
 } from "../convex/classSessions";
 import { cancelEnrollment } from "../convex/enrollments";
+import { selectAcademy } from "../convex/onboarding";
 import { getAllStudents, getStudentById } from "../convex/students";
 import {
   confirmClass,
@@ -25,6 +26,35 @@ const handler = (fn: unknown) =>
   (fn as { _handler: (ctx: unknown, args: unknown) => Promise<any> })._handler;
 const today = "2026-11-20";
 const clock = Date.parse(`${today}T15:00:00Z`);
+
+test("student attendance uses the student record and sessions of the selected academy", async (t) => {
+  t.mock.method(Date, "now", () => clock);
+  const { ctx, tables } = fixture();
+  tables.gyms = [
+    { _id: "gym", name: "Academia A" },
+    { _id: "elsewhere", name: "Academia B" },
+  ];
+  tables.academySelections = [];
+  tables.students.push({
+    ...tables.students[0],
+    _id: "student_other_academy",
+    name: "Outro aluno",
+    gymIds: ["elsewhere"],
+  });
+  const otherSession = tables.classSessions.find((row) => row._id === "outside-scope");
+  otherSession.sessionDate = today;
+
+  const overview = () => handler(getOverview)(ctx, { refreshDay: today });
+  assert.equal((await overview()).profile.name, "Igor Miguel");
+  assert.equal((await overview()).week.total, 1);
+  await handler(selectAcademy)(ctx, { gymId: "elsewhere" });
+  assert.equal((await overview()).profile.name, "Outro aluno");
+  assert.equal((await overview()).week.total, 0);
+  await assert.rejects(handler(confirmClass)(ctx, { sessionId: "monday" }), /não está disponível/);
+  await handler(confirmClass)(ctx, { sessionId: "outside-scope" });
+  assert.equal(tables.enrollments.at(-1)?.studentId, "student_other_academy");
+  assert.equal((await overview()).week.total, 1);
+});
 
 function fixture(subject = "student-login") {
   const template = {

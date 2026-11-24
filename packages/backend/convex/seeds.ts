@@ -98,9 +98,9 @@ export const seedDemoData = mutation({
     const existingAdminTeacher = await ctx.db
       .query("teachers")
       .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", adminClerkUserId))
-      .unique();
+      .collect();
     const adminTeacherId =
-      existingAdminTeacher?._id ??
+      existingAdminTeacher.find((profile) => profile.gymIds.includes(gymId))?._id ??
       (await ctx.db.insert("teachers", {
         clerkUserId: adminClerkUserId,
         name: "Admin User",
@@ -122,9 +122,9 @@ export const seedDemoData = mutation({
     const existingTeacher = await ctx.db
       .query("teachers")
       .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", teacherClerkUserId))
-      .unique();
+      .collect();
     const teacherId =
-      existingTeacher?._id ??
+      existingTeacher.find((profile) => profile.gymIds.includes(gymId))?._id ??
       (await ctx.db.insert("teachers", {
         clerkUserId: teacherClerkUserId,
         name: "Professor Teste",
@@ -146,9 +146,9 @@ export const seedDemoData = mutation({
     const existingStudent = await ctx.db
       .query("students")
       .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", studentClerkUserId))
-      .unique();
+      .collect();
     const studentId =
-      existingStudent?._id ??
+      existingStudent.find((profile) => profile.gymIds.includes(gymId))?._id ??
       (await ctx.db.insert("students", {
         clerkUserId: studentClerkUserId,
         name: "Aluno Teste",

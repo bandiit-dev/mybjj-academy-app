@@ -85,10 +85,8 @@ export const createClassSession = mutation({
     const gymIds = args.gymIds ?? classTemplate.gymIds;
     const unityIds = args.unityIds ?? classTemplate.unityIds;
 
-    if (principal.isAdmin) {
-      assertAdminGymScope(principal, classTemplate.gymIds);
-      assertAdminGymScope(principal, gymIds);
-    }
+    assertAdminGymScope(principal, classTemplate.gymIds);
+    assertAdminGymScope(principal, gymIds);
     await assertTeacherCanCreateSession(principal, teacherIds);
 
     const now = Date.now();
@@ -124,7 +122,7 @@ export const updateClassSession = mutation({
   handler: async (ctx, { classSessionId, ...patch }) => {
     const principal = await requireSessionTeacherOrAdmin(ctx, classSessionId);
     const {session} = principal;
-    if (principal.isAdmin && patch.gymIds) assertAdminGymScope(principal, patch.gymIds);
+    if (patch.gymIds) assertAdminGymScope(principal, patch.gymIds);
 
     if (patch.sessionDate) {
       assertSessionDate(patch.sessionDate);
@@ -244,6 +242,7 @@ export const getTeacherUpcomingSessions = query({
     }
 
     const today = toIsoDate();
+    const gymIds = new Set([...(principal.teacher?.gymIds ?? []), ...(principal.student?.gymIds ?? [])]);
 
     const scheduled = await ctx.db
       .query("classSessions")
@@ -252,7 +251,8 @@ export const getTeacherUpcomingSessions = query({
 
     return scheduled
       .filter(
-        (session) => session.teacherIds.includes(targetTeacherId) && includeSessionDate(session.sessionDate, today)
+        (session) => session.teacherIds.includes(targetTeacherId) &&
+          session.gymIds.some(id => gymIds.has(id)) && includeSessionDate(session.sessionDate, today)
       )
       .sort((a, b) => (a.sessionDate === b.sessionDate ? a.startsAt - b.startsAt : a.sessionDate.localeCompare(b.sessionDate)))
       .slice(0, limit ?? 50);

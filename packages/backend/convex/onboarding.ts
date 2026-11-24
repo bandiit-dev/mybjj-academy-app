@@ -4,27 +4,29 @@ import { internal } from "./_generated/api";
 import { assertDegree, beltValidator } from "./lib/validators";
 
 import { action, internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
-import { getAuthUserIdentity, getCurrentStudentByClerkId, getCurrentTeacherByClerkId } from "./lib/auth";
+import { academyMemberships, academySelection, getAuthUserIdentity, getProfilesByClerkId, resolveAcademyMembership } from "./lib/auth";
 
 type AuthCtx = Pick<QueryCtx, "auth" | "db"> | Pick<MutationCtx, "auth" | "db">;
 
 async function findProfilesByEmail(ctx: AuthCtx, email: string | undefined) {
   if (!email) return { teacher: null, student: null };
   const normalized = email.trim().toLowerCase();
-  const [teacher, student] = await Promise.all([
-    ctx.db.query("teachers").withIndex("by_email", (q) => q.eq("email", normalized)).first(),
+  const [teachers, students] = await Promise.all([
+    ctx.db.query("teachers").withIndex("by_email", (q) => q.eq("email", normalized)).collect(),
     ctx.db.query("students").withIndex("by_email", (q) => q.eq("email", normalized))
-      .filter((q) => q.neq(q.field("clerkUserId"), undefined)).first()
+      .filter((q) => q.neq(q.field("clerkUserId"), undefined)).collect()
   ]);
-  return { teacher, student };
+  const pendingTeacher = teachers.find(profile => profile.clerkUserId.startsWith("invitation:"));
+  const pendingStudent = students.find(profile => profile.clerkUserId?.startsWith("invitation:"));
+  if (pendingTeacher || pendingStudent) {
+    return { teacher: pendingTeacher ?? null, student: pendingStudent ?? null };
+  }
+  return { teacher: teachers[0] ?? null, student: students[0] ?? null };
 }
 
 async function linkVerifiedProfile(ctx: MutationCtx, subject: string, email: string) {
-  const [currentTeacher, currentStudent] = await Promise.all([
-    getCurrentTeacherByClerkId(ctx, subject),
-    getCurrentStudentByClerkId(ctx, subject),
-  ]);
-  if (currentTeacher || currentStudent) return { status: "linked" as const };
+  const { teachers, students } = await getProfilesByClerkId(ctx, subject);
+  if (teachers.length || students.length) return { status: "linked" as const };
 
   const { teacher, student } = await findProfilesByEmail(ctx, email);
   if (teacher && student) throw new Error("Multiple profiles use this email; contact support");
@@ -83,17 +85,16 @@ export const getOnboardingStatus = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity?.subject) return { status: "unauthenticated" as const };
 
-    const [teacher, student] = await Promise.all([
-      getCurrentTeacherByClerkId(ctx, identity.subject),
-      getCurrentStudentByClerkId(ctx, identity.subject)
-    ]);
-
+    const { teachers, students, active, memberships } = await resolveAcademyMembership(ctx, identity.subject);
+    const teacher = teachers[0];
+    const student = students[0];
     if (teacher || student) {
       return {
         status: "ready" as const,
-        isAdmin: teacher?.userType === "Admin" || student?.userType === "Admin",
-        profileType: teacher ? "teacher" as const : "student" as const,
-        displayName: teacher?.name ?? student?.name ?? identity.name ?? "Usuário"
+        isAdmin: active ? active.role === "admin" : teacher?.userType === "Admin" || student?.userType === "Admin",
+        profileType: active?.profileType ?? (teacher ? "teacher" as const : "student" as const),
+        displayName: active?.profile.name ?? teacher?.name ?? student?.name ?? identity.name ?? "Usuário",
+        ...(memberships.size > 1 ? { activeGymId: active?.gymId } : {}),
       };
     }
 
@@ -116,6 +117,34 @@ export const getOnboardingStatus = query({
       email: email ?? ""
     };
   }
+});
+
+export const listAcademyAccess = query({
+  args: {},
+  handler: async (ctx) => {
+    const { subject } = await getAuthUserIdentity(ctx);
+    const memberships = academyMemberships(await getProfilesByClerkId(ctx, subject));
+    const academies = await Promise.all([...memberships.values()].map(async ({ gymId, role }) => {
+      const gym = await ctx.db.get(gymId);
+      return gym ? { gymId, role, name: gym.name } : null;
+    }));
+    return academies.filter(academy => academy !== null);
+  },
+});
+
+export const selectAcademy = mutation({
+  args: { gymId: v.id("gyms") },
+  handler: async (ctx, { gymId }) => {
+    const { subject } = await getAuthUserIdentity(ctx);
+    const memberships = academyMemberships(await getProfilesByClerkId(ctx, subject));
+    const membership = memberships.get(gymId);
+    if (!membership || !(await ctx.db.get(gymId))) {
+      throw new Error("Forbidden: academy access required");
+    }
+    const saved = await academySelection(ctx, subject);
+    if (saved) await ctx.db.patch(saved._id, { gymId });
+    else await ctx.db.insert("academySelections", { clerkUserId: subject, gymId });
+  },
 });
 
 export const linkExistingProfile = mutation({
@@ -152,11 +181,8 @@ export const bootstrapAcademyAdmin = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity?.subject) throw new Error("Unauthorized");
 
-    const [currentTeacher, currentStudent] = await Promise.all([
-      getCurrentTeacherByClerkId(ctx, identity.subject),
-      getCurrentStudentByClerkId(ctx, identity.subject)
-    ]);
-    if (currentTeacher || currentStudent) throw new Error("This Clerk user already has a profile");
+    const { teachers, students } = await getProfilesByClerkId(ctx, identity.subject);
+    if (teachers.length || students.length) throw new Error("This Clerk user already has a profile");
 
     const identityEmail = typeof identity.email === "string" ? identity.email.trim().toLowerCase() : "";
     const email = identityEmail || args.contactEmail.trim().toLowerCase();

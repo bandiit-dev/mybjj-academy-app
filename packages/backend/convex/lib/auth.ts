@@ -1,6 +1,6 @@
-import { paidGymIds } from "./portalBilling";
+import { hasPaidPortalAccess, paidGymIds } from "./portalBilling";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 
 type AuthIdentity = {
   subject: string;
@@ -20,39 +20,84 @@ export async function getAuthUserIdentity(ctx: AuthCtx): Promise<AuthIdentity> {
   };
 }
 
-export async function getCurrentTeacherByClerkId(ctx: AuthCtx, clerkUserId: string) {
-  return ctx.db
-    .query("teachers")
-    .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", clerkUserId))
+export async function getProfilesByClerkId(ctx: AuthCtx, clerkUserId: string) {
+  const [teachers, students] = await Promise.all([
+    ctx.db.query("teachers").withIndex("by_clerkUserId", q => q.eq("clerkUserId", clerkUserId)).collect(),
+    ctx.db.query("students").withIndex("by_clerkUserId", q => q.eq("clerkUserId", clerkUserId)).collect(),
+  ]);
+  return { teachers, students };
+}
+
+export type AcademyRole = "admin" | "teacher" | "student";
+
+export function academyMemberships({
+  teachers,
+  students,
+}: Awaited<ReturnType<typeof getProfilesByClerkId>>) {
+  const memberships = new Map<Id<"gyms">, {
+    gymId: Id<"gyms">;
+    role: AcademyRole;
+    profile: Doc<"teachers"> | Doc<"students">;
+    profileType: "teacher" | "student";
+  }>();
+  const profiles = [
+    ...teachers.map(profile => ({ profile, profileType: "teacher" as const })),
+    ...students.map(profile => ({ profile, profileType: "student" as const })),
+  ];
+  // Keep existing admin-first and teacher-first defaults for linked accounts.
+  profiles.sort((a, b) => Number(b.profile.userType === "Admin") - Number(a.profile.userType === "Admin"));
+  for (const { profile, profileType } of profiles) {
+    const role = profile.userType === "Admin" ? "admin" : profileType;
+    for (const gymId of profile.gymIds) {
+      if (!memberships.has(gymId)) memberships.set(gymId, { gymId, profile, profileType, role });
+    }
+  }
+  return memberships;
+}
+
+export function academySelection(ctx: AuthCtx, clerkUserId: string) {
+  return ctx.db.query("academySelections")
+    .withIndex("by_clerkUserId", q => q.eq("clerkUserId", clerkUserId))
     .unique();
 }
 
-export async function getCurrentStudentByClerkId(ctx: AuthCtx, clerkUserId: string) {
-  return ctx.db
-    .query("students")
-    .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", clerkUserId))
-    .unique();
+export async function resolveAcademyMembership(ctx: AuthCtx, clerkUserId: string) {
+  const profiles = await getProfilesByClerkId(ctx, clerkUserId);
+  const memberships = academyMemberships(profiles);
+  const choices = [...memberships.values()];
+  let active = choices[0];
+  if (choices.length > 1) {
+    const saved = await academySelection(ctx, clerkUserId);
+    const selected = saved && memberships.get(saved.gymId);
+    if (selected) {
+      active = selected;
+    } else if (active?.role === "admin") {
+      const admins = choices.filter(choice => choice.role === "admin");
+      const accounts = await Promise.all(admins.map(({ gymId }) =>
+        ctx.db.query("billingAccounts").withIndex("by_gymId", q => q.eq("gymId", gymId)).unique()
+      ));
+      const paid = accounts.findIndex(account => hasPaidPortalAccess(account));
+      if (paid !== -1) active = admins[paid];
+    }
+  }
+  return { ...profiles, memberships, active };
 }
 
 export async function getCurrentPrincipal(ctx: AuthCtx, options: {skipSubscription?: boolean} = {}) {
   const identity = await getAuthUserIdentity(ctx);
-
-  const [teacher, student] = await Promise.all([
-    getCurrentTeacherByClerkId(ctx, identity.subject),
-    getCurrentStudentByClerkId(ctx, identity.subject)
-  ]);
-
-  const isAdmin = teacher?.userType === "Admin" || student?.userType === "Admin";
-
-  if(isAdmin && !options.skipSubscription) {
-    const allowed = await paidGymIds(ctx, new Set([...(teacher?.gymIds??[]),...(student?.gymIds??[])]));
-    return {
-      identity, isAdmin,
-      teacher: teacher ? {...teacher,gymIds:teacher.gymIds.filter(id=>allowed.has(id))} : null,
-      student: student ? {...student,gymIds:student.gymIds.filter(id=>allowed.has(id))} : null
-    };
-  }
-  return {identity, teacher, student, isAdmin};
+  const { teachers, students, active } = await resolveAcademyMembership(ctx, identity.subject);
+  const teacher = active ? teachers.find(item => item._id === active.profile._id) : teachers[0];
+  const student = active ? students.find(item => item._id === active.profile._id) : students[0];
+  const isAdmin = active ? active.role === "admin" :
+    teacher?.userType === "Admin" || student?.userType === "Admin";
+  const gymIds = active ? [active.gymId] : [];
+  if (isAdmin && !options.skipSubscription) await paidGymIds(ctx, gymIds);
+  return {
+    identity,
+    isAdmin,
+    teacher: teacher ? { ...teacher, gymIds } : null,
+    student: student ? { ...student, gymIds } : null,
+  };
 }
 
 export async function getAccessibleGymIds(ctx: AuthCtx) {
@@ -99,7 +144,7 @@ export async function requireTeacherOrAdmin(ctx: AuthCtx, teacherId: Id<"teacher
   if(principal.isAdmin && !targetTeacher.gymIds.some(id=>[...(principal.teacher?.gymIds??[]),...(principal.student?.gymIds??[])].includes(id))) {
     throw new Error("Forbidden: teacher belongs to another or unpaid academy");
   }
-  const isSelf = targetTeacher.clerkUserId === principal.identity.subject;
+  const isSelf = targetTeacher._id === principal.teacher?._id;
 
   if (!principal.isAdmin && !isSelf) {
     throw new Error("Forbidden: requires teacher ownership or admin role");
@@ -123,7 +168,7 @@ export async function requireStudentSelfOrAdmin(ctx: AuthCtx, studentId: Id<"stu
   if(principal.isAdmin && !targetStudent.gymIds.some(id=>[...(principal.teacher?.gymIds??[]),...(principal.student?.gymIds??[])].includes(id))) {
     throw new Error("Forbidden: student belongs to another or unpaid academy");
   }
-  const isSelf = targetStudent.clerkUserId === principal.identity.subject;
+  const isSelf = targetStudent._id === principal.student?._id;
 
   if (!principal.isAdmin && !isSelf) {
     throw new Error("Forbidden: requires student ownership or admin role");
@@ -144,7 +189,7 @@ export async function requireSessionTeacherOrAdmin(ctx: AuthCtx, classSessionId:
     throw new Error("Class session not found");
   }
 
-  if(principal.isAdmin && !session.gymIds.some(id=>[...(principal.teacher?.gymIds??[]),...(principal.student?.gymIds??[])].includes(id))) {
+  if(!session.gymIds.some(id=>[...(principal.teacher?.gymIds??[]),...(principal.student?.gymIds??[])].includes(id))) {
     throw new Error("Forbidden: session belongs to another or unpaid academy");
   }
   const teacherId = principal.teacher?._id;

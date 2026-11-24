@@ -5,9 +5,8 @@ import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 
 import {
-  getAuthUserIdentity,
   getAccessibleGymIds,
-  getCurrentTeacherByClerkId,
+  getCurrentPrincipal,
   requireAdmin,
   requireTeacherOrAdmin
 } from "./lib/auth";
@@ -86,9 +85,12 @@ export const updateTeacher = mutation({
       return teacherId;
     }
 
+    if (patch.clerkUserId !== undefined && patch.clerkUserId !== authResult.targetTeacher.clerkUserId) {
+      throw new Error("Forbidden: use the invitation flow to link teacher accounts");
+    }
     if (patch.gymIds) assertAdminGymScope(authResult, patch.gymIds);
     const adminGymIds = new Set([...(authResult.teacher?.gymIds ?? []), ...(authResult.student?.gymIds ?? [])]);
-    if (!authResult.targetTeacher.gymIds.some((gymId: Id<"gyms">) => adminGymIds.has(gymId))) {
+    if (!authResult.targetTeacher.gymIds.every((gymId: Id<"gyms">) => adminGymIds.has(gymId))) {
       throw new Error("Forbidden: teacher belongs to another academy");
     }
 
@@ -122,7 +124,6 @@ export const getAllTeachers = query({
 export const getCurrentTeacher = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await getAuthUserIdentity(ctx);
-    return getCurrentTeacherByClerkId(ctx, identity.subject);
+    return (await getCurrentPrincipal(ctx, { skipSubscription: true })).teacher;
   }
 });

@@ -444,7 +444,7 @@ export function StudentPortal({ section = "home" }: { section?: Section }) {
     );
 
   const { profile, today } = overview;
-  const name = user?.firstName?.trim() || profile.name.trim().split(/\s+/)[0];
+  const name = profile.name.trim().split(/\s+/)[0] || user?.firstName?.trim();
   return (
     <AdminShell
       title={sectionTitle[section]}

@@ -6,10 +6,8 @@ import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 
 import {
-  getAuthUserIdentity,
   getAccessibleGymIds,
   getCurrentPrincipal,
-  getCurrentStudentByClerkId,
   requireAcademyUnitAdmin,
   requireAdmin,
   requireStudentOrAdmin
@@ -45,6 +43,9 @@ export const createStudent = mutation({
     if (!principal.isAdmin && args.plan) throw new Error("Forbidden: only an admin can choose a student plan");
     if (!principal.isAdmin && args.userType !== "Normal") {
       throw new Error("Forbidden: users cannot assign admin access");
+    }
+    if (!principal.isAdmin) {
+      throw new Error("Forbidden: an academy administrator must register the student");
     }
     assertDateOfBirth(args.dateOfBirth);
     assertDegree(args.degree);
@@ -105,9 +106,12 @@ export const updateStudent = mutation({
       return studentId;
     }
 
+    if (patch.clerkUserId !== undefined && patch.clerkUserId !== authResult.targetStudent.clerkUserId) {
+      throw new Error("Forbidden: use the invitation flow to link student accounts");
+    }
     if (patch.gymIds) assertAdminGymScope(authResult, patch.gymIds);
     const adminGymIds = new Set([...(authResult.teacher?.gymIds ?? []), ...(authResult.student?.gymIds ?? [])]);
-    if (!authResult.targetStudent.gymIds.some((gymId: Id<"gyms">) => adminGymIds.has(gymId))) {
+    if (!authResult.targetStudent.gymIds.every((gymId: Id<"gyms">) => adminGymIds.has(gymId))) {
       throw new Error("Forbidden: student belongs to another academy");
     }
 
@@ -147,8 +151,7 @@ export const getAllStudents = query({
 export const getCurrentStudent = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await getAuthUserIdentity(ctx);
-    return withStudentPlan(await getCurrentStudentByClerkId(ctx, identity.subject));
+    return withStudentPlan((await getCurrentPrincipal(ctx, { skipSubscription: true })).student);
   }
 });
 

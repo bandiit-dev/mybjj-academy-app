@@ -5,7 +5,6 @@ import { mutation, query, type MutationCtx } from "./_generated/server";
 import {
   getAccessibleGymIds,
   getCurrentPrincipal,
-  getCurrentStudentByClerkId,
   requireSessionTeacherOrAdmin
 } from "./lib/auth";
 import { addPlanMonths } from "./lib/studentPlans";
@@ -93,7 +92,8 @@ export const cancelEnrollment = mutation({
       )
       .unique();
 
-    if (!existing) {
+    const session = await ctx.db.get(classSessionId);
+    if (!existing || !session?.gymIds.some(gymId => student.gymIds.includes(gymId))) {
       return { enrollmentId: null, status: "Cancelled" as const };
     }
 
@@ -127,13 +127,7 @@ export const cancelEnrollment = mutation({
 export const getMyUpcomingEnrollments = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-
-    if (!identity?.subject) {
-      throw new Error("Unauthorized");
-    }
-
-    const student = await getCurrentStudentByClerkId(ctx, identity.subject);
+    const { student } = await getCurrentPrincipal(ctx, { skipSubscription: true });
     if (!student) {
       return [];
     }
@@ -151,7 +145,7 @@ export const getMyUpcomingEnrollments = query({
 
     return confirmed
       .map((enrollment, index) => ({ enrollment, session: sessions[index] }))
-      .filter((item) => item.session !== null && item.session.status !== "Cancelled" && item.session.sessionDate >= today)
+      .filter((item) => item.session !== null && item.session.gymIds.some(gymId => student.gymIds.includes(gymId)) && item.session.status !== "Cancelled" && item.session.sessionDate >= today)
       .sort((a, b) => {
         const dateOrder = a.session!.sessionDate.localeCompare(b.session!.sessionDate);
         return dateOrder === 0 ? a.session!.startsAt - b.session!.startsAt : dateOrder;
@@ -164,17 +158,13 @@ export const getMyEnrollmentForSession = query({
     classSessionId: v.id("classSessions")
   },
   handler: async (ctx, { classSessionId }) => {
-    const identity = await ctx.auth.getUserIdentity();
-
-    if (!identity?.subject) {
-      throw new Error("Unauthorized");
-    }
-
-    const student = await getCurrentStudentByClerkId(ctx, identity.subject);
+    const { student } = await getCurrentPrincipal(ctx, { skipSubscription: true });
     if (!student) {
       return null;
     }
 
+    const session = await ctx.db.get(classSessionId);
+    if (!session?.gymIds.some(gymId => student.gymIds.includes(gymId))) return null;
     return ctx.db
       .query("enrollments")
       .withIndex("by_classSessionId_studentId", (q) =>

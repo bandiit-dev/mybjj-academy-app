@@ -28,6 +28,11 @@ const enrollmentStatusValidator = v.union(v.literal("Confirmed"), v.literal("Can
 const attendanceStatusValidator = v.union(v.literal("Present"), v.literal("Absent"));
 
 export default defineSchema({
+  academySelections: defineTable({
+    clerkUserId: v.string(),
+    gymId: v.id("gyms"),
+  }).index("by_clerkUserId", ["clerkUserId"]),
+
   billingAccounts: defineTable({
     ownerClerkUserId: v.string(), gymId: v.optional(v.id("gyms")),
     stripeCustomerId: v.optional(v.string()), stripeSubscriptionId: v.optional(v.string()),

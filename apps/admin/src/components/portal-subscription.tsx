@@ -13,6 +13,7 @@ import {
   pendingCheckoutPlanKey,
 } from "@/utils/checkout-plan";
 import { usePortalSubscription } from "@/hooks/use-portal-subscription";
+import { AcademySwitcher } from "@/components/academy-switcher";
 import { AuthPageLayout } from "./auth-page-layout";
 
 const date = (value: number | null) =>
@@ -124,6 +125,7 @@ export function SubscriptionPage() {
             </button>
           </SignOutButton>
         </div>
+        <AcademySwitcher />
         <h1>Sua academia, organizada.</h1>
         <p>
           Ative sua assinatura para gerenciar alunos, professores e aulas no My
