@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { getStudentBilling, initializeExistingPlans, setPayment, setPlanActive } from "../convex/studentPlans";
-import { updateStudent } from "../convex/students";
-import { addPlanMonths, academyToday, getStudentPlan, periodAt, scheduledPlanPeriods, validateStudentPlan } from "../convex/lib/studentPlans";
+import { getAllStudents, updateStudent } from "../convex/students";
+import { updateGym } from "../convex/gyms";
+import { addPlanMonths, academyToday, getStudentPlan, monthlyPaymentDueDate, periodAt, scheduledPlanPeriods, validateStudentPlan } from "../convex/lib/studentPlans";
 
 const handler = (fn: unknown) => (fn as { _handler: (ctx: any, args: any) => Promise<any> })._handler;
 const monthly = {type: "Mensal" as const, startDate: "2024-01-31", isActive: true};
@@ -10,6 +11,7 @@ const monthly = {type: "Mensal" as const, startDate: "2024-01-31", isActive: tru
 function context({admin = true, authenticated = true, otherAcademy = false} = {}) {
   const tables: Record<string, any[]> = {
     billingAccounts: [{_id:"billing_1",gymId:"gym_1",status:"active",priceId:"price_test",paidThrough:Date.UTC(2199,0,1)}],
+    gyms: [{_id:"gym_1"}, {_id:"gym_2"}],
     teachers: admin ? [{_id:"teacher_1",clerkUserId:"owner",userType:"Admin",gymIds:["gym_1"]}] : [],
     students: [{_id:"student_1",clerkUserId:"student_user",gymIds:[otherAcademy?"gym_2":"gym_1"],plan:{...monthly},userType:"Normal"}],
     studentPayments: []
@@ -79,6 +81,43 @@ test("unpaid past periods leave a manually active plan active",async()=>{
   const billing=await handler(getStudentBilling)(ctx,{studentId:"student_1"});
   assert.equal(billing.student.plan.isActive,true);
   assert.ok(billing.periods.some((row:any)=>row.periodStart==="2024-01-31"&&!row.paid));
+});
+
+test("the academy administrator can save and clear a valid monthly due day", async () => {
+  const ctx = context();
+  const update = handler(updateGym);
+  for (const day of [0, 32, 4.5]) {
+    await assert.rejects(update(ctx, { gymId: "gym_1", studentPaymentDueDay: day }), /entre 1 e 31/);
+  }
+  await assert.rejects(update(ctx, { gymId: "gym_2", studentPaymentDueDay: 10 }), /academy access/);
+  await update(ctx, { gymId: "gym_1", studentPaymentDueDay: 31 });
+  await update(ctx, { gymId: "gym_1", name: "Academia A" });
+  assert.equal(ctx.tables.gyms[0].studentPaymentDueDay, 31);
+  await update(ctx, { gymId: "gym_1", studentPaymentDueDay: null });
+  assert.equal(ctx.tables.gyms[0].studentPaymentDueDay, undefined);
+});
+
+test("monthly due dates clamp to the month end and the first enrollment date", () => {
+  assert.equal(monthlyPaymentDueDate(periodAt(monthly, 1), 31), "2024-02-29");
+  assert.equal(monthlyPaymentDueDate({ planType: "Mensal", periodStart: "2026-04-20" }, 31), "2026-04-30");
+  assert.equal(monthlyPaymentDueDate(periodAt(monthly, 0), 10, monthly.startDate), "2024-01-31");
+  assert.equal(monthlyPaymentDueDate(periodAt(monthly, 1), 10, monthly.startDate), "2024-02-10");
+  assert.equal(monthlyPaymentDueDate(periodAt({ ...monthly, type: "Anual" }, 0), 10), null);
+});
+
+test("active students appear overdue after the due day until the manager marks the month paid", async (t) => {
+  const ctx = context();
+  ctx.tables.gyms[0].studentPaymentDueDay = 10;
+  const list = async () => (await handler(getAllStudents)(ctx, { paymentStatusDay: academyToday() }))[0];
+  const clock = t.mock.method(Date, "now", () => Date.parse("2024-02-11T02:59:59Z"));
+  assert.equal((await list()).paymentOverdue, false);
+  clock.mock.mockImplementation(() => Date.parse("2024-02-11T03:00:00Z"));
+  assert.equal((await list()).paymentOverdue, true);
+  assert.equal((await list()).plan.isActive, true);
+  await handler(setPayment)(ctx, { ...payment, ...periodAt(monthly, 1), paidOn: "2024-02-11" });
+  assert.equal((await list()).paymentOverdue, false);
+  const billing = await handler(getStudentBilling)(ctx, { studentId: "student_1" });
+  assert.equal(billing.periods.find((period: any) => period.periodStart === "2024-02-29")?.dueDate, "2024-02-10");
 });
 
 test("plan changes preserve old payments and allow correcting recorded historical periods",async()=>{

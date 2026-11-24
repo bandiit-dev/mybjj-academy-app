@@ -7,7 +7,7 @@ import { hasPaidPortalAccess, PORTAL_PLANS, stripeConfigured } from "./lib/porta
 type Ctx = QueryCtx | MutationCtx;
 async function billingContext(ctx: Ctx, selectedGymId?: Id<"gyms">) {
   const principal = await getCurrentPrincipal(ctx,{skipSubscription:true});
-  if((principal.teacher||principal.student)&&!principal.isAdmin) throw new Error("Forbidden: admin role required");
+  if((principal.teacher||principal.student||principal.studentAccessDisabled)&&!principal.isAdmin) throw new Error("Forbidden: admin role required");
   const gyms = new Set([...(principal.teacher?.gymIds??[]),...(principal.student?.gymIds??[])]);
   if(selectedGymId && !gyms.has(selectedGymId)) throw new Error("Forbidden: academy access required");
   let gymId = selectedGymId ?? [...gyms][0];

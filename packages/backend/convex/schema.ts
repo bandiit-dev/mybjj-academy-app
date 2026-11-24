@@ -62,6 +62,7 @@ export default defineSchema({
 
   gyms: defineTable({
     teamName: v.optional(v.string()),
+    studentPaymentDueDay: v.optional(v.number()),
     name: v.string(),
     cnpj: v.string(),
     phone: v.string(),

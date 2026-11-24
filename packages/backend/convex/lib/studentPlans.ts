@@ -77,6 +77,33 @@ export function periodAt(plan: StudentPlan, index: number) {
     periodEnd: addPlanMonths(plan.startDate, (index + 1) * months) };
 }
 
+export function currentPlanPeriod(plan: StudentPlan, today: string, monthlyDueDay?: number) {
+  const [year, month] = today.split("-").map(Number);
+  const [startYear, startMonth] = plan.startDate.split("-").map(Number);
+  const months = (year - startYear) * 12 + month - startMonth;
+  const index = Math.max(0, Math.floor(months / PLAN_MONTHS[plan.type]));
+  const period = periodAt(plan, index);
+  // A configured monthly deadline follows the calendar month even if the stored period starts later.
+  if (plan.type === "Mensal" && monthlyDueDay !== undefined) return period;
+  return period.periodStart > today && index > 0 ? periodAt(plan, index - 1) : period;
+}
+
+export function monthlyPaymentDueDate(
+  period: Pick<ReturnType<typeof periodAt>, "planType" | "periodStart">,
+  dueDay?: number,
+  planStart?: string,
+) {
+  if (period.planType !== "Mensal" || dueDay === undefined) return null;
+  const [year, month] = period.periodStart.split("-").map(Number);
+  const day = Math.min(dueDay, new Date(Date.UTC(year, month, 0)).getUTCDate());
+  const due = `${period.periodStart.slice(0, 7)}-${String(day).padStart(2, "0")}`;
+  return period.periodStart === planStart && due < planStart ? planStart : due;
+}
+
+export async function academyStudentDueDay(ctx: Pick<QueryCtx, "db">, gymId?: Id<"gyms">) {
+  return gymId ? (await ctx.db.get(gymId))?.studentPaymentDueDay : undefined;
+}
+
 export function isPlanPeriod(plan: StudentPlan, start: string, end: string) {
   const [year, month] = start.split("-").map(Number);
   const [startYear, startMonth] = plan.startDate.split("-").map(Number);

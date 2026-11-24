@@ -81,6 +81,14 @@ export function AcademySettingsPage() {
                   <span>Data de Fundação</span>
                   <strong>{gym.founded}</strong>
                 </label>
+                <label className="academy-field">
+                  <span>Data de Vencimento</span>
+                  <strong>
+                    {gym.studentPaymentDueDay === undefined
+                      ? "Não definida"
+                      : `Dia ${gym.studentPaymentDueDay} de cada mês`}
+                  </strong>
+                </label>
               </div>
             </Card>
             <Card

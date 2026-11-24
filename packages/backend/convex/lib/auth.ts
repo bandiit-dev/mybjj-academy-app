@@ -30,6 +30,10 @@ export async function getProfilesByClerkId(ctx: AuthCtx, clerkUserId: string) {
 
 export type AcademyRole = "admin" | "teacher" | "student";
 
+export function isStudentAccessDisabled(student: Doc<"students"> | null | undefined) {
+  return student?.userType !== "Admin" && student?.plan?.isActive === false;
+}
+
 export function academyMemberships({
   teachers,
   students,
@@ -91,12 +95,14 @@ export async function getCurrentPrincipal(ctx: AuthCtx, options: {skipSubscripti
   const isAdmin = active ? active.role === "admin" :
     teacher?.userType === "Admin" || student?.userType === "Admin";
   const gymIds = active ? [active.gymId] : [];
+  const studentAccessDisabled = isStudentAccessDisabled(student);
   if (isAdmin && !options.skipSubscription) await paidGymIds(ctx, gymIds);
   return {
     identity,
     isAdmin,
     teacher: teacher ? { ...teacher, gymIds } : null,
-    student: student ? { ...student, gymIds } : null,
+    student: student && !studentAccessDisabled ? { ...student, gymIds } : null,
+    studentAccessDisabled,
   };
 }
 

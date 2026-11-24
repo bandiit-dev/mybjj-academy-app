@@ -1207,6 +1207,9 @@ export function EditAcademyForm() {
             phone: String(d.get("phone")),
             email: String(d.get("email")),
             founded: String(d.get("founded")),
+            studentPaymentDueDay: d.get("studentPaymentDueDay")
+              ? Number(d.get("studentPaymentDueDay"))
+              : null,
             branding: {
               logoUrl: (await uploadImage(d, "logoUrl")) || undefined,
               primaryColor: String(d.get("primaryColor")) || undefined,
@@ -1252,6 +1255,22 @@ export function EditAcademyForm() {
           type="date"
           defaultValue={gym.founded}
         />
+        <label className="management-field">
+          <span>Data de Vencimento</span>
+          <input
+            name="studentPaymentDueDay"
+            type="number"
+            min={1}
+            max={31}
+            step={1}
+            defaultValue={gym.studentPaymentDueDay}
+            placeholder="Dia do mês"
+          />
+          <small>
+            Defina o dia do mês para o pagamento das mensalidades. Em meses mais
+            curtos, vale o último dia do mês.
+          </small>
+        </label>
       </Section>
       <Section title="Branding">
         <ImageFileField

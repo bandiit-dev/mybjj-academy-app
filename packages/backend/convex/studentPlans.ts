@@ -1,17 +1,21 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import {
-  academyToday, assertActiveStudentCapacity, assertPlanDate, getStudentPlan, isPlanPeriod, paymentKey,
+  academyToday, academyStudentDueDay, assertActiveStudentCapacity, assertPlanDate, getStudentPlan, isPlanPeriod, monthlyPaymentDueDate, paymentKey,
   planTypeValidator, requireStudentPlanAdmin, scheduledPlanPeriods
 } from "./lib/studentPlans";
 
 export const getStudentBilling = query({
-  args: { studentId: v.id("students") },
+  args: { studentId: v.id("students"), refreshDay: v.optional(v.string()) },
   handler: async (ctx, {studentId}) => {
-    const {student} = await requireStudentPlanAdmin(ctx, studentId);
-    const plan = getStudentPlan(student);
-    const records = await ctx.db.query("studentPayments").withIndex("by_studentId", q => q.eq("studentId", studentId)).collect();
-    const periods = new Map(scheduledPlanPeriods(plan).map(period => [paymentKey(period), {
+    const {student, principal} = await requireStudentPlanAdmin(ctx, studentId);
+    const today = academyToday();
+    const plan = getStudentPlan(student, today);
+    const [records, dueDay] = await Promise.all([
+      ctx.db.query("studentPayments").withIndex("by_studentId", q => q.eq("studentId", studentId)).collect(),
+      academyStudentDueDay(ctx, principal.teacher?.gymIds[0] ?? principal.student?.gymIds[0]),
+    ]);
+    const periods = new Map(scheduledPlanPeriods(plan, today).map(period => [paymentKey(period), {
       ...period, paid: false, paidOn: "", notes: "", recordedBy: "", updatedAt: 0
     }]));
     for (const record of records) periods.set(paymentKey(record), {
@@ -21,8 +25,11 @@ export const getStudentBilling = query({
     });
     return {
       student: {...student, plan},
-      periods: [...periods.values()].sort((a,b) => b.periodStart.localeCompare(a.periodStart) || a.planType.localeCompare(b.planType)),
-      today: academyToday()
+      periods: [...periods.values()].map(period => ({
+        ...period,
+        dueDate: monthlyPaymentDueDate(period, dueDay, plan.startDate),
+      })).sort((a,b) => b.periodStart.localeCompare(a.periodStart) || a.planType.localeCompare(b.planType)),
+      today
     };
   }
 });

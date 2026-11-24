@@ -304,7 +304,7 @@ function MonthlyTeachingPanel({
 }
 
 export function Dashboard() {
-  const students = useQuery(api.students.getAllStudents);
+  const students = useQuery(api.students.getAllStudents, {});
   const teachers = useQuery(api.teachers.getAllTeachers);
   const units = useQuery(api.unities.getAllUnities);
   const month = academyToday().slice(0, 7);

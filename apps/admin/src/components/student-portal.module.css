@@ -130,6 +130,10 @@
   background: #ecfdf3;
   color: var(--student-positive);
 }
+.overdue {
+  background: #fee2e2;
+  color: #991b1b;
+}
 
 .days,
 .classList {

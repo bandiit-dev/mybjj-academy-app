@@ -13,6 +13,7 @@ import {
 } from "@mybjj/backend/convex/lib/studentPlans";
 import { AdminShell } from "@/components/dashboard";
 import { PortalImage } from "@/components/portal-image";
+import { useAcademyDay } from "@/hooks/use-academy-day";
 
 const dateLabel = (date?: string) =>
   date ? date.split("-").reverse().join("/") : "—";
@@ -34,22 +35,26 @@ type PaymentPeriod = {
   paidOn: string;
   notes: string;
   updatedAt: number;
+  dueDate: string | null;
 };
 
 function PaymentRow({
   studentId,
   period,
   today,
+  active,
 }: {
   studentId: Id<"students">;
   period: PaymentPeriod;
   today: string;
+  active: boolean;
 }) {
   const save = useMutation(api.studentPlans.setPayment);
   const [paidOn, setPaidOn] = useState(period.paidOn || today);
   const [notes, setNotes] = useState(period.notes);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const overdue = active && period.dueDate !== null && today > period.dueDate;
   async function record(paid: boolean) {
     setBusy(true);
     setError(null);
@@ -81,10 +86,15 @@ function PaymentRow({
           {dateLabel(period.periodStart)} a{" "}
           {dateLabel(lastCoveredDay(period.periodEnd))}
         </small>
+        {period.dueDate && (
+          <small>Vencimento em {dateLabel(period.dueDate)}</small>
+        )}
       </td>
       <td>
-        <span className={`student-status ${period.paid ? "paid" : "pending"}`}>
-          {period.paid ? "Pago" : "Pendente"}
+        <span
+          className={`student-status ${period.paid ? "paid" : overdue ? "inactive" : "pending"}`}
+        >
+          {period.paid ? "Pago" : overdue ? "Em atraso" : "Pendente"}
         </span>
       </td>
       <td>
@@ -152,7 +162,11 @@ function PaymentRow({
 }
 
 function StudentBilling({ studentId }: { studentId: Id<"students"> }) {
-  const data = useQuery(api.studentPlans.getStudentBilling, { studentId });
+  const refreshDay = useAcademyDay();
+  const data = useQuery(api.studentPlans.getStudentBilling, {
+    studentId,
+    refreshDay,
+  });
   const [scope, setScope] = useState("history");
   const [page, setPage] = useState(0);
   if (data === undefined)
@@ -161,11 +175,12 @@ function StudentBilling({ studentId }: { studentId: Id<"students"> }) {
         Carregando histórico de pagamentos...
       </section>
     );
-  const rows = data.periods.filter((period) =>
-    scope === "future"
-      ? period.periodStart > data.today
-      : period.periodStart <= data.today,
-  );
+  const rows = data.periods.filter((period) => {
+    const start = period.dueDate
+      ? `${period.dueDate.slice(0, 7)}-01`
+      : period.periodStart;
+    return scope === "future" ? start > data.today : start <= data.today;
+  });
   const pageCount = Math.max(1, Math.ceil(rows.length / 12));
   const currentPage = Math.min(page, pageCount - 1);
   return (
@@ -187,7 +202,7 @@ function StudentBilling({ studentId }: { studentId: Id<"students"> }) {
               setPage(0);
             }}
           >
-            <option value="history">Períodos até hoje</option>
+            <option value="history">Períodos atuais e anteriores</option>
             <option value="future">Próximos períodos</option>
           </select>
         </label>
@@ -212,6 +227,7 @@ function StudentBilling({ studentId }: { studentId: Id<"students"> }) {
                   studentId={studentId}
                   period={period}
                   today={data.today}
+                  active={data.student.plan.isActive}
                 />
               ))}
           </tbody>
@@ -460,8 +476,8 @@ export function StudentDetailsPage({
                 Início do plano: <strong>{dateLabel(plan.startDate)}</strong>
               </p>
               <p className="account-access-help">
-                A academia controla a ativação do plano. O histórico de
-                pagamentos é mantido ao alterar o plano ou desativar o aluno.
+                Desativar o aluno suspende o acesso ao aplicativo e preserva o
+                histórico de pagamentos.
               </p>
             </section>
             <StudentAttendance key={studentId} studentId={studentId} />

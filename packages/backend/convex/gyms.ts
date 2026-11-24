@@ -6,6 +6,12 @@ import { v } from "convex/values";
 
 import { getAccessibleGymIds, requireAdmin } from "./lib/auth";
 
+function validateDueDay(day: number) {
+  if (!Number.isInteger(day) || day < 1 || day > 31) {
+    throw new Error("Informe um dia de vencimento entre 1 e 31 para a mensalidade.");
+  }
+}
+
 async function withTeamName(ctx: Pick<QueryCtx, "db">, gym: Doc<"gyms">) {
   // Prefill the free-text field from an existing affiliation until it is edited.
   const team = gym.teamName === undefined && gym.teamId ? await ctx.db.get(gym.teamId) : null;
@@ -15,6 +21,7 @@ async function withTeamName(ctx: Pick<QueryCtx, "db">, gym: Doc<"gyms">) {
 export const createGym = mutation({
   args: {
     teamName: v.optional(v.string()),
+    studentPaymentDueDay: v.optional(v.number()),
     name: v.string(),
     cnpj: v.string(),
     phone: v.string(),
@@ -31,6 +38,7 @@ export const createGym = mutation({
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
+    if (args.studentPaymentDueDay !== undefined) validateDueDay(args.studentPaymentDueDay);
     const now = Date.now();
 
     return ctx.db.insert("gyms", {
@@ -46,6 +54,7 @@ export const updateGym = mutation({
   args: {
     gymId: v.id("gyms"),
     teamName: v.optional(v.string()),
+    studentPaymentDueDay: v.optional(v.union(v.number(), v.null())),
     name: v.optional(v.string()),
     cnpj: v.optional(v.string()),
     phone: v.optional(v.string()),
@@ -62,7 +71,7 @@ export const updateGym = mutation({
     ),
     teacherIds: v.optional(v.array(v.id("teachers")))
   },
-  handler: async (ctx, { gymId, ...patch }) => {
+  handler: async (ctx, { gymId, studentPaymentDueDay, ...patch }) => {
     const principal = await requireAdmin(ctx);
     assertAdminGymScope(principal, [gymId]);
 
@@ -70,9 +79,13 @@ export const updateGym = mutation({
     if (!gym) {
       throw new Error("Gym not found");
     }
+    if (studentPaymentDueDay != null) validateDueDay(studentPaymentDueDay);
 
     await ctx.db.patch(gymId, {
       ...patch,
+      ...(studentPaymentDueDay !== undefined
+        ? { studentPaymentDueDay: studentPaymentDueDay ?? undefined }
+        : {}),
       ...(patch.teamName !== undefined ? {teamName: patch.teamName.trim()} : {}),
       updatedAt: Date.now()
     });

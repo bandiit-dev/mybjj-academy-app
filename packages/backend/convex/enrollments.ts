@@ -3,8 +3,8 @@ import { ConvexError, v } from "convex/values";
 
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import {
-  getAccessibleGymIds,
   getCurrentPrincipal,
+  requireAdmin,
   requireSessionTeacherOrAdmin
 } from "./lib/auth";
 import { addPlanMonths } from "./lib/studentPlans";
@@ -201,8 +201,8 @@ export const getSessionRoster = query({
 export const getMonthlyPresence = query({
   args: { month: v.string() },
   handler: async (ctx, {month}) => {
-    const {principal, gymIds} = await getAccessibleGymIds(ctx);
-    if (!principal.isAdmin) throw new Error("Forbidden: admin role required");
+    const principal = await requireAdmin(ctx);
+    const gymIds = new Set([...(principal.teacher?.gymIds ?? []), ...(principal.student?.gymIds ?? [])]);
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error("Invalid month. Expected YYYY-MM.");
     const start = `${month}-01`;
     const end = addPlanMonths(start, 1);

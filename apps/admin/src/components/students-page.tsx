@@ -1,19 +1,19 @@
 "use client";
 
-import { getStudentPlan } from "@mybjj/backend/convex/lib/studentPlans";
 import { PortalImage } from "@/components/portal-image";
 import { api } from "@mybjj/backend/convex/_generated/api";
 import {
   BELT_LABELS,
   BELT_CLASSES,
 } from "@mybjj/backend/convex/lib/validators";
-import type { Doc } from "@mybjj/backend/convex/_generated/dataModel";
+import type { Id } from "@mybjj/backend/convex/_generated/dataModel";
 import { useQuery } from "convex/react";
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { AdminShell } from "@/components/dashboard";
+import { useAcademyDay } from "@/hooks/use-academy-day";
 
 const beltLabels = BELT_LABELS;
 const beltClasses = BELT_CLASSES;
@@ -31,9 +31,8 @@ function SmallIcon({ name }: { name: string }) {
 }
 
 export function StudentsPage() {
-  const students = useQuery(api.students.getAllStudents) as
-    | Doc<"students">[]
-    | undefined;
+  const paymentStatusDay = useAcademyDay();
+  const students = useQuery(api.students.getAllStudents, { paymentStatusDay });
   const unities = useQuery(api.unities.getAllUnities);
   const [search, setSearch] = useState("");
   const [belt, setBelt] = useState("all");
@@ -55,7 +54,7 @@ export function StudentsPage() {
               value.toLocaleLowerCase("pt-BR").includes(term),
             )) &&
           (belt === "all" || student.belt === belt) &&
-          (unit === "all" || student.unityIds.includes(unit as never))
+          (unit === "all" || student.unityIds.includes(unit as Id<"unities">))
         );
       }),
     [students, search, belt, unit],
@@ -170,15 +169,22 @@ export function StudentsPage() {
                     </td>
                     <td>
                       <span className="member-badge student">
-                        {getStudentPlan(student).type}
+                        {student.plan.type}
                       </span>
                     </td>
                     <td>
-                      <span
-                        className={`student-status ${getStudentPlan(student).isActive ? "active" : "inactive"}`}
-                      >
-                        {getStudentPlan(student).isActive ? "Ativo" : "Inativo"}
-                      </span>
+                      <div className="belt-cell">
+                        <span
+                          className={`student-status ${student.plan.isActive ? "active" : "inactive"}`}
+                        >
+                          {student.plan.isActive ? "Ativo" : "Inativo"}
+                        </span>
+                        {student.paymentOverdue && (
+                          <span className="student-status inactive">
+                            Em atraso
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td>
                       <div className="row-actions">

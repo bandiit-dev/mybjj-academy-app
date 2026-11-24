@@ -14,7 +14,7 @@ import {
   saveStaffSessionLog,
 } from "../convex/classSessions";
 import { cancelEnrollment } from "../convex/enrollments";
-import { selectAcademy } from "../convex/onboarding";
+import { getOnboardingStatus, selectAcademy } from "../convex/onboarding";
 import { getAllStudents, getStudentById } from "../convex/students";
 import {
   confirmClass,
@@ -41,7 +41,9 @@ test("student attendance uses the student record and sessions of the selected ac
     name: "Outro aluno",
     gymIds: ["elsewhere"],
   });
-  const otherSession = tables.classSessions.find((row) => row._id === "outside-scope");
+  const otherSession = tables.classSessions.find(
+    (row) => row._id === "outside-scope",
+  );
   otherSession.sessionDate = today;
 
   const overview = () => handler(getOverview)(ctx, { refreshDay: today });
@@ -50,7 +52,10 @@ test("student attendance uses the student record and sessions of the selected ac
   await handler(selectAcademy)(ctx, { gymId: "elsewhere" });
   assert.equal((await overview()).profile.name, "Outro aluno");
   assert.equal((await overview()).week.total, 0);
-  await assert.rejects(handler(confirmClass)(ctx, { sessionId: "monday" }), /não está disponível/);
+  await assert.rejects(
+    handler(confirmClass)(ctx, { sessionId: "monday" }),
+    /não está disponível/,
+  );
   await handler(confirmClass)(ctx, { sessionId: "outside-scope" });
   assert.equal(tables.enrollments.at(-1)?.studentId, "student_other_academy");
   assert.equal((await overview()).week.total, 1);
@@ -281,6 +286,44 @@ test("student overview reads their own payments, actual week and academy schedul
     handler(getOverview)(fixture("teacher-login").ctx, {}),
     /requires a student account/,
   );
+});
+
+test("overdue students retain access until their academy manually deactivates their plan", async (t) => {
+  t.mock.method(Date, "now", () => clock);
+  const { ctx, tables } = fixture();
+  tables.gyms = [{ _id: "gym", studentPaymentDueDay: 10 }];
+  const student = tables.students[0];
+  const payment = tables.studentPayments[0];
+  payment.paid = false;
+  const overview = () => handler(getOverview)(ctx, { refreshDay: today });
+  assert.equal((await overview()).payments.status, "overdue");
+  assert.equal((await overview()).payments.dueDate, "2026-11-10");
+  assert.equal(
+    (await handler(getOnboardingStatus)(ctx, {})).studentAccessDisabled,
+    undefined,
+  );
+  await handler(confirmClass)(ctx, { classId: "class-intro" });
+
+  payment.paid = true;
+  assert.equal((await overview()).payments.status, "paid");
+  assert.equal((await overview()).payments.dueDate, "2026-12-10");
+
+  student.plan.isActive = false;
+  assert.equal(
+    (await handler(getOnboardingStatus)(ctx, {})).studentAccessDisabled,
+    true,
+  );
+  await assert.rejects(overview(), /requires a student account/);
+  await assert.rejects(
+    handler(getSchedule)(ctx, { date: today }),
+    /requires a student account/,
+  );
+  await assert.rejects(
+    handler(confirmClass)(ctx, { classId: "class-intro" }),
+    /requires a student account/,
+  );
+  student.plan.isActive = true;
+  assert.equal((await overview()).payments.status, "paid");
 });
 
 test("today's recurring class becomes one session and one confirmation, including retries", async (t) => {
@@ -635,17 +678,25 @@ test("class history and notes are scoped to assigned teachers and academy admins
 test("assigned teachers can mark students from the session academy present without a confirmation", async (t) => {
   t.mock.method(Date, "now", () => clock);
   const { ctx, tables, friday } = fixture("teacher-login");
-  tables.students.push({ _id: "outside", name: "Paulo", gymIds: ["elsewhere"] });
+  tables.students.push({
+    _id: "outside",
+    name: "Paulo",
+    gymIds: ["elsewhere"],
+  });
   tables.classSessions.push(
     { ...friday, _id: "other-teacher", teacherIds: ["substitute"] },
     { ...friday, _id: "cancelled", status: "Cancelled" },
     { ...friday, _id: "future", startsAt: clock + 60_000 },
   );
-  const getLog = () => handler(getStaffSessionLog)(ctx, { sessionId: "monday" });
+  const getLog = () =>
+    handler(getStaffSessionLog)(ctx, { sessionId: "monday" });
   const mark = (studentId: string, sessionId = "monday") =>
     handler(markStaffSessionPresence)(ctx, { studentId, sessionId });
   const markBatch = (studentIds: string[]) =>
-    handler(markStaffSessionPresences)(ctx, { studentIds, sessionId: "monday" });
+    handler(markStaffSessionPresences)(ctx, {
+      studentIds,
+      sessionId: "monday",
+    });
 
   assert.deepEqual((await getLog()).availableStudents, [
     { id: "other-student", name: "Ana", belt: "White", degree: 0 },
@@ -657,7 +708,10 @@ test("assigned teachers can mark students from the session academy present witho
   );
   assert.equal(tables.attendance.length, 1);
   for (const sessionId of ["other-teacher", "cancelled", "future"]) {
-    await assert.rejects(mark("other-student", sessionId), /não está disponível/);
+    await assert.rejects(
+      mark("other-student", sessionId),
+      /não está disponível/,
+    );
   }
   await assert.rejects(
     handler(markStaffSessionPresence)(

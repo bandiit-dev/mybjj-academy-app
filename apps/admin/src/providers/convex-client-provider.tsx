@@ -22,7 +22,10 @@ import {
   pendingCheckoutPlanKey,
 } from "@/utils/checkout-plan";
 import { BrandLogo } from "@/components/brand-logo";
-import { AcademySwitchContext } from "@/components/academy-switcher";
+import {
+  AcademySwitchContext,
+  AcademySwitcher,
+} from "@/components/academy-switcher";
 
 function PortalAccessGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -310,6 +313,27 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
         <div className="auth-spinner" />
         <strong>Preparando seu cadastro...</strong>
       </main>
+    );
+  }
+  if (studentAccount && onboarding.studentAccessDisabled) {
+    return (
+      <AcademySwitchContext.Provider
+        value={{ activeGymId, switchAcademy, error: switchError }}
+      >
+        <main className="auth-state">
+          <div className="auth-denied">
+            <BrandLogo className="auth-brand-logo" />
+            <h1>Acesso desativado</h1>
+            <p>Entre em contato com a academia para reativar seu acesso.</p>
+            <AcademySwitcher />
+            <SignOutButton redirectUrl="/">
+              <button className="button secondary" type="button">
+                Sair
+              </button>
+            </SignOutButton>
+          </div>
+        </main>
+      </AcademySwitchContext.Provider>
     );
   }
   if (studentAccount || (needsBilling && studentRoute)) {

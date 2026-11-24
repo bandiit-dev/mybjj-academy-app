@@ -7,10 +7,12 @@ import { confirmStudentEnrollment } from "./enrollments";
 import { getCurrentPrincipal } from "./lib/auth";
 import {
   academyToday,
+  academyStudentDueDay,
   assertPlanDate,
+  currentPlanPeriod,
   getStudentPlan,
-  periodAt,
-  PLAN_MONTHS,
+  monthlyPaymentDueDate,
+  paymentKey,
 } from "./lib/studentPlans";
 import { toIsoDate } from "./lib/validators";
 
@@ -153,37 +155,38 @@ async function paymentSummary(
   today: string,
 ) {
   const plan = getStudentPlan(student, today);
-  const records = await ctx.db
-    .query("studentPayments")
-    .withIndex("by_studentId", (q) => q.eq("studentId", student._id))
-    .collect();
+  const [records, dueDay] = await Promise.all([
+    ctx.db
+      .query("studentPayments")
+      .withIndex("by_studentId", (q) => q.eq("studentId", student._id))
+      .collect(),
+    academyStudentDueDay(ctx, student.gymIds[0]),
+  ]);
+  const current = currentPlanPeriod(plan, today, dueDay);
+  const monthlyDue = monthlyPaymentDueDate(current, dueDay, plan.startDate);
   const paid = records.filter((record) => record.paid);
   const lastPayment =
     paid
       .flatMap((record) => (record.paidOn ? [record.paidOn] : []))
       .sort()
       .at(-1) ?? null;
-  const currentPaid = paid.filter(
-    (record) =>
-      record.planType === plan.type &&
-      record.periodStart >= plan.startDate &&
-      record.periodStart <= today &&
-      today < record.periodEnd,
+  const currentPaid = paid.filter((record) =>
+    monthlyDue
+      ? paymentKey(record) === paymentKey(current)
+      : record.planType === plan.type &&
+        record.periodStart >= plan.startDate &&
+        record.periodStart <= today &&
+        today < record.periodEnd,
   );
   const coveredThrough = currentPaid.sort((a, b) =>
     b.periodEnd.localeCompare(a.periodEnd),
   )[0]?.periodEnd;
-  const months =
-    (Number(today.slice(0, 4)) - Number(plan.startDate.slice(0, 4))) * 12 +
-    Number(today.slice(5, 7)) -
-    Number(plan.startDate.slice(5, 7));
-  const interval = PLAN_MONTHS[plan.type];
-  const index = Math.max(0, Math.floor(months / interval));
-  const period = periodAt(plan, index);
-  const current =
-    period.periodStart > today && index > 0
-      ? periodAt(plan, index - 1)
-      : period;
+  const dueDate = coveredThrough
+    ? (monthlyPaymentDueDate(
+        { ...current, periodStart: coveredThrough },
+        dueDay,
+      ) ?? coveredThrough)
+    : (monthlyDue ?? current.periodStart);
 
   return {
     type: plan.type,
@@ -193,9 +196,11 @@ async function paymentSummary(
         ? ("paid" as const)
         : plan.startDate > today
           ? ("upcoming" as const)
-          : ("pending" as const),
+          : monthlyDue && today > monthlyDue
+            ? ("overdue" as const)
+            : ("pending" as const),
     lastPayment,
-    dueDate: plan.isActive ? (coveredThrough ?? current.periodStart) : null,
+    dueDate: plan.isActive ? dueDate : null,
   };
 }
 

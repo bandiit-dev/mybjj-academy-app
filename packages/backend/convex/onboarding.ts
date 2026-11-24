@@ -4,7 +4,7 @@ import { internal } from "./_generated/api";
 import { assertDegree, beltValidator } from "./lib/validators";
 
 import { action, internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
-import { academyMemberships, academySelection, getAuthUserIdentity, getProfilesByClerkId, resolveAcademyMembership } from "./lib/auth";
+import { academyMemberships, academySelection, getAuthUserIdentity, getProfilesByClerkId, isStudentAccessDisabled, resolveAcademyMembership } from "./lib/auth";
 
 type AuthCtx = Pick<QueryCtx, "auth" | "db"> | Pick<MutationCtx, "auth" | "db">;
 
@@ -89,11 +89,15 @@ export const getOnboardingStatus = query({
     const teacher = teachers[0];
     const student = students[0];
     if (teacher || student) {
+      const currentStudent = active?.profileType === "student"
+        ? students.find(profile => profile._id === active.profile._id)
+        : !active && !teacher ? student : null;
       return {
         status: "ready" as const,
         isAdmin: active ? active.role === "admin" : teacher?.userType === "Admin" || student?.userType === "Admin",
         profileType: active?.profileType ?? (teacher ? "teacher" as const : "student" as const),
         displayName: active?.profile.name ?? teacher?.name ?? student?.name ?? identity.name ?? "Usuário",
+        ...(isStudentAccessDisabled(currentStudent) ? { studentAccessDisabled: true } : {}),
         ...(memberships.size > 1 ? { activeGymId: active?.gymId } : {}),
       };
     }

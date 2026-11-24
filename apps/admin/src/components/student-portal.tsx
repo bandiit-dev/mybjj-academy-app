@@ -2,7 +2,7 @@
 
 import { SignOutButton, useUser } from "@clerk/nextjs";
 import { api } from "@mybjj/backend/convex/_generated/api";
-import { academyToday } from "@mybjj/backend/convex/lib/studentPlans";
+import { useAcademyDay } from "@/hooks/use-academy-day";
 import {
   BELT_CLASSES,
   BELT_LABELS,
@@ -363,6 +363,7 @@ function PaymentSummary({ payments }: Pick<Overview, "payments">) {
   const status = {
     paid: "Em dia",
     pending: "Pendente",
+    overdue: "Em atraso",
     inactive: "Inativo",
     upcoming: "A iniciar",
   };
@@ -376,7 +377,7 @@ function PaymentSummary({ payments }: Pick<Overview, "payments">) {
       <div className={styles.between}>
         <h2>{title[payments.type]}</h2>
         <span
-          className={`${styles.badge} ${payments.status === "paid" ? styles.positive : ""}`}
+          className={`${styles.badge} ${payments.status === "paid" ? styles.positive : payments.status === "overdue" ? styles.overdue : ""}`}
         >
           {status[payments.status]}
         </span>
@@ -390,7 +391,7 @@ function PaymentSummary({ payments }: Pick<Overview, "payments">) {
       </div>
       <div className={styles.dueDate}>
         <p>
-          {payments.status === "pending"
+          {payments.status === "pending" || payments.status === "overdue"
             ? "Vencimento do período"
             : "Próximo vencimento"}
         </p>
@@ -426,15 +427,8 @@ function StudentSchedule({ today }: { today: string }) {
 
 export function StudentPortal({ section = "home" }: { section?: Section }) {
   const { user } = useUser();
-  const [refreshDay, setRefreshDay] = useState(academyToday);
+  const refreshDay = useAcademyDay();
   const overview = useQuery(api.studentPortal.getOverview, { refreshDay });
-  useEffect(() => {
-    const timer = window.setInterval(
-      () => setRefreshDay(academyToday()),
-      30_000,
-    );
-    return () => window.clearInterval(timer);
-  }, []);
 
   if (!overview)
     return (

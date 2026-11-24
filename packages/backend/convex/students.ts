@@ -1,6 +1,6 @@
 import { assertAdminGymScope } from "./lib/auth";
-import { assertActiveStudentCapacity, getStudentPlan, studentPlanValidator, validateStudentPlan, withStudentPlan } from "./lib/studentPlans";
-import { mutationGeneric as mutation, queryGeneric as query } from "convex/server";
+import { academyStudentDueDay, academyToday, assertActiveStudentCapacity, currentPlanPeriod, getStudentPlan, monthlyPaymentDueDate, studentPlanValidator, validateStudentPlan, withStudentPlan } from "./lib/studentPlans";
+import { mutation, query } from "./_generated/server";
 import { assertDateOfBirth, assertDegree, beltValidator } from "./lib/validators";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
@@ -138,13 +138,28 @@ export const getStudentById = query({
 });
 
 export const getAllStudents = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { paymentStatusDay: v.optional(v.string()) },
+  handler: async (ctx, { paymentStatusDay }) => {
     const principal = await requireAdmin(ctx);
-    const gymIds = new Set([...(principal.teacher?.gymIds ?? []), ...(principal.student?.gymIds ?? [])]);
-    const students = await ctx.db.query("students").collect();
-    return students.filter((student) => student.gymIds.some((gymId: Id<"gyms">) => gymIds.has(gymId)))
-      .map(student => ({ ...student, plan: getStudentPlan(student) }));
+    const gymId = principal.teacher?.gymIds[0] ?? principal.student?.gymIds[0];
+    const today = academyToday();
+    const [students, dueDay] = await Promise.all([
+      ctx.db.query("students").collect(),
+      paymentStatusDay ? academyStudentDueDay(ctx, gymId) : undefined,
+    ]);
+    const academyStudents = students.filter(student => gymId && student.gymIds.includes(gymId));
+    return Promise.all(academyStudents.map(async student => {
+      const plan = getStudentPlan(student, today);
+      const result = { ...student, plan, paymentOverdue: false };
+      if (!plan.isActive || plan.type !== "Mensal" || dueDay === undefined || today < plan.startDate) return result;
+      const period = currentPlanPeriod(plan, today, dueDay);
+      const dueDate = monthlyPaymentDueDate(period, dueDay, plan.startDate);
+      if (!dueDate || today <= dueDate) return result;
+      const payment = await ctx.db.query("studentPayments").withIndex("by_period", q => q
+        .eq("studentId", student._id).eq("planType", period.planType)
+        .eq("periodStart", period.periodStart).eq("periodEnd", period.periodEnd)).unique();
+      return { ...result, paymentOverdue: !payment?.paid };
+    }));
   }
 });
 
