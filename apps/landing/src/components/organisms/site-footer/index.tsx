@@ -38,12 +38,17 @@ export function SiteFooter({ home = false }: { home?: boolean }) {
           className="mt-10 max-w-full lg:mt-[53px]"
         />
         <div className="mt-[35px] grid items-center gap-5 text-[#f0f0f0] sm:grid-cols-[1fr_auto_1fr]">
-          <DesignImage
-            asset="09216.svg"
-            width={30}
-            height={30}
-            alt="Instagram"
-          />
+          <a
+            href="https://www.instagram.com/mybjjacademyapp/"
+            className="justify-self-start"
+          >
+            <DesignImage
+              asset="09216.svg"
+              width={30}
+              height={30}
+              alt="Instagram"
+            />
+          </a>
           <div className="flex flex-wrap gap-x-7 gap-y-2 text-sm">
             <Link href="/politica-de-privacidade">Política de Privacidade</Link>
             <Link href="/termos-de-uso">Termos de Uso</Link>
