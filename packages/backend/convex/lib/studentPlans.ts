@@ -77,6 +77,12 @@ export function periodAt(plan: StudentPlan, index: number) {
     periodEnd: addPlanMonths(plan.startDate, (index + 1) * months) };
 }
 
+export function lastCoveredDay(exclusiveEnd: string) {
+  return new Date(Date.parse(`${exclusiveEnd}T00:00:00Z`) - 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+}
+
 export function currentPlanPeriod(plan: StudentPlan, today: string, monthlyDueDay?: number) {
   const [year, month] = today.split("-").map(Number);
   const [startYear, startMonth] = plan.startDate.split("-").map(Number);

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { getStudentBilling, initializeExistingPlans, setPayment, setPlanActive } from "../convex/studentPlans";
+import { getAcademyPaymentOverview, getStudentBilling, initializeExistingPlans, setPayment, setPlanActive } from "../convex/studentPlans";
 import { getAllStudents, updateStudent } from "../convex/students";
 import { updateGym } from "../convex/gyms";
 import { claim, finish, queuePage } from "../convex/monthlyReminders";
@@ -17,7 +17,7 @@ function context({admin = true, authenticated = true, otherAcademy = false} = {}
     gyms: [{_id:"gym_1"}, {_id:"gym_2"}],
     teachers: admin ? [{_id:"teacher_1",clerkUserId:"owner",userType:"Admin",gymIds:["gym_1"]}] : [],
     students: [{_id:"student_1",clerkUserId:"student_user",gymIds:[otherAcademy?"gym_2":"gym_1"],plan:{...monthly},userType:"Normal"}],
-    studentPayments: [], monthlyPaymentReminders: []
+    unities: [], studentPayments: [], monthlyPaymentReminders: []
   };
   const db = {
     get: async (id: string) => Object.values(tables).flat().find(row=>row._id===id)??null,
@@ -267,4 +267,59 @@ test("upcoming periods are generated without gaps and always include a future pl
   for(let i=1;i<periods.length;i++) assert.equal(periods[i-1].periodEnd,periods[i].periodStart);
   assert.equal(scheduledPlanPeriods({...monthly,startDate:"2090-01-01"},"2024-06-15").length,1);
   assert.equal(getStudentPlan({plan:{...monthly,isActive:false}}).isActive,false);
+});
+
+test("the academy payment overview resolves active periods and scopes payments and reminders", async t => {
+  t.mock.method(Date, "now", () => Date.parse("2024-02-21T02:30:00Z"));
+  const ctx = context();
+  ctx.tables.gyms[0].studentPaymentDueDay = 20;
+  ctx.tables.unities.push(
+    {_id: "unit_1", gymId: "gym_1", name: "Centro"},
+    {_id: "unit_2", gymId: "gym_2", name: "Outra academia"},
+  );
+  const started = {type: "Mensal", startDate: "2024-01-15", isActive: true};
+  ctx.tables.students = [
+    { _id: "paid", name: "Pago", gymIds: ["gym_1"], unityIds: ["unit_1", "unit_2"], plan: started },
+    { _id: "unpaid", name: "Pendente", gymIds: ["gym_1"], unityIds: [], plan: started },
+    { _id: "future", name: "Futuro", gymIds: ["gym_1"], unityIds: [], plan: {...started, startDate: "2024-03-01"} },
+    { _id: "inactive", name: "Inativo", gymIds: ["gym_1"], unityIds: [], plan: {...started, isActive: false} },
+    { _id: "annual", name: "Anual", gymIds: ["gym_1"], unityIds: [], plan: {...started, type: "Anual"} },
+    { _id: "outside", name: "Fora", gymIds: ["gym_2"], unityIds: [], plan: started },
+  ];
+  ctx.tables.studentPayments.push(
+    { studentId: "paid", ...periodAt(started as typeof monthly, 1), paid: true, paidOn: "2024-02-17", notes: "Interno" },
+    { studentId: "unpaid", ...periodAt(started as typeof monthly, 0), paid: true, paidOn: "2024-01-20" },
+    { studentId: "annual", ...periodAt({ ...monthly, startDate: started.startDate, type: "Anual" }, 0), paid: true },
+  );
+  ctx.tables.monthlyPaymentReminders.push(
+    { studentId: "paid", gymId: "gym_1", month: "2024-02", sentAt: 10, recipient: "private@example.com" },
+    { studentId: "unpaid", gymId: "gym_1", month: "2024-02", failedAt: 20 },
+    { studentId: "unpaid", gymId: "gym_2", month: "2024-02", sentAt: 30 },
+  );
+  const overview = () => handler(getAcademyPaymentOverview)(ctx, { refreshDay: academyToday() });
+  const current = await overview();
+  assert.equal(current.today, "2024-02-20");
+  assert.deepEqual(current.units, [{id: "unit_1", name: "Centro"}]);
+  assert.deepEqual(current.rows.map((row: any) => [row.id, row.status]), [
+    ["paid", "paid"], ["unpaid", "pending"], ["future", "upcoming"], ["inactive", "inactive"], ["annual", "paid"],
+  ]);
+  assert.deepEqual(current.rows[0].unitIds, ["unit_1"]);
+  assert.equal(current.rows[0].paidOn, "2024-02-17");
+  assert.equal(current.rows[0].dueDate, "2024-02-20");
+  assert.deepEqual(current.rows[0].reminder, {status: "sent", at: 10});
+  assert.deepEqual(current.rows[1].reminder, {status: "failed", at: 20});
+  assert.equal(current.rows[4].dueDate, null);
+  assert.equal(current.rows[4].period.periodEnd, "2025-01-15");
+
+  t.mock.method(Date, "now", () => Date.parse("2024-02-21T03:30:00Z"));
+  assert.equal((await overview()).rows[1].status, "overdue");
+});
+
+test("the academy payment overview requires administrative access", async () => {
+  const args = {refreshDay: "2024-02-20"};
+  const ctx = context({admin: false});
+  await assert.rejects(handler(getAcademyPaymentOverview)(ctx, args), /admin role required/);
+  ctx.tables.teachers.push({clerkUserId: "student_user", userType: "Normal", gymIds: ["gym_1"]});
+  await assert.rejects(handler(getAcademyPaymentOverview)(ctx, args), /admin role required/);
+  await assert.rejects(handler(getAcademyPaymentOverview)(context({authenticated: false}), args), /Unauthorized/);
 });

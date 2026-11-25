@@ -8,6 +8,7 @@ import type { Id } from "@mybjj/backend/convex/_generated/dataModel";
 import { BELT_LABELS } from "@mybjj/backend/convex/lib/validators";
 import {
   getStudentPlan,
+  lastCoveredDay,
   paymentKey,
   type PlanType,
 } from "@mybjj/backend/convex/lib/studentPlans";
@@ -23,11 +24,6 @@ const attendanceTime = new Intl.DateTimeFormat("pt-BR", {
   minute: "2-digit",
   timeZone: "America/Sao_Paulo",
 });
-function lastCoveredDay(exclusiveEnd: string) {
-  return new Date(new Date(`${exclusiveEnd}T00:00:00Z`).getTime() - 86400000)
-    .toISOString()
-    .slice(0, 10);
-}
 type PaymentPeriod = {
   planType: PlanType;
   periodStart: string;

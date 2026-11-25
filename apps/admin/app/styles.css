@@ -2764,6 +2764,24 @@ select:focus-visible {
   min-width: 440px;
 }
 
+.payment-month-heading {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+.academy-payments-table {
+  min-width: 880px;
+}
+.academy-payments-table td {
+  vertical-align: middle;
+}
+.academy-payments-table .card-action {
+  white-space: nowrap;
+}
+.academy-payments-table .student-status.neutral {
+  background: #f4f4f5;
+  color: var(--muted);
+}
+
 .class-history-picker {
   max-width: 340px;
 }

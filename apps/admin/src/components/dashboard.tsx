@@ -21,6 +21,7 @@ const navItems = [
   { label: "Visão geral", icon: "layout-grid.svg", href: "/" },
   { label: "Aulas", icon: "book-open.svg", href: "/aulas" },
   { label: "Alunos", icon: "users.svg", href: "/alunos" },
+  { label: "Mensalidades", icon: "calendar.svg", href: "/mensalidades" },
   { label: "Professores", icon: "graduation-cap.svg", href: "/professores" },
   { label: "Unidades", icon: "map-pin.svg", href: "/unidades" },
   { label: "Academia", icon: "shield.svg", href: "/academia" },
