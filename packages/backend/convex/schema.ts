@@ -54,13 +54,15 @@ export default defineSchema({
 
   images: defineTable({
     storageId: v.id("_storage"),
-    url: v.string(),
+    url: v.optional(v.string()),
+    studentPhotoGymId: v.optional(v.id("gyms")),
+    attachedToStudent: v.optional(v.boolean()),
     contentType: v.string(),
     fileName: v.string(),
     size: v.number(),
     uploadedBy: v.string(),
     createdAt: v.number()
-  }).index("by_uploadedBy", ["uploadedBy"]),
+  }).index("by_uploadedBy", ["uploadedBy"]).index("by_url", ["url"]),
 
   gyms: defineTable({
     teamName: v.optional(v.string()),
@@ -84,6 +86,7 @@ export default defineSchema({
   })
     .index("by_cnpj", ["cnpj"])
     .index("by_email", ["email"])
+    .index("by_brandingLogo", ["branding.logoUrl"])
     .index("by_studentPaymentRemindersEnabled", ["studentPaymentRemindersEnabled"]),
 
   unities: defineTable({
@@ -105,7 +108,7 @@ export default defineSchema({
     founded: v.string(),
     createdAt: v.number(),
     updatedAt: v.number()
-  }),
+  }).index("by_logo", ["logo"]),
 
   teachers: defineTable({
     clerkUserId: v.string(),
@@ -125,12 +128,14 @@ export default defineSchema({
     updatedAt: v.number()
   })
     .index("by_clerkUserId", ["clerkUserId"])
+    .index("by_picture", ["picture"])
     .index("by_email", ["email"]),
 
   students: defineTable({
     plan: v.optional(studentPlanValidator),
     clerkUserId: v.optional(v.string()),
     guardianEmail: v.optional(v.string()),
+    photoId: v.optional(v.id("images")),
     dateOfBirth: v.optional(v.string()),
     name: v.string(),
     email: v.string(),
@@ -146,6 +151,7 @@ export default defineSchema({
   })
     .index("by_clerkUserId", ["clerkUserId"])
     .index("by_guardianEmail", ["guardianEmail"])
+    .index("by_picture", ["picture"])
     .index("by_email", ["email"]),
 
   studentGraduations: defineTable({

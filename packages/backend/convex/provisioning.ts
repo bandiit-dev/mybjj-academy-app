@@ -7,6 +7,7 @@ import type { Id } from "./_generated/dataModel";
 import { action, internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { getProfilesByClerkId, requireAcademyUnitAdmin } from "./lib/auth";
 import { recordStudentGraduation } from "./lib/studentGraduation";
+import { claimStudentPhoto, rejectPublicStudentPhoto } from "./lib/studentPhotos";
 import { INVITATION_PREFIX, profilesWithAccessEmail } from "./lib/accountInvitations";
 
 const userTypeValidator = v.union(v.literal("Normal"), v.literal("Admin"));
@@ -43,7 +44,7 @@ async function checkInvitationAllowed(
     if (args.reuseInvitation && (!args.invitationId || !pendingIds.includes(args.invitationId))) {
       throw new Error("O acesso do responsável mudou. Tente salvar novamente.");
     }
-    return { pendingInvitationId: pendingIds[0] };
+    return { principal, pendingInvitationId: pendingIds[0] };
   }
   const email = args.email.trim().toLowerCase();
   const [teachers, students] = await Promise.all([
@@ -61,7 +62,7 @@ async function checkInvitationAllowed(
       throw new Error("A profile already exists in this academy for this account");
     }
   }
-  return {};
+  return { principal };
 }
 
 export const assertInvitationAllowed = internalQuery({
@@ -71,7 +72,7 @@ export const assertInvitationAllowed = internalQuery({
     guardianEmail: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const invitation = await checkInvitationAllowed(ctx, args);
+    const { principal: _, ...invitation } = await checkInvitationAllowed(ctx, args);
     if (args.studentInvitation) {
       const previous = args.studentId ? await ctx.db.get(args.studentId) : null;
       const plan = args.plan ?? getStudentPlan(previous ?? {});
@@ -107,10 +108,12 @@ export const insertInvitedStudent = internalMutation({
     plan: v.optional(studentPlanValidator),
     guardianEmail: v.optional(v.string()), reuseInvitation: v.optional(v.boolean()),
     invitationId: v.optional(v.string()), existingClerkUserId: v.optional(v.string()), name: v.string(), email: v.string(), phone: v.optional(v.string()), dateOfBirth: v.optional(v.string()), belt: beltValidator,
-    degree: v.number(), gymId: v.id("gyms"), unityId: v.id("unities"), picture: v.string()
+    degree: v.number(), gymId: v.id("gyms"), unityId: v.id("unities"),
+    picture: v.optional(v.string()), photoId: v.optional(v.id("images")),
   },
   handler: async (ctx, args) => {
-    await checkInvitationAllowed(ctx, args);
+    const { principal } = await checkInvitationAllowed(ctx, args);
+    rejectPublicStudentPhoto(args.picture);
     const plan = validateStudentPlan(getStudentPlan(args));
     assertDateOfBirth(args.dateOfBirth);
     assertDegree(args.degree); const now = Date.now();
@@ -120,7 +123,8 @@ export const insertInvitedStudent = internalMutation({
       guardianEmail: args.guardianEmail?.trim().toLowerCase(),
       clerkUserId: invitedClerkUserId(args), name: args.name.trim(), email: args.email.trim().toLowerCase(),
       phone: (args.phone ?? "").trim(), dateOfBirth: args.dateOfBirth, belt: args.belt, degree: args.degree, gymIds: [args.gymId], unityIds: [args.unityId],
-      picture: args.picture.trim(), userType: "Normal", createdAt: now, updatedAt: now
+      picture: "", ...await claimStudentPhoto(ctx, args.photoId, [args.gymId], principal.identity.subject),
+      userType: "Normal", createdAt: now, updatedAt: now
     });
   }
 });
@@ -262,10 +266,12 @@ export const inviteStudent = action({
     plan: v.optional(studentPlanValidator),
     guardianEmail: v.optional(v.string()),
     name: v.string(), email: v.string(), phone: v.optional(v.string()), dateOfBirth: v.optional(v.string()), belt: beltValidator, degree: v.number(),
-    gymId: v.id("gyms"), unityId: v.id("unities"), picture: v.string(), redirectUrl: v.string()
+    gymId: v.id("gyms"), unityId: v.id("unities"), redirectUrl: v.string(),
+    picture: v.optional(v.string()), photoId: v.optional(v.id("images")),
   },
   handler: async (ctx, args): Promise<Id<"students">> => {
     if (!(await ctx.auth.getUserIdentity())) throw new Error("Unauthorized");
+    rejectPublicStudentPhoto(args.picture);
     const invitation = await ctx.runQuery(internal.provisioning.assertInvitationAllowed, {
       email: args.email, guardianEmail: args.guardianEmail, gymId: args.gymId,
       unityId: args.unityId, studentInvitation: true, plan: args.plan,
@@ -288,14 +294,16 @@ const existingStudentInvitationArgs = {
   guardianEmail: v.optional(v.string()),
   studentId: v.id("students"), name: v.string(), email: v.string(), phone: v.optional(v.string()),
   dateOfBirth: v.optional(v.string()), belt: beltValidator, degree: v.number(),
-  gymId: v.id("gyms"), unityId: v.id("unities"), picture: v.string()
+  gymId: v.id("gyms"), unityId: v.id("unities"),
+  picture: v.optional(v.string()), photoId: v.optional(v.id("images")),
 };
 
 export const updateInvitedStudent = internalMutation({
   args: { ...existingStudentInvitationArgs, invitationId: v.optional(v.string()),
     existingClerkUserId: v.optional(v.string()), reuseInvitation: v.optional(v.boolean()) },
   handler: async (ctx, args) => {
-    await checkInvitationAllowed(ctx, args);
+    const { principal } = await checkInvitationAllowed(ctx, args);
+    rejectPublicStudentPhoto(args.picture);
     if (args.plan) validateStudentPlan(args.plan);
     assertDateOfBirth(args.dateOfBirth);
     assertDegree(args.degree);
@@ -308,7 +316,8 @@ export const updateInvitedStudent = internalMutation({
       guardianEmail: args.guardianEmail?.trim().toLowerCase(),
       name: args.name.trim(), email: args.email.trim().toLowerCase(), phone: (args.phone ?? "").trim(),
       dateOfBirth: args.dateOfBirth, belt: args.belt, degree: args.degree,
-      gymIds: [args.gymId], unityIds: [args.unityId], picture: args.picture.trim(),
+      gymIds: [args.gymId], unityIds: [args.unityId],
+      ...await claimStudentPhoto(ctx, args.photoId, [args.gymId], principal.identity.subject, previous.photoId),
       clerkUserId: invitedClerkUserId(args), updatedAt
     });
     return args.studentId;
@@ -319,6 +328,7 @@ export const inviteExistingStudent = action({
   args: { ...existingStudentInvitationArgs, redirectUrl: v.string() },
   handler: async (ctx, args): Promise<Id<"students">> => {
     if (!(await ctx.auth.getUserIdentity())) throw new Error("Unauthorized");
+    rejectPublicStudentPhoto(args.picture);
     if (args.plan) validateStudentPlan(args.plan);
     assertDateOfBirth(args.dateOfBirth);
     assertDegree(args.degree);

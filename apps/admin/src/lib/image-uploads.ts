@@ -3,6 +3,7 @@
 import { useAction } from "convex/react";
 import { useRef } from "react";
 import { api } from "@mybjj/backend/convex/_generated/api";
+import type { Id } from "@mybjj/backend/convex/_generated/dataModel";
 import { MAX_IMAGE_BYTES } from "@mybjj/backend/convex/lib/imageValidation";
 
 export function validateImageFile(file: File): string | null {
@@ -31,6 +32,16 @@ function readBase64(file: File): Promise<string> {
   });
 }
 
+async function imageUploadArgs(file: File) {
+  const error = validateImageFile(file);
+  if (error) throw new Error(error);
+  return {
+    base64: await readBase64(file),
+    contentType: file.type || (/\.png$/i.test(file.name) ? "image/png" : "image/jpeg"),
+    fileName: file.name,
+  };
+}
+
 export function useImageUpload() {
   const upload = useAction(api.images.uploadBase64);
   const cache = useRef(new Map<File, Promise<string>>());
@@ -38,16 +49,9 @@ export function useImageUpload() {
     const file = data.get(`${name}File`);
     if (!(file instanceof File) || !file.size)
       return String(data.get(name) ?? "");
-    const error = validateImageFile(file);
-    if (error) throw new Error(error);
     let result = cache.current.get(file);
     if (!result) {
-      result = (async () => {
-        const base64 = await readBase64(file);
-        const contentType =
-          file.type || (/\.png$/i.test(file.name) ? "image/png" : "image/jpeg");
-        return (await upload({ base64, contentType, fileName: file.name })).url;
-      })();
+      result = imageUploadArgs(file).then(upload).then((image) => image.url);
       cache.current.set(file, result);
     }
     try {
@@ -55,6 +59,16 @@ export function useImageUpload() {
     } catch (cause) {
       cache.current.delete(file);
       throw cause;
+    }
+  };
+}
+
+export function useStudentPhotoUpload() {
+  const upload = useAction(api.studentPhotos.upload);
+  return async (data: FormData, gymId: Id<"gyms">) => {
+    const file = data.get("pictureFile");
+    if (file instanceof File && file.size) {
+      return upload({ ...await imageUploadArgs(file), gymId });
     }
   };
 }

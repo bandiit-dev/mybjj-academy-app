@@ -4,6 +4,7 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 const isPublicRoute = createRouteMatcher(["/"]);
 const isLegacyAuthRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
+const isStudentPhotoRoute = createRouteMatcher(["/api/student-photos/:studentId"]);
 
 export default clerkMiddleware(
   async (auth, request) => {
@@ -12,7 +13,7 @@ export default clerkMiddleware(
       url.pathname = "/";
       return NextResponse.redirect(url);
     }
-    if (!isPublicRoute(request)) {
+    if (!isPublicRoute(request) && !isStudentPhotoRoute(request)) {
       const signIn = new URL("/", request.url);
       const plan = parseCheckoutPlan(request.nextUrl.searchParams.get("plano"));
       if (request.nextUrl.pathname === "/assinatura" && plan) {

@@ -2,6 +2,7 @@ import { assertAdminGymScope } from "./lib/auth";
 import { academyStudentDueDay, academyToday, assertActiveStudentCapacity, currentPlanPeriod, getStudentPlan, monthlyPaymentDueDate, studentPlanValidator, validateStudentPlan, withStudentPlan } from "./lib/studentPlans";
 import { mutation, query } from "./_generated/server";
 import { recordStudentGraduation } from "./lib/studentGraduation";
+import { claimStudentPhoto, rejectPublicStudentPhoto, studentPhotoPath, withProtectedStudentPhoto } from "./lib/studentPhotos";
 import { assertDateOfBirth, assertDegree, beltValidator } from "./lib/validators";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
@@ -28,10 +29,11 @@ export const createStudent = mutation({
     degree: v.number(),
     gymIds: v.array(v.id("gyms")),
     unityIds: v.array(v.id("unities")),
-    picture: v.string(),
+    picture: v.optional(v.string()),
+    photoId: v.optional(v.id("images")),
     userType: userTypeValidator
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, { picture, photoId, ...args }) => {
     const principal = await getCurrentPrincipal(ctx);
 
     if (principal.isAdmin) assertAdminGymScope(principal, args.gymIds);
@@ -50,6 +52,7 @@ export const createStudent = mutation({
     }
     assertDateOfBirth(args.dateOfBirth);
     assertDegree(args.degree);
+    rejectPublicStudentPhoto(picture);
 
     const now = Date.now();
     const plan = validateStudentPlan(getStudentPlan(args));
@@ -57,6 +60,8 @@ export const createStudent = mutation({
 
     return ctx.db.insert("students", {
       ...args,
+      picture: "",
+      ...await claimStudentPhoto(ctx, photoId, args.gymIds, principal.identity.subject),
       plan,
       createdAt: now,
       updatedAt: now
@@ -78,10 +83,12 @@ export const updateStudent = mutation({
     gymIds: v.optional(v.array(v.id("gyms"))),
     unityIds: v.optional(v.array(v.id("unities"))),
     picture: v.optional(v.string()),
+    photoId: v.optional(v.id("images")),
     userType: v.optional(userTypeValidator)
   },
-  handler: async (ctx, { studentId, ...patch }) => {
+  handler: async (ctx, { studentId, picture, photoId, ...patch }) => {
     const authResult = await requireStudentOrAdmin(ctx, studentId);
+    rejectPublicStudentPhoto(picture);
 
     if (patch.plan && !authResult.isAdmin) throw new Error("Forbidden: only an admin can change a student plan");
     if (patch.plan) validateStudentPlan(patch.plan);
@@ -92,12 +99,12 @@ export const updateStudent = mutation({
     }
 
     if (!authResult.isAdmin) {
+      if (photoId) throw new Error("Forbidden: only an admin can change a student photo");
       const selfPatch: Record<string, unknown> = {};
 
       if (patch.name !== undefined) selfPatch.name = patch.name;
       if (patch.email !== undefined) selfPatch.email = patch.email;
       if (patch.phone !== undefined) selfPatch.phone = patch.phone;
-      if (patch.picture !== undefined) selfPatch.picture = patch.picture;
 
       await ctx.db.patch(studentId, {
         ...selfPatch,
@@ -125,6 +132,8 @@ export const updateStudent = mutation({
     await recordStudentGraduation(ctx, authResult.targetStudent, patch, updatedAt);
     await ctx.db.patch(studentId, {
       ...patch,
+      ...await claimStudentPhoto(ctx, photoId, patch.gymIds ?? authResult.targetStudent.gymIds,
+        authResult.identity.subject, authResult.targetStudent.photoId),
       plan,
       updatedAt,
     });
@@ -168,10 +177,10 @@ export const getStudentDetailsForStaff = query({
     const student = await ctx.db.get(studentId);
     if (!student?.gymIds.some(gymId => gymIds.has(gymId))) return null;
     if (principal.isAdmin) {
-      return { role: "admin" as const, student };
+      return { role: "admin" as const, student: withProtectedStudentPhoto(student) };
     }
-    const { name, picture, belt, degree } = student;
-    return { role: "teacher" as const, student: { name, picture, belt, degree } };
+    const { name, belt, degree } = student;
+    return { role: "teacher" as const, student: { name, picture: studentPhotoPath(student), belt, degree } };
   },
 });
 
@@ -205,7 +214,7 @@ export const getAllStudents = query({
     const academyStudents = students.filter(student => gymId && student.gymIds.includes(gymId));
     return Promise.all(academyStudents.map(async student => {
       const plan = getStudentPlan(student, today);
-      const result = { ...student, plan, paymentOverdue: false };
+      const result = { ...withProtectedStudentPhoto(student), plan, paymentOverdue: false };
       if (!plan.isActive || plan.type !== "Mensal" || dueDay === undefined || today < plan.startDate) return result;
       const period = currentPlanPeriod(plan, today, dueDay);
       const dueDate = monthlyPaymentDueDate(period, dueDay, plan.startDate);
@@ -231,10 +240,11 @@ export const createStudentWithoutAccount = mutation({
     plan: v.optional(studentPlanValidator),
     name: v.string(), email: v.optional(v.string()), phone: v.optional(v.string()),
     dateOfBirth: v.optional(v.string()), belt: beltValidator, degree: v.number(),
-    gymId: v.id("gyms"), unityId: v.id("unities"), picture: v.string()
+    gymId: v.id("gyms"), unityId: v.id("unities"), picture: v.optional(v.string()), photoId: v.optional(v.id("images")),
   },
   handler: async (ctx, args) => {
-    await requireAcademyUnitAdmin(ctx, args.gymId, args.unityId);
+    const principal = await requireAcademyUnitAdmin(ctx, args.gymId, args.unityId);
+    rejectPublicStudentPhoto(args.picture);
     assertDegree(args.degree);
     assertDateOfBirth(args.dateOfBirth);
     if (!args.name.trim()) throw new Error("Student name is required");
@@ -246,7 +256,8 @@ export const createStudentWithoutAccount = mutation({
       name: args.name.trim(), email: (args.email ?? "").trim().toLowerCase(),
       phone: (args.phone ?? "").trim(), dateOfBirth: args.dateOfBirth,
       belt: args.belt, degree: args.degree, gymIds: [args.gymId], unityIds: [args.unityId],
-      picture: args.picture.trim(), userType: "Normal", createdAt: now, updatedAt: now
+      picture: "", ...await claimStudentPhoto(ctx, args.photoId, [args.gymId], principal.identity.subject),
+      userType: "Normal", createdAt: now, updatedAt: now
     });
   }
 });

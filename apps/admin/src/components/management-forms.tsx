@@ -18,7 +18,7 @@ import {
   readStudentPlan,
 } from "@/components/student-plan-fields";
 import { ImageFileField } from "@/components/image-file-field";
-import { useImageUpload } from "@/lib/image-uploads";
+import { useImageUpload, useStudentPhotoUpload } from "@/lib/image-uploads";
 import { AdminShell } from "@/components/dashboard";
 
 type Option = { label: string; value: string };
@@ -519,7 +519,7 @@ function GuardianAccessFields({
 }
 
 export function AddStudentForm() {
-  const uploadImage = useImageUpload();
+  const uploadPhoto = useStudentPhotoUpload();
   const gyms = useQuery(api.gyms.getAllGyms);
   const units = useQuery(api.unities.getAllUnities);
   const invite = useAction(api.provisioning.inviteStudent);
@@ -539,6 +539,7 @@ export function AddStudentForm() {
           const email = String(d.get("email") ?? "").trim();
           const guardianEmail = guardianAccess ? String(d.get("guardianEmail") ?? "").trim() : undefined;
           if (createAccount) assertInvitationEmail(guardianEmail ?? email);
+          const gymId = d.get("gymId") as Id<"gyms">;
 
           const profile = {
             plan: readStudentPlan(d),
@@ -548,9 +549,9 @@ export function AddStudentForm() {
             dateOfBirth: String(d.get("dateOfBirth") ?? "") || undefined,
             belt: String(d.get("belt")) as Belt,
             degree: Number(d.get("degree")),
-            gymId: d.get("gymId") as Id<"gyms">,
+            gymId,
             unityId: d.get("unityId") as Id<"unities">,
-            picture: await uploadImage(d, "picture"),
+            photoId: await uploadPhoto(d, gymId),
           };
           return createAccount
             ? invite({ ...profile, guardianEmail, redirectUrl: `${window.location.origin}/` })
@@ -759,7 +760,7 @@ function MissingForm({ title }: { title: string }) {
 }
 
 export function EditStudentForm({ studentId }: { studentId: Id<"students"> }) {
-  const uploadImage = useImageUpload();
+  const uploadPhoto = useStudentPhotoUpload();
   const student = useQuery(api.students.getStudentById, { studentId });
   const gyms = useQuery(api.gyms.getAllGyms);
   const units = useQuery(api.unities.getAllUnities);
@@ -782,6 +783,7 @@ export function EditStudentForm({ studentId }: { studentId: Id<"students"> }) {
       {...submit}
       onSubmit={async (data) =>
         submit.run(async () => {
+          const gymId = data.get("gymId") as Id<"gyms">;
           const profile = {
             plan: readStudentPlan(data),
             studentId,
@@ -791,9 +793,8 @@ export function EditStudentForm({ studentId }: { studentId: Id<"students"> }) {
             dateOfBirth: String(data.get("dateOfBirth") ?? ""),
             belt: String(data.get("belt")) as Belt,
             degree: Number(data.get("degree")),
-            picture: await uploadImage(data, "picture"),
+            photoId: await uploadPhoto(data, gymId),
           };
-          const gymId = data.get("gymId") as Id<"gyms">;
           const unityId = data.get("unityId") as Id<"unities">;
           return shouldInvite
             ? invite({

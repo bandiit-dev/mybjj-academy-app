@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { requireAdmin } from "./lib/auth";
+import { withProtectedStudentPhoto } from "./lib/studentPhotos";
 import {
   academyToday, academyStudentDueDay, assertActiveStudentCapacity, assertPlanDate, currentPlanPeriod, getStudentPlan, isPlanPeriod, monthlyPaymentDueDate, paymentKey,
   planTypeValidator, requireStudentPlanAdmin, scheduledPlanPeriods
@@ -97,7 +98,7 @@ export const getStudentBilling = query({
       recordedBy: record.recordedBy, updatedAt: record.updatedAt
     });
     return {
-      student: {...student, plan},
+      student: { ...withProtectedStudentPhoto(student), plan },
       periods: [...periods.values()].map(period => ({
         ...period,
         dueDate: monthlyPaymentDueDate(period, dueDay, plan.startDate),

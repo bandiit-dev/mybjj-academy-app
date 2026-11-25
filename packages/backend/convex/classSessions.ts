@@ -1,4 +1,5 @@
 import { assertAdminGymScope } from "./lib/auth";
+import { studentPhotoPath } from "./lib/studentPhotos";
 import { ConvexError, v } from "convex/values";
 
 import type { Doc, Id } from "./_generated/dataModel";
@@ -657,12 +658,12 @@ export const getStaffSessionLog = query({
     for (const row of attendance) roster.set(row.studentId, row.status);
     const eligibleStudents = academyStudents
       .filter((student) => student.gymIds.some((id) => sessionGyms.has(id)))
-      .map(({ _id: id, name, belt, degree, picture }) => ({
-        id,
-        name,
-        belt,
-        degree,
-        picture,
+      .map((student) => ({
+        id: student._id,
+        name: student.name,
+        belt: student.belt,
+        degree: student.degree,
+        picture: studentPhotoPath(student),
       }))
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
     const students = eligibleStudents.flatMap((student) => {

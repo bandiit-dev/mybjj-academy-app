@@ -3,6 +3,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { requireAdmin } from "./auth";
 import { PORTAL_PLANS, TRIAL_STUDENT_LIMIT } from "./portalBilling";
+import { withProtectedStudentPhoto } from "./studentPhotos";
 
 export const PLAN_MONTHS = { Mensal: 1, Semestral: 6, Anual: 12 } as const;
 export type PlanType = keyof typeof PLAN_MONTHS;
@@ -143,5 +144,5 @@ export async function requireStudentPlanAdmin(ctx: QueryCtx | MutationCtx, stude
 }
 
 export function withStudentPlan(student: Doc<"students"> | null) {
-  return student ? { ...student, plan: getStudentPlan(student) } : null;
+  return student ? { ...withProtectedStudentPhoto(student), plan: getStudentPlan(student) } : null;
 }

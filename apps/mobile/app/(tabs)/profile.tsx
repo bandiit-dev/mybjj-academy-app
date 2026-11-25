@@ -27,8 +27,8 @@ export default function ProfileScreen() {
     setName(profile.name);
     setEmail(profile.email);
     setPhone(profile.phone);
-    setPicture(profile.picture);
-  }, [profile]);
+    setPicture(teacher?.picture ?? "");
+  }, [profile, teacher]);
 
   async function onSave() {
     if (!profile) return;
@@ -38,7 +38,7 @@ export default function ProfileScreen() {
       if (teacher) {
         await updateTeacher({ teacherId: teacher._id, name, email, phone, picture });
       } else if (student) {
-        await updateStudent({ studentId: student._id, name, email, phone, picture });
+        await updateStudent({ studentId: student._id, name, email, phone });
       }
     } finally {
       setSaving(false);
@@ -74,13 +74,13 @@ export default function ProfileScreen() {
           className="h-12 rounded-xl border border-[#D1D5DB] bg-white px-4 text-[#111827]"
         />
         <TextInput value={phone} onChangeText={setPhone} placeholder="Telefone" className="h-12 rounded-xl border border-[#D1D5DB] bg-white px-4 text-[#111827]" />
-        <TextInput
+        {teacher ? <TextInput
           value={picture}
           onChangeText={setPicture}
           placeholder="URL da foto"
           autoCapitalize="none"
           className="h-12 rounded-xl border border-[#D1D5DB] bg-white px-4 text-[#111827]"
-        />
+        /> : null}
       </View>
 
       <Pressable onPress={onSave} disabled={saving} className="h-12 items-center justify-center rounded-xl bg-[#111827]">

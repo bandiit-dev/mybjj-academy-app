@@ -235,6 +235,13 @@ Practical user lifecycle:
 - `NEXT_PUBLIC_CONVEX_URL`
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
 - `CLERK_SECRET_KEY`
+- `CONVEX_SITE_URL` (optional override for the Convex HTTP actions origin when using a custom or self-hosted URL)
+
+### Migrating existing student photos
+
+After deploying the Convex schema and admin portal, run `studentPhotos:migrateLegacyPhotos` on the same Convex deployment with `{}`. If the result includes `nextCursor`, run it again with `{"cursor":"<nextCursor>"}` until `nextCursor` is `null`.
+
+The migration copies existing Convex uploads into private storage references and revokes their original download URLs by deleting the old files. Review `unresolved` for external or missing images that need to be uploaded again and for images still used as teacher photos or logos. Remove those public references before rerunning the migration to revoke the old URLs. Legacy URLs are hidden from the portal throughout the migration.
 
 ### Landing
 

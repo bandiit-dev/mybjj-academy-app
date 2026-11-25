@@ -67,3 +67,13 @@ test("a signed-out checkout link keeps the plan through the login redirect", asy
   assert.equal(target.pathname, "/");
   assert.equal(target.searchParams.get("plano"), "trial");
 });
+
+test("a signed-out student photo request receives no image or cacheable response", async () => {
+  const response = await fetch(new URL("/api/student-photos/example-student", base), {
+    redirect: "manual",
+  });
+  assert.equal(response.status, 401);
+  assert.equal(response.headers.get("cache-control"), "private, no-store");
+  assert.equal(response.headers.get("cross-origin-resource-policy"), "same-origin");
+  assert.equal(await response.text(), "");
+});

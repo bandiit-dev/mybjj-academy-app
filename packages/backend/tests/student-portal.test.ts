@@ -753,7 +753,7 @@ test("assigned teachers can mark students from the session academy present witho
     {
       id: "other-student",
       name: "Ana",
-      picture: "https://example.com/ana.jpg",
+      picture: "",
       belt: "White",
       degree: 0,
       status: "Present",

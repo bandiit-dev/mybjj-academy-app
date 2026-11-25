@@ -2,6 +2,7 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { verifyStripeSignature } from "./lib/stripeApi";
+import { serve as serveStudentPhoto } from "./studentPhotos";
 
 export const stripeWebhook = httpAction(async(ctx,request)=>{
   const secret=process.env.STRIPE_WEBHOOK_SECRET;
@@ -24,4 +25,5 @@ export const stripeWebhook = httpAction(async(ctx,request)=>{
 });
 const http=httpRouter();
 http.route({path:"/stripe/webhook",method:"POST",handler:stripeWebhook});
+http.route({ path: "/student-photo", method: "GET", handler: serveStudentPhoto });
 export default http;

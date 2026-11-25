@@ -6,6 +6,7 @@ import { classTitle, recurringTime } from "./classes";
 import { movedSessions } from "./classSessions";
 import { confirmStudentEnrollment } from "./enrollments";
 import { assertSelectedStudent, getCurrentPrincipal } from "./lib/auth";
+import { studentPhotoPath } from "./lib/studentPhotos";
 import {
   academyToday,
   academyStudentDueDay,
@@ -263,7 +264,7 @@ export const getOverview = query({
       today,
       profile: {
         name: student.name,
-        picture: student.picture,
+        picture: studentPhotoPath(student),
         belt: student.belt,
         degree: student.degree,
         email: student.email,
