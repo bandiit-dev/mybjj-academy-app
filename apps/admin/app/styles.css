@@ -2773,6 +2773,13 @@ select:focus-visible {
   align-items: flex-end;
   gap: 12px;
 }
+.class-schedule-form {
+  display: grid;
+  gap: 12px;
+}
+.class-schedule-form p {
+  margin: 0;
+}
 .class-history-form {
   display: grid;
   justify-items: start;

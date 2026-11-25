@@ -3,10 +3,12 @@ import { test } from "node:test";
 import { getStudentAttendanceHistory } from "../convex/attendance";
 import { getStaffClasses } from "../convex/classes";
 import {
+  changeStaffScheduleOccurrence,
   correctStaffSessionAttendance,
   getClassSessionById,
   getClassSessionDetail,
   getStaffClassHistory,
+  getStaffScheduleOccurrence,
   getStaffSessionLog,
   getTeacherClassHistory,
   getMonthlyTeachingCounts,
@@ -237,6 +239,7 @@ function fixture(subject = "student-login") {
           async *[Symbol.asyncIterator]() {
             yield* rows;
           },
+          first: async () => rows[0] ?? null,
           unique: async () => {
             assert.ok(rows.length <= 1);
             return rows[0] ?? null;
@@ -610,7 +613,7 @@ test("class history and notes are scoped to assigned teachers and academy admins
   });
   assert.deepEqual(
     history.sessions.map((row: { _id: string }) => row._id),
-    ["tuesday", "monday"],
+    ["cancelled", "tuesday", "monday"],
   );
   assert.equal(history.canRecord, true);
   const session = await handler(getStaffSessionLog)(ctx, {
@@ -646,7 +649,7 @@ test("class history and notes are scoped to assigned teachers and academy admins
   assert.equal(
     (await handler(getStaffClassHistory)(admin, { classId: "class-intro" }))
       .sessions.length,
-    3,
+    4,
   );
   await assert.rejects(
     handler(saveStaffSessionLog)(admin, {
@@ -999,4 +1002,100 @@ test("staff can correct an attendance mark while keeping the student's confirmat
   assert.equal(tables.enrollments[0].status, "Confirmed");
   tables.students.push({_id: "outside", gymIds: ["elsewhere"]});
   await assert.rejects(correct("outside", "Absent"), /alunos da academia/);
+});
+
+test("rescheduling preserves confirmations and gives the substitute access to the new occurrence", async (t) => {
+  let now = clock;
+  t.mock.method(Date, "now", () => now);
+  const { ctx, tables, friday } = fixture("teacher-login");
+  const classId = "class-intro";
+  const original = "2026-11-27";
+  const destination = "2026-11-28";
+  tables.teachers.push({
+    _id: "substitute", name: "Ana Costa", clerkUserId: "substitute-login", gymIds: ["gym"],
+  });
+  tables.classSessions.push({
+    ...friday, _id: "upcoming", sessionDate: original,
+    startsAt: Date.parse(original + "T10:00:00Z"),
+    endsAt: Date.parse(original + "T11:15:00Z"), updatedAt: now - 1,
+  });
+  tables.enrollments.push({
+    _id: "upcoming-enrollment", classSessionId: "upcoming", studentId: "student", status: "Confirmed",
+  });
+  const login = (subject: string) => ({ ...ctx, auth: { getUserIdentity: async () => ({ subject }) } });
+  const student = login("student-login");
+  const substitute = login("substitute-login");
+  const getOccurrence = (date: string) =>
+    handler(getStaffScheduleOccurrence)(ctx, { classId, date });
+  const occurrence = await getOccurrence(original);
+  const args = {
+    classId, date: original, sessionId: occurrence.sessionId, revision: occurrence.revision,
+    change: { type: "update", date: destination, startTime: "18:30", substituteTeacherId: "substitute" },
+  };
+
+  assert.equal(await handler(changeStaffScheduleOccurrence)(ctx, args), "upcoming");
+  await assert.rejects(handler(changeStaffScheduleOccurrence)(ctx, args), /foi alterada/);
+  assert.equal((await getOccurrence(original)).date, destination);
+  assert.equal((await getOccurrence(destination)).sessionId, "upcoming");
+  assert.equal((await handler(getStaffClasses)(substitute, {})).classes.length, 1);
+  assert.deepEqual((await handler(getSchedule)(student, { date: original })), []);
+  const [moved] = await handler(getSchedule)(student, { date: destination });
+  assert.equal(moved.scheduleStatus, "Rescheduled");
+  assert.equal(moved.startsAt, Date.parse(destination + "T21:30:00Z"));
+  assert.equal(moved.endsAt - moved.startsAt, 75 * 60_000);
+  assert.equal(moved.confirmed, true);
+  assert.deepEqual(moved.teachers, ["Ana Costa"]);
+  const [next] = await handler(getSchedule)(student, { date: "2026-12-04" });
+  assert.equal(next.sessionId, null);
+  assert.deepEqual(next.teachers, ["Carlos Silva"]);
+  assert.deepEqual(tables.classes[0].teacherIds, ["teacher"]);
+
+  now = Date.parse(destination + "T23:00:00Z");
+  await assert.rejects(handler(confirmClass)(student, { classId, date: original }), /não está disponível/);
+  await assert.rejects(handler(recordClassDate)(ctx, { classId, date: original }), /foi reagendada/);
+  await handler(saveStaffSessionLog)(substitute, { sessionId: "upcoming", notes: "Treino de guarda" });
+  const history = await handler(getTeacherClassHistory)(substitute, {});
+  assert.equal(history.classes[0].date, destination);
+  assert.equal(history.classes[0].sessionId, "upcoming");
+  assert.equal((await handler(getStaffSessionLog)(substitute, { sessionId: "upcoming" })).leadTeacher.name, "Ana Costa");
+});
+
+test("schedule changes require authorized staff and protect future recurring dates and past records", async (t) => {
+  let now = clock;
+  t.mock.method(Date, "now", () => now);
+  const { ctx, tables } = fixture("teacher-login");
+  const classId = "class-intro";
+  const date = "2026-11-27";
+  const args = { classId, date, sessionId: null, revision: null };
+  const change = (input: unknown) => handler(changeStaffScheduleOccurrence)(ctx, { ...args, change: input });
+  const login = (subject: string) => ({ ...ctx, auth: { getUserIdentity: async () => ({ subject }) } });
+  const student = login("student-login");
+  tables.teachers.push(
+    { _id: "other", name: "Outro", clerkUserId: "other-teacher", gymIds: ["gym"] },
+    { _id: "outside", name: "Fora", gymIds: ["elsewhere"] },
+  );
+  await assert.rejects(handler(changeStaffScheduleOccurrence)(student, { ...args, change: { type: "cancel" } }), /teacher or admin/);
+  await assert.rejects(handler(changeStaffScheduleOccurrence)(login("other-teacher"), { ...args, change: { type: "cancel" } }), /não está disponível/);
+  await assert.rejects(change({ type: "update", date: "2026-12-04", startTime: "08:00" }), /Já existe uma ocorrência/);
+  await assert.rejects(change({ type: "update", date, startTime: "08:00", substituteTeacherId: "outside" }), /professor da academia/);
+  await assert.rejects(change({ type: "update", date: today, startTime: "08:00" }), /horário futuros/);
+  await assert.rejects(handler(changeStaffScheduleOccurrence)(ctx, {
+    ...args, date: "2026-11-16", sessionId: "monday", change: { type: "cancel" },
+  }), /ainda não começaram/);
+
+  const cancelledSession = await change({ type: "cancel" });
+  const [cancelled] = await handler(getSchedule)(student, { date });
+  assert.equal(cancelled.sessionId, cancelledSession);
+  assert.equal(cancelled.scheduleStatus, "Cancelled");
+  assert.equal(cancelled.confirmed, false);
+  assert.equal((await handler(getStaffScheduleOccurrence)(ctx, { classId, date })).canEdit, false);
+  const [following] = await handler(getSchedule)(student, { date: "2026-12-04" });
+  assert.equal(following.sessionId, null);
+  assert.equal(following.scheduleStatus, null);
+  now = Date.parse(date + "T23:00:00Z");
+  const history = await handler(getStaffClassHistory)(ctx, { classId });
+  assert.equal(history.sessions[0]._id, cancelledSession);
+  assert.equal(history.sessions[0].status, "Cancelled");
+  await assert.rejects(handler(confirmClass)(student, { sessionId: cancelledSession }), /não está disponível/);
+  await assert.rejects(handler(recordClassDate)(ctx, { classId, date }), /Já existe um registro/);
 });

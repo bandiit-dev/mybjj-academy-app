@@ -333,6 +333,182 @@ export const getClassSessionDetail = query({
   }
 });
 
+export function movedSessions(
+  ctx: Pick<QueryCtx, "db">,
+  date: string,
+  classId?: Id<"classes">,
+) {
+  return ctx.db.query("classSessions").withIndex(
+    "by_originalSessionDate_classId",
+    q => classId
+      ? q.eq("originalSessionDate", date).eq("classId", classId)
+      : q.eq("originalSessionDate", date),
+  );
+}
+
+function sessionsOnClassDate(ctx: Pick<QueryCtx, "db">, classId: Id<"classes">, date: string) {
+  return ctx.db.query("classSessions").withIndex(
+    "by_classId_sessionDate",
+    q => q.eq("classId", classId).eq("sessionDate", date),
+  );
+}
+
+async function scheduleOccurrence(ctx: Pick<QueryCtx, "db" | "auth">, classId: Id<"classes">, date: string) {
+  assertPlanDate(date);
+  const staff = await getClassStaff(ctx);
+  const template = await ctx.db.get(classId);
+  if (!template || !staffHasClassScope(staff, template)) return null;
+
+  const [actual, moved] = await Promise.all([
+    sessionsOnClassDate(ctx, classId, date).collect(),
+    movedSessions(ctx, date, classId).collect(),
+  ]);
+  const matches = [...actual, ...moved.filter(row => row.sessionDate !== date)];
+  const assigned = staff.isAdmin || template.teacherIds.some(id => id === staff.teacher?._id);
+  const visible = matches.filter(row => staffCanManageSession(staff, row));
+  if (!assigned && !visible.length) return null;
+  if (matches.length > 1) return { kind: "ambiguous" as const };
+
+  const session = matches[0];
+  const gymIds = session?.gymIds ?? template.gymIds;
+  if (!gymIds.length || !gymIds.every(id => staff.gymIds.has(id))) return null;
+  const time = session ?? recurringTime(template, date);
+  if (!time || time.endsAt === null) return null;
+  return {
+    kind: "occurrence" as const,
+    template,
+    session,
+    gymIds,
+    startsAt: time.startsAt,
+    endsAt: time.endsAt,
+  };
+}
+
+export const getStaffScheduleOccurrence = query({
+  args: { classId: v.id("classes"), date: v.string() },
+  handler: async (ctx, { classId, date }) => {
+    const result = await scheduleOccurrence(ctx, classId, date);
+    if (!result || result.kind !== "occurrence") return result;
+    const { session, template, gymIds, startsAt, endsAt } = result;
+    const teachers = (await ctx.db.query("teachers").collect())
+      .filter(teacher => teacher.gymIds.some(id => gymIds.includes(id)))
+      .map(({ _id, name }) => ({ _id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    return {
+      kind: result.kind,
+      sessionId: session?._id ?? null,
+      revision: session?.updatedAt ?? template.updatedAt ?? null,
+      date: session?.sessionDate ?? date,
+      originalDate: session?.originalSessionDate ?? date,
+      startsAt,
+      endsAt,
+      status: session?.status ?? "Scheduled",
+      canEdit: (session?.status ?? "Scheduled") === "Scheduled" && startsAt > Date.now(),
+      teacherNames: teachers
+        .filter(teacher => (session?.teacherIds ?? template.teacherIds).includes(teacher._id))
+        .map(teacher => teacher.name),
+      substituteTeacherId: session?.substituteTeacherId ?? null,
+      teachers,
+    };
+  },
+});
+
+export const changeStaffScheduleOccurrence = mutation({
+  args: {
+    classId: v.id("classes"),
+    date: v.string(),
+    sessionId: v.union(v.id("classSessions"), v.null()),
+    revision: v.union(v.number(), v.null()),
+    change: v.union(
+      v.object({ type: v.literal("cancel") }),
+      v.object({
+        type: v.literal("update"),
+        date: v.string(),
+        startTime: v.string(),
+        substituteTeacherId: v.optional(v.union(v.id("teachers"), v.null())),
+      }),
+    ),
+  },
+  handler: async (ctx, { classId, date, sessionId, revision, change }) => {
+    const occurrence = await scheduleOccurrence(ctx, classId, date);
+    if (!occurrence || occurrence.kind !== "occurrence") {
+      throw new ConvexError("Esta ocorrência não está disponível para alteração.");
+    }
+    const { template, session, gymIds, startsAt, endsAt } = occurrence;
+    if ((session?._id ?? null) !== sessionId || (session?.updatedAt ?? template.updatedAt ?? null) !== revision) {
+      throw new ConvexError("A aula foi alterada. Confira os dados atualizados antes de salvar.");
+    }
+    const now = Date.now();
+    if ((session && session.status !== "Scheduled") || startsAt <= now) {
+      throw new ConvexError("Somente aulas que ainda não começaram podem ser alteradas.");
+    }
+
+    const currentDate = session?.sessionDate ?? date;
+    const values = {
+      sessionDate: currentDate,
+      startsAt,
+      endsAt,
+      teacherIds: session?.teacherIds ?? template.teacherIds,
+      substituteTeacherId: session?.substituteTeacherId,
+      originalSessionDate: session?.originalSessionDate ?? currentDate,
+      originalStartsAt: session?.originalStartsAt ?? startsAt,
+      status: (change.type === "cancel" ? "Cancelled" : "Scheduled") as Doc<"classSessions">["status"],
+      updatedAt: Math.max(now, (session?.updatedAt ?? 0) + 1),
+    };
+
+    if (change.type === "update") {
+      assertPlanDate(change.date);
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(change.startTime)) {
+        throw new ConvexError("Informe um horário válido.");
+      }
+      const nextStart = Date.parse(`${change.date}T${change.startTime}:00-03:00`);
+      if (nextStart <= now) throw new ConvexError("Escolha uma data e um horário futuros.");
+
+      if (change.date !== currentDate) {
+        const [actual, moved] = await Promise.all([
+          sessionsOnClassDate(ctx, classId, change.date).collect(),
+          movedSessions(ctx, change.date, classId).collect(),
+        ]);
+        if (
+          actual.some(row => row._id !== session?._id) ||
+          moved.some(row => row._id !== session?._id) ||
+          (change.date !== values.originalSessionDate && recurringTime(template, change.date))
+        ) {
+          throw new ConvexError("Já existe uma ocorrência desta aula nessa data. Escolha outra data.");
+        }
+      }
+      if (change.date !== currentDate || Math.floor(nextStart / 60_000) !== Math.floor(startsAt / 60_000)) {
+        values.sessionDate = change.date;
+        values.startsAt = nextStart;
+        values.endsAt = nextStart + (endsAt - startsAt);
+      }
+      if (change.substituteTeacherId) {
+        const substitute = await ctx.db.get(change.substituteTeacherId);
+        if (!substitute?.gymIds.some(id => gymIds.includes(id))) {
+          throw new ConvexError("Selecione um professor da academia desta aula.");
+        }
+        values.substituteTeacherId = substitute._id;
+        values.teacherIds = [substitute._id];
+      } else if (change.substituteTeacherId === null && session?.substituteTeacherId) {
+        values.teacherIds = template.teacherIds;
+        values.substituteTeacherId = undefined;
+      }
+    }
+
+    if (session) {
+      await ctx.db.patch(session._id, values);
+      return session._id;
+    }
+    return ctx.db.insert("classSessions", {
+      ...values,
+      classId,
+      gymIds,
+      unityIds: template.unityIds,
+      createdAt: now,
+    });
+  },
+});
+
 export const getStaffClassHistory = query({
   args: { classId: v.id("classes") },
   handler: async (ctx, { classId }) => {
@@ -340,9 +516,9 @@ export const getStaffClassHistory = query({
     const template = await ctx.db.get(classId);
     if (!template || !staffHasClassScope(staff, template)) return null;
 
-    const accessibleSessions = (
-      await staffClassSessions(ctx, classId).collect()
-    ).filter((session) => staffCanManageSession(staff, session));
+    const scopedSessions = (await staffClassSessions(ctx, classId).collect())
+      .filter(session => staffHasClassScope(staff, session));
+    const accessibleSessions = scopedSessions.filter(session => staffCanManageSession(staff, session));
     const assigned = template.teacherIds.some(
       (id) => id === staff.teacher?._id,
     );
@@ -350,28 +526,52 @@ export const getStaffClassHistory = query({
 
     const now = Date.now();
     const today = academyToday(now);
+    const future = (staff.isAdmin || assigned ? scopedSessions : accessibleSessions)
+      .filter(session => session.startsAt > now)
+      .sort((a, b) => a.startsAt - b.startsAt);
+    let nextScheduleDate = future.find(session => session.status === "Scheduled")?.sessionDate;
+    if (staff.isAdmin || assigned) {
+      const occupiedDates = new Set(scopedSessions.flatMap(session =>
+        session.originalSessionDate
+          ? [session.sessionDate, session.originalSessionDate]
+          : [session.sessionDate],
+      ));
+      for (let offset = 0; offset < 14; offset++) {
+        const date = academyToday(now + offset * 86_400_000);
+        const time = recurringTime(template, date);
+        if (!occupiedDates.has(date) && time?.endsAt && time.startsAt > now) {
+          if (!nextScheduleDate || date < nextScheduleDate) nextScheduleDate = date;
+          break;
+        }
+      }
+    }
     const sessions = accessibleSessions
       .filter(
         (session) =>
           session.sessionDate <= today &&
-          session.startsAt <= now &&
-          session.status !== "Cancelled",
+          session.startsAt <= now,
       )
       .sort(
         (a, b) =>
           b.sessionDate.localeCompare(a.sessionDate) || b.startsAt - a.startsAt,
       )
-      .map(({ _id, sessionDate, startsAt, status }) => ({
+      .map(({ _id, sessionDate, startsAt, status, originalSessionDate, originalStartsAt }) => ({
         _id,
         sessionDate,
         startsAt,
         status,
+        ...(originalStartsAt !== undefined && originalStartsAt !== startsAt ? {
+          originalSessionDate,
+          originalStartsAt,
+        } : {}),
       }));
 
     return {
       title: classTitle(template),
       isAdmin: staff.isAdmin,
       canRecord: staff.isAdmin || assigned,
+      canManageSchedule: staff.isAdmin || assigned || future.length > 0,
+      nextScheduleDate: nextScheduleDate ?? future[0]?.sessionDate ?? today,
       sessions,
       today,
     };
@@ -569,9 +769,7 @@ export const recordClassDate = mutation({
     if (date > academyToday())
       throw new ConvexError("Selecione a data de uma aula já realizada.");
 
-    const sessions = await staffClassSessions(ctx, classId)
-      .filter((q) => q.eq(q.field("sessionDate"), date))
-      .collect();
+    const sessions = await sessionsOnClassDate(ctx, classId, date).collect();
     if (sessions.length) {
       const available = sessions.filter(
         (session) =>
@@ -584,6 +782,10 @@ export const recordClassDate = mutation({
       throw new ConvexError(
         "Já existe um registro para esta data. Selecione uma sessão disponível no histórico.",
       );
+    }
+    const moved = await movedSessions(ctx, date, classId).first();
+    if (moved) {
+      throw new ConvexError("Esta aula foi reagendada. Consulte a nova data no histórico.");
     }
 
     if (!template.gymIds.every((id) => staff.gymIds.has(id))) {

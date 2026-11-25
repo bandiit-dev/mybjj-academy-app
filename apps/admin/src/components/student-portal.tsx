@@ -181,8 +181,11 @@ function ClassRow({
       <div className={styles.classInfo}>
         <strong>{entry.title}</strong>
         {details && <p>{details}</p>}
+        {entry.scheduleStatus === "Rescheduled" && <p>Aula reagendada</p>}
       </div>
-      {confirmed ? (
+      {entry.scheduleStatus === "Cancelled" ? (
+        <span className={styles.badge}>Aula cancelada</span>
+      ) : confirmed ? (
         <div className={styles.confirmedActions}>
           <span className={`${styles.badge} ${styles.positive}`}>
             Presença confirmada

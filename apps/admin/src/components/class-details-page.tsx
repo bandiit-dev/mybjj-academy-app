@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { AdminShell } from "@/components/dashboard";
+import { ClassScheduleChanges } from "@/components/class-schedule-changes";
 import { PortalImage } from "@/components/portal-image";
 import { SessionAttendancePicker } from "@/components/session-attendance-picker";
 
@@ -312,6 +313,11 @@ export function ClassDetailsPage({ classId }: { classId: Id<"classes"> }) {
       <Link className="button secondary" href="/aulas">
         ← Voltar
       </Link>
+      {history?.canManageSchedule && (
+        <a className="button secondary" href="#alteracoes-programacao">
+          Alterar programação
+        </a>
+      )}
       {history?.isAdmin && (
         <Link className="button primary" href={`/aulas/${classId}/editar`}>
           Editar aula
@@ -353,7 +359,10 @@ export function ClassDetailsPage({ classId }: { classId: Id<"classes"> }) {
                         {hour.format(item.startsAt)}
                         {item.status === "Scheduled"
                           ? " · Registro pendente"
+                          : item.status === "Cancelled"
+                            ? " · Cancelada"
                           : ""}
+                        {item.originalStartsAt !== undefined ? " · Reagendada" : ""}
                       </option>
                     ))}
                   </select>
@@ -364,7 +373,14 @@ export function ClassDetailsPage({ classId }: { classId: Id<"classes"> }) {
                 </p>
               )}
             </section>
-            {session && (
+            {session?.originalSessionDate &&
+              session.originalStartsAt !== undefined && (
+                <p>
+                  Horário original · {dateLabel(session.originalSessionDate)},{" "}
+                  {hour.format(session.originalStartsAt)}
+                </p>
+              )}
+            {session && session.status !== "Cancelled" && (
               <SessionRecord
                 key={session._id}
                 sessionId={session._id}
@@ -378,6 +394,13 @@ export function ClassDetailsPage({ classId }: { classId: Id<"classes"> }) {
                 classId={classId}
                 today={history.today}
                 onRegistered={setSelectedId}
+              />
+            )}
+            {history.canManageSchedule && (
+              <ClassScheduleChanges
+                classId={classId}
+                today={history.today}
+                nextDate={history.nextScheduleDate}
               />
             )}
           </>

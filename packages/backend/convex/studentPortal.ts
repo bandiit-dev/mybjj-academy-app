@@ -3,6 +3,7 @@ import type { Doc } from "./_generated/dataModel";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import { isStudentPresent } from "./attendance";
 import { classTitle, recurringTime } from "./classes";
+import { movedSessions } from "./classSessions";
 import { confirmStudentEnrollment } from "./enrollments";
 import { getCurrentPrincipal } from "./lib/auth";
 import {
@@ -49,7 +50,12 @@ async function schedule(
   date: string,
   sessions: Doc<"classSessions">[],
 ) {
-  const existingClasses = new Set(sessions.map((session) => session.classId));
+  const moved = (await movedSessions(ctx, date).collect()).filter(
+    (session) => sharesAcademy(student, session),
+  );
+  const existingClasses = new Set(
+    [...sessions, ...moved].map((session) => session.classId),
+  );
   const templates = (await ctx.db.query("classes").collect()).filter(
     (template) => sharesAcademy(student, template),
   );
@@ -58,11 +64,16 @@ async function schedule(
   );
   const entries = [
     ...sessions
-      .filter((session) => session.status !== "Cancelled")
+      .filter((session) => session.status !== "Cancelled" || session.originalSessionDate !== undefined)
       .map((session) => ({
         ...session,
         sessionId: session._id,
         template: templateById.get(session.classId),
+        scheduleStatus: session.status === "Cancelled"
+          ? "Cancelled" as const
+          : session.originalStartsAt !== undefined && session.originalStartsAt !== session.startsAt
+            ? "Rescheduled" as const
+            : null,
       })),
     ...templates.flatMap((template) => {
       if (existingClasses.has(template._id)) return [];
@@ -75,6 +86,7 @@ async function schedule(
               teacherIds: template.teacherIds,
               unityIds: template.unityIds,
               sessionId: null,
+              scheduleStatus: null,
               template,
             },
           ]
@@ -100,12 +112,13 @@ async function schedule(
     entries
       .sort((a, b) => a.startsAt - b.startsAt)
       .map(async (entry) => {
-        const [enrollment, attendance] = entry.sessionId
+        const [enrollment, attendance] = entry.sessionId && entry.scheduleStatus !== "Cancelled"
           ? await participation(ctx, student._id, entry.sessionId)
           : [null, null];
         return {
           classId: entry.classId,
           sessionId: entry.sessionId,
+          scheduleStatus: entry.scheduleStatus,
           startsAt: entry.startsAt,
           endsAt: entry.endsAt,
           title: classTitle(entry.template),
@@ -324,6 +337,8 @@ export const confirmClass = mutation({
       if (available) {
         sessionId = available._id;
       } else {
+        const moved = await movedSessions(ctx, sessionDate, classId).collect();
+        if (moved.some(session => sharesAcademy(student, session))) throw unavailable();
         if (time.endsAt === null)
           throw new ConvexError(
             "A duração desta aula precisa ser atualizada pela academia.",

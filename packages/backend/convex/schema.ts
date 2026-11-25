@@ -195,6 +195,9 @@ export default defineSchema({
   classSessions: defineTable({
     classId: v.id("classes"),
     sessionDate: v.string(),
+    originalSessionDate: v.optional(v.string()),
+    originalStartsAt: v.optional(v.number()),
+    substituteTeacherId: v.optional(v.id("teachers")),
     startsAt: v.number(),
     endsAt: v.number(),
     teacherIds: v.array(v.id("teachers")),
@@ -206,7 +209,9 @@ export default defineSchema({
     updatedAt: v.number()
   })
     .index("by_classId", ["classId"])
+    .index("by_classId_sessionDate", ["classId", "sessionDate"])
     .index("by_sessionDate", ["sessionDate"])
+    .index("by_originalSessionDate_classId", ["originalSessionDate", "classId"])
     .index("by_status", ["status"])
     .index("by_sessionDate_status", ["sessionDate", "status"]),
 
