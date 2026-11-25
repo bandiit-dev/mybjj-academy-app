@@ -21,7 +21,7 @@ const unavailable = () =>
   new ConvexError("Esta aula não está disponível para confirmação.");
 
 async function currentStudent(ctx: Pick<QueryCtx, "db" | "auth">) {
-  const principal = await getCurrentPrincipal(ctx, { skipSubscription: true });
+  const principal = await getCurrentPrincipal(ctx);
   if (!principal.student || principal.teacher || principal.isAdmin) {
     throw new Error("Forbidden: student portal requires a student account");
   }

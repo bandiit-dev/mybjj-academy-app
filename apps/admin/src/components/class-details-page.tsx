@@ -102,13 +102,31 @@ function SessionRecord({
 }) {
   const data = useQuery(api.classSessions.getStaffSessionLog, { sessionId });
   const save = useMutation(api.classSessions.saveStaffSessionLog);
+  const correctAttendance = useMutation(api.classSessions.correctStaffSessionAttendance);
   const [draftNotes, setDraftNotes] = useState<string>();
   const [draftTeacherId, setDraftTeacherId] = useState<string>();
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [correcting, setCorrecting] = useState<Id<"students">>();
+  const [attendanceError, setAttendanceError] = useState("");
 
   if (!data) return <p role="status">Carregando registro da aula...</p>;
+
+  async function changeAttendance(
+    studentId: Id<"students">,
+    status: "Present" | "Absent" | "Unmarked",
+  ) {
+    setCorrecting(studentId);
+    setAttendanceError("");
+    try {
+      await correctAttendance({ sessionId, studentId, status });
+    } catch (cause) {
+      setAttendanceError(errorMessage(cause, "Não foi possível corrigir a presença."));
+    } finally {
+      setCorrecting(undefined);
+    }
+  }
 
   const teacherId =
     draftTeacherId ??
@@ -207,6 +225,9 @@ function SessionRecord({
           roster={data.students}
           availableStudents={data.availableStudents}
         />
+        {attendanceError && (
+          <p className="payment-error" role="alert">{attendanceError}</p>
+        )}
         {data.students.length ? (
           <ul className="class-session-students">
             {data.students.map((student) => (
@@ -246,11 +267,25 @@ function SessionRecord({
                     </div>
                   </div>
                 </div>
-                <span
-                  className={`student-status ${student.status === "Present" ? "active" : student.status === "Absent" ? "inactive" : "pending"}`}
-                >
-                  {rosterLabel[student.status]}
-                </span>
+                <label className="management-field">
+                  <select
+                    value={student.status === "Confirmed" ? "Unmarked" : student.status}
+                    aria-label={`Presença de ${student.name}`}
+                    disabled={correcting !== undefined}
+                    onChange={event => {
+                      const status = event.target.value;
+                      if (status === "Present" || status === "Absent" || status === "Unmarked") {
+                        void changeAttendance(student.id, status);
+                      }
+                    }}
+                  >
+                    <option value="Unmarked">
+                      {student.status === "Confirmed" ? rosterLabel.Confirmed : "Sem registro da equipe"}
+                    </option>
+                    <option value="Present">{rosterLabel.Present}</option>
+                    <option value="Absent">{rosterLabel.Absent}</option>
+                  </select>
+                </label>
               </li>
             ))}
           </ul>

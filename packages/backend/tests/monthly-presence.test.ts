@@ -16,6 +16,7 @@ function context({admin=true,authenticated=true}={}) {
       {_id:"next",sessionDate:"2026-12-01",status:"Scheduled",gymIds:["gym_1"]},
       {_id:"other_gym",sessionDate:"2026-11-05",status:"Completed",gymIds:["gym_2"]}
     ],
+    attendance: [],
     enrollments:[
       {classSessionId:"first",studentId:"a",status:"Confirmed"},
       {classSessionId:"last",studentId:"a",status:"Confirmed"},
@@ -40,23 +41,23 @@ function context({admin=true,authenticated=true}={}) {
   }};
 }
 
-test("monthly presence counts confirmed enrollments by class date and distinct students",async()=>{
+test("monthly presence keeps unverified confirmations separate",async()=>{
   const ctx=context();
-  assert.deepEqual(await handler(ctx,{month:"2026-11"}),{month:"2026-11",totalEnrollments:3,studentCount:2});
+  assert.deepEqual(await handler(ctx,{month:"2026-11"}),{month:"2026-11",verifiedPresences:0,pendingConfirmations:3,studentCount:0});
 });
 
 test("empty months return zero, and December excludes January of the next year",async()=>{
   const ctx=context();
-  assert.deepEqual(await handler(ctx,{month:"2026-09"}),{month:"2026-09",totalEnrollments:0,studentCount:0});
+  assert.deepEqual(await handler(ctx,{month:"2026-09"}),{month:"2026-09",verifiedPresences:0,pendingConfirmations:0,studentCount:0});
   ctx.tables.classSessions.push({_id:"january",sessionDate:"2027-01-01",status:"Scheduled",gymIds:["gym_1"]});
   ctx.tables.enrollments.push({classSessionId:"january",studentId:"a",status:"Confirmed"});
-  assert.deepEqual(await handler(ctx,{month:"2026-12"}),{month:"2026-12",totalEnrollments:1,studentCount:1});
+  assert.deepEqual(await handler(ctx,{month:"2026-12"}),{month:"2026-12",verifiedPresences:0,pendingConfirmations:1,studentCount:0});
 });
 
 test("duplicate enrollment records do not inflate a student's count in one session",async()=>{
   const ctx=context();
   ctx.tables.enrollments.push({classSessionId:"first",studentId:"a",status:"Confirmed"});
-  assert.equal((await handler(ctx,{month:"2026-11"})).totalEnrollments,3);
+  assert.equal((await handler(ctx,{month:"2026-11"})).pendingConfirmations,3);
 });
 
 test("monthly presence validates the month and requires admin access",async()=>{
@@ -65,4 +66,20 @@ test("monthly presence validates the month and requires admin access",async()=>{
   }
   await assert.rejects(handler(context({admin:false}),{month:"2026-11"}),/admin role required/);
   await assert.rejects(handler(context({authenticated:false}),{month:"2026-11"}),/Unauthorized/);
+});
+
+
+test("staff marks take precedence and include students who never confirmed", async () => {
+  const ctx = context();
+  ctx.tables.attendance.push(
+    {classSessionId:"first", studentId:"a", status:"Absent"},
+    {classSessionId:"first", studentId:"b", status:"Present"},
+    {classSessionId:"last", studentId:"b", status:"Present"},
+    {classSessionId:"cancelled", studentId:"a", status:"Present"},
+    {classSessionId:"other_gym", studentId:"a", status:"Present"},
+    {classSessionId:"first", studentId:"outsider", status:"Present"},
+  );
+  assert.deepEqual(await handler(ctx,{month:"2026-11"}), {
+    month:"2026-11", verifiedPresences:2, pendingConfirmations:1, studentCount:1,
+  });
 });

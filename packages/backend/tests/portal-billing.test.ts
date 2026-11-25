@@ -399,6 +399,83 @@ test("trial checkout is card-free, grants time-limited access, and cannot be rep
   });
 });
 
+test("a coupon saved during the card-free trial is applied at the next checkout", async () => {
+  const ctx = context();
+  const row = ctx.tables.billingAccounts[0];
+  row.status = "pending";
+  delete row.stripeSubscriptionId;
+  delete row.paidThrough;
+  let firstTimeOnly = true;
+  let trialStarted = false;
+  let trialEnded = false;
+
+  await withStripe((path, body) => {
+    if (path.startsWith("promotion_codes?")) return { data: [{
+      id: "promo_month", code: "PRIMEIROROLA", active: true,
+      restrictions: { first_time_transaction: firstTimeOnly },
+    }] };
+    if (path.startsWith("subscriptions?")) return { data: trialEnded ? [{
+      id: "sub_trial", status: "canceled", metadata: { billingAccountId: row._id },
+    }] : [] };
+    if (path.startsWith("checkout/sessions?")) return { data: [] };
+    if (path === "prices/price_monthly") return price;
+    if (path === "checkout/sessions") {
+      if (body.get("metadata[checkoutOption]") === "trial") {
+        assert.equal(body.get("payment_method_collection"), "if_required");
+        assert.equal(body.get("subscription_data[trial_period_days]"), "7");
+        assert.equal(body.get("discounts[0][promotion_code]"), null);
+        trialStarted = true;
+        return { id: "cs_trial", url: "https://checkout.stripe.com/trial", expires_at: future / 1000 };
+      }
+      assert.equal(body.get("discounts[0][promotion_code]"), "promo_month");
+      assert.equal(body.get("subscription_data[trial_period_days]"), null);
+      return { id: "cs_discount", url: "https://checkout.stripe.com/discount", expires_at: future / 1000 };
+    }
+    if (path === "checkout/sessions/cs_trial" || path === "checkout/sessions/cs_discount") return {
+      mode: "subscription", status: "complete", client_reference_id: row._id,
+      customer: "cus_test", subscription: path.endsWith("cs_trial") ? "sub_trial" : "sub_discount",
+    };
+    if (path.startsWith("subscriptions/sub_trial")) return subscription({
+      id: "sub_trial", status: trialEnded ? "canceled" : "trialing",
+      trial_end: future / 1000, latest_invoice: null,
+      metadata: { billingAccountId: row._id, checkoutOption: "trial" },
+    });
+    if (path.startsWith("subscriptions/sub_discount")) return subscription({
+      id: "sub_discount", status: "active",
+      latest_invoice: {
+        ...subscription().latest_invoice, amount_paid: 0,
+        parent: { subscription_details: { subscription: "sub_discount" } },
+        lines: { data: [{ amount: 0, price: price.id, period: { end: future / 1000 } }] },
+      },
+    });
+    throw new Error(`Unexpected Stripe request ${path}`);
+  }, async () => {
+    const getStatus = () => handler(billing.getStatus)(ctx, {});
+    const trial = () => handler(stripe.createCheckout)(ctx, {
+      option: "trial", promotionCode: " PRIMEIROROLA ",
+    });
+    await assert.rejects(trial(), /não pode ser usado após o teste grátis/);
+    assert.equal(trialStarted, false);
+    assert.equal((await getStatus()).trialPromotionCode, null);
+
+    firstTimeOnly = false;
+    await trial();
+    await handler(stripe.confirmCheckout)(ctx, { sessionId: "cs_trial" });
+    assert.equal((await getStatus()).trialPromotionCode, "PRIMEIROROLA");
+    assert.equal((await getStatus()).hasAccess, true);
+
+    trialEnded = true;
+    await handler(stripe.confirmCheckout)(ctx, { sessionId: "cs_trial" });
+    const status = await getStatus();
+    assert.equal(status.hasAccess, false);
+    assert.equal(status.canStartTrial, false);
+    await handler(stripe.createCheckout)(ctx, { option: "starter", promotionCode: status.trialPromotionCode });
+    await handler(stripe.confirmCheckout)(ctx, { sessionId: "cs_discount" });
+    assert.equal((await getStatus()).hasAccess, true);
+    assert.equal((await getStatus()).trialPromotionCode, null);
+  });
+});
+
 test("Full checkout uses the active default monthly price on the configured product", async () => {
   const ctx = context();
   const row = ctx.tables.billingAccounts[0];

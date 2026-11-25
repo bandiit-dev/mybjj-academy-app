@@ -230,42 +230,49 @@ export const unmarkAttendance = mutation({
     studentId: v.id("students")
   },
   handler: async (ctx, { classSessionId, studentId }) => {
-    await requireSessionTeacherOrAdmin(ctx, classSessionId);
-
-    const existing = await ctx.db
-      .query("attendance")
-      .withIndex("by_classSessionId_studentId", (q) =>
-        q.eq("classSessionId", classSessionId).eq("studentId", studentId)
-      )
-      .unique();
-
-    if (!existing) {
-      return null;
+    const { sessionGymIds } = await requireSessionTeacherOrAdmin(ctx, classSessionId);
+    const student = await ctx.db.get(studentId);
+    if (!student?.gymIds.some(id => sessionGymIds.includes(id))) {
+      throw new Error("Forbidden: student does not belong to this session's academy");
     }
-
-    await ctx.db.delete(existing._id);
-
-    return existing._id;
+    return clearAttendance(ctx, classSessionId, studentId);
   }
 });
+
+export async function clearAttendance(
+  ctx: MutationCtx,
+  classSessionId: Id<"classSessions">,
+  studentId: Id<"students">,
+) {
+  const existing = await ctx.db
+    .query("attendance")
+    .withIndex("by_classSessionId_studentId", q =>
+      q.eq("classSessionId", classSessionId).eq("studentId", studentId)
+    )
+    .unique();
+  if (!existing) return null;
+  await ctx.db.delete(existing._id);
+  return existing._id;
+}
 
 export const getSessionAttendance = query({
   args: {
     classSessionId: v.id("classSessions")
   },
   handler: async (ctx, { classSessionId }) => {
-    await requireSessionTeacherOrAdmin(ctx, classSessionId);
+    const { sessionGymIds } = await requireSessionTeacherOrAdmin(ctx, classSessionId);
 
     const attendance = await ctx.db
       .query("attendance")
       .withIndex("by_classSessionId", (q) => q.eq("classSessionId", classSessionId))
       .collect();
 
-    const students = await Promise.all(attendance.map((item) => ctx.db.get(item.studentId)));
-
-    return attendance.map((item, index) => ({
-      attendance: item,
-      student: students[index]
+    const rows = await Promise.all(attendance.map(async item => {
+      const student = await ctx.db.get(item.studentId);
+      return student?.gymIds.some(id => sessionGymIds.includes(id)) ? {
+        attendance: { studentId: item.studentId, status: item.status },
+      } : null;
     }));
+    return rows.filter(row => row !== null);
   }
 });

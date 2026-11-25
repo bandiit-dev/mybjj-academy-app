@@ -96,7 +96,7 @@ export async function getCurrentPrincipal(ctx: AuthCtx, options: {skipSubscripti
     teacher?.userType === "Admin" || student?.userType === "Admin";
   const gymIds = active ? [active.gymId] : [];
   const studentAccessDisabled = isStudentAccessDisabled(student);
-  if (isAdmin && !options.skipSubscription) await paidGymIds(ctx, gymIds);
+  if (!options.skipSubscription && (active || isAdmin)) await paidGymIds(ctx, gymIds);
   return {
     identity,
     isAdmin,
@@ -195,7 +195,9 @@ export async function requireSessionTeacherOrAdmin(ctx: AuthCtx, classSessionId:
     throw new Error("Class session not found");
   }
 
-  if(!session.gymIds.some(id=>[...(principal.teacher?.gymIds??[]),...(principal.student?.gymIds??[])].includes(id))) {
+  const gymIds = new Set([...(principal.teacher?.gymIds ?? []), ...(principal.student?.gymIds ?? [])]);
+  const sessionGymIds = session.gymIds.filter(id => gymIds.has(id));
+  if (!sessionGymIds.length) {
     throw new Error("Forbidden: session belongs to another or unpaid academy");
   }
   const teacherId = principal.teacher?._id;
@@ -208,6 +210,7 @@ export async function requireSessionTeacherOrAdmin(ctx: AuthCtx, classSessionId:
   return {
     ...principal,
     session,
+    sessionGymIds,
     teachesSession
   };
 }

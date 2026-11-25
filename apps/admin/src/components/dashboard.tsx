@@ -546,12 +546,12 @@ export function Dashboard() {
                 </div>
                 <div className="monthly-presence-metric">
                   <strong className="monthly-presence-total">
-                    {monthlyPresence?.totalEnrollments ?? "—"}
+                    {monthlyPresence?.verifiedPresences ?? "—"}
                   </strong>
                   <span>
-                    {monthlyPresence?.totalEnrollments === 1
-                      ? "presença no mês"
-                      : "presenças no mês"}
+                    {monthlyPresence?.verifiedPresences === 1
+                      ? "presença registrada pela equipe"
+                      : "presenças registradas pela equipe"}
                   </span>
                 </div>
                 <p className="monthly-presence-students">
@@ -560,7 +560,10 @@ export function Dashboard() {
                     : `${monthlyPresence.studentCount} ${monthlyPresence.studentCount === 1 ? "aluno com presença" : "alunos com presença"}`}
                 </p>
                 <small>
-                  Presenças confirmadas nas aulas do mês, sem cancelamentos.
+                  {monthlyPresence?.pendingConfirmations ?? "—"}{" "}
+                  {monthlyPresence?.pendingConfirmations === 1
+                    ? "confirmação de aluno sem validação da equipe"
+                    : "confirmações de alunos sem validação da equipe"}
                 </small>
               </div>
             </section>

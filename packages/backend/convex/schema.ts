@@ -42,6 +42,7 @@ export default defineSchema({
     plan: v.optional(v.union(v.literal("starter"), v.literal("full"))),
     trialEndsAt: v.optional(v.number()), trialUsed: v.optional(v.boolean()),
     trialCheckoutReserved: v.optional(v.boolean()),
+    trialPromotionCode: v.optional(v.string()),
     paidThrough: v.optional(v.number()), currentPeriodEnd: v.optional(v.number()),
     cancelAtPeriodEnd: v.boolean(), stripeSyncedAt: v.number(), lastEventCreated: v.number(),
     createdAt: v.number(), updatedAt: v.number()

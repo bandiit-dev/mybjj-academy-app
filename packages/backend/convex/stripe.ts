@@ -33,7 +33,7 @@ async function assertOwnerSignup(ctx: ActionCtx, principal: { teacher: unknown; 
 export const createCheckout = action({
   args:{promotionCode:v.optional(v.string()),option:v.optional(checkoutOptionValidator)},handler:async(ctx,{promotionCode,option="starter"}):Promise<{url:string}>=>{
     const trial = option === "trial";
-    const code = trial ? "" : promotionCode?.trim() ?? "";
+    const code = promotionCode?.trim() ?? "";
     if(code.length>100) throw new ConvexError("O cupom deve ter no máximo 100 caracteres.");
     const config=billingConfiguration();
     const successUrl=`${config.appUrl}/assinatura?checkout=success&session_id={CHECKOUT_SESSION_ID}`;
@@ -64,16 +64,31 @@ export const createCheckout = action({
           (promo.max_redemptions==null || promo.times_redeemed<promo.max_redemptions));
         const promotion=eligible.find((promo:StripeData)=>stripeId(promo.customer)===customerId)??eligible[0];
         if(!promotion) throw new ConvexError("Cupom inválido, expirado ou indisponível para sua conta.");
+        if ((trial || account.trialUsed) && promotion.restrictions?.first_time_transaction) {
+          throw new ConvexError("Este cupom só vale antes da primeira assinatura e não pode ser usado após o teste grátis.");
+        }
         promotionCodeId=promotion.id;
       }
       const matchesPromotion=(session:StripeData)=>trial || (promotionCodeId
         ? session.metadata?.promotionCodeId===promotionCodeId
         : !session.metadata?.promotionCodeId && session.allow_promotion_codes===true);
       const matchesCheckout=(session:StripeData)=> (session.metadata?.checkoutOption ?? "starter") === option && matchesPromotion(session) && session.success_url===successUrl && session.cancel_url===cancelUrl;
+      async function saveCheckoutSession(session: StripeData) {
+        await ctx.runMutation(internal.billing.finishCheckout, {
+          accountId: account._id,
+          attempt,
+          sessionId: session.id,
+          expiresAt: session.expires_at * 1000,
+          ...(trial ? { trialPromotionCode: code || null } : {}),
+        });
+      }
       if(account.checkoutSessionId) {
         const previous=await stripeRequest(`checkout/sessions/${encodeURIComponent(account.checkoutSessionId)}`);
         if(previous.status==="open" && previous.expires_at*1000>Date.now() && previous.url) {
-          if(matchesCheckout(previous)) return {url:previous.url};
+          if(matchesCheckout(previous)) {
+            if (trial) await saveCheckoutSession(previous);
+            return {url:previous.url};
+          }
           await stripeRequest(`checkout/sessions/${encodeURIComponent(previous.id??account.checkoutSessionId)}/expire`,{});
         }
         if(previous.status==="complete" && stripeId(previous.subscription)) {
@@ -100,7 +115,7 @@ export const createCheckout = action({
       }
       const openSession=ownedSessions.find(matchesCheckout);
       if(openSession) {
-        await ctx.runMutation(internal.billing.finishCheckout,{accountId:account._id,attempt,sessionId:openSession.id,expiresAt:openSession.expires_at*1000});
+        await saveCheckoutSession(openSession);
         return {url:openSession.url};
       }
       const priceId = await checkoutPrice(option === "full" ? "full" : "starter");
@@ -120,7 +135,7 @@ export const createCheckout = action({
         cancel_url:cancelUrl
       },`checkout:${account._id}:${attempt}`);
       if(!session.url) throw new Error("Missing checkout URL");
-      await ctx.runMutation(internal.billing.finishCheckout,{accountId:account._id,attempt,sessionId:session.id,expiresAt:session.expires_at*1000});
+      await saveCheckoutSession(session);
       return {url:session.url};
     } finally {
       await ctx.runMutation(internal.billing.finishCheckout,{accountId:account._id,attempt});

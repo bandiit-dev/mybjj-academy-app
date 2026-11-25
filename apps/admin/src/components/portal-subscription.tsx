@@ -71,7 +71,8 @@ export function SubscriptionPage() {
   const confirm = useAction(api.stripe.confirmCheckout);
   const started = useRef(false);
   const [confirmation, setConfirmation] = useState("");
-  const [promotionCode, setPromotionCode] = useState("");
+  const [couponInput, setCouponInput] = useState<string>();
+  const promotionCode = couponInput ?? billing?.trialPromotionCode ?? "";
   const requested = useSearchParams().get("plano");
   const [selected, setSelected] = useState<CheckoutOption>(
     () => parseCheckoutPlan(requested) ?? "starter",
@@ -189,7 +190,7 @@ export function SubscriptionPage() {
                 </select>
               </label>
             )}
-            {!manageSubscription && !trial && (
+            {!manageSubscription && (
               <label
                 className="subscription-coupon"
                 htmlFor="subscription-promotion-code"
@@ -199,7 +200,7 @@ export function SubscriptionPage() {
                   id="subscription-promotion-code"
                   type="text"
                   value={promotionCode}
-                  onChange={(event) => setPromotionCode(event.target.value)}
+                  onChange={(event) => setCouponInput(event.target.value)}
                   maxLength={100}
                   autoComplete="off"
                   autoCapitalize="characters"
@@ -209,7 +210,9 @@ export function SubscriptionPage() {
                   aria-describedby="subscription-coupon-hint"
                 />
                 <small id="subscription-coupon-hint">
-                  O desconto será validado e exibido no pagamento.
+                  {trial
+                    ? "Seu cupom fica salvo para quando você escolher um plano após os 7 dias grátis."
+                    : "O desconto será validado e exibido no pagamento."}
                 </small>
               </label>
             )}
@@ -220,7 +223,7 @@ export function SubscriptionPage() {
               onClick={() =>
                 payment.open(
                   manageSubscription,
-                  trial ? undefined : promotionCode,
+                  promotionCode,
                   option,
                 )
               }
@@ -329,7 +332,9 @@ export function AcademySubscriptionTile({ gymId }: { gymId: Id<"gyms"> }) {
           )}
           {billing.status === "trialing" ? (
             <p className="subscription-footnote">
-              Ao fim do teste, escolha um plano para continuar.
+              {billing.trialPromotionCode
+                ? "Seu cupom está salvo. Ao fim do teste, escolha um plano e confira o desconto no pagamento."
+                : "Ao fim do teste, escolha um plano para continuar."}
             </p>
           ) : billing.canManage ? (
             <button

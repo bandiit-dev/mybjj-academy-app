@@ -40,6 +40,7 @@ export const getStatus = query({
       plan: PORTAL_PLANS[account?.plan ?? "starter"],
       trialEndsAt: account?.trialEndsAt ?? null,
       canStartTrial: context.canManage && await trialAvailable(ctx, context.principal.identity.subject, account?._id),
+      trialPromotionCode: context.canManage ? account?.trialPromotionCode ?? null : null,
       status:account?.status??"pending",paidThrough:account?.paidThrough??null,
       currentPeriodEnd:account?.currentPeriodEnd??null,cancelAtPeriodEnd:account?.cancelAtPeriodEnd??false,
       hasCustomer:Boolean(account?.stripeCustomerId),hasSubscription:Boolean(account?.stripeSubscriptionId),
@@ -97,14 +98,22 @@ export const reserveCheckout = internalMutation({
 });
 
 export const finishCheckout = internalMutation({
-  args:{accountId:v.id("billingAccounts"),attempt:v.number(),sessionId:v.optional(v.string()),expiresAt:v.optional(v.number())},
+  args:{
+    accountId:v.id("billingAccounts"),attempt:v.number(),sessionId:v.optional(v.string()),
+    expiresAt:v.optional(v.number()),trialPromotionCode:v.optional(v.union(v.string(), v.null()))
+  },
   handler:async(ctx,args)=>{
     const context=await billingContext(ctx);
     if(!context.canManage||context.account?._id!==args.accountId) throw new Error("Forbidden");
     if(context.account.checkoutAttempt!==args.attempt) return;
     await ctx.db.patch(args.accountId,{
       checkoutLockUntil:undefined,
-      ...(args.sessionId?{checkoutSessionId:args.sessionId,checkoutExpiresAt:args.expiresAt}:{}),updatedAt:Date.now()
+      ...(args.sessionId ? {
+        checkoutSessionId: args.sessionId,
+        checkoutExpiresAt: args.expiresAt,
+        ...(args.trialPromotionCode !== undefined ? { trialPromotionCode: args.trialPromotionCode ?? undefined } : {}),
+      } : {}),
+      updatedAt:Date.now()
     });
   }
 });
@@ -134,6 +143,7 @@ export const applyStripeSnapshot = internalMutation({
       await ctx.db.patch(account._id,{
         stripeSubscriptionId:args.subscriptionId,status:args.status,priceId:args.priceId,plan:args.plan,
         trialEndsAt:args.trialEndsAt,trialUsed:account.trialUsed || args.trialUsed || undefined,
+        ...(args.status === "active" && args.paidThrough ? { trialPromotionCode: undefined } : {}),
         paidThrough,currentPeriodEnd:args.currentPeriodEnd,cancelAtPeriodEnd:args.cancelAtPeriodEnd,
         stripeSyncedAt:args.checkedAt,lastEventCreated:Math.max(account.lastEventCreated,args.eventCreated??0),updatedAt:Date.now()
       });

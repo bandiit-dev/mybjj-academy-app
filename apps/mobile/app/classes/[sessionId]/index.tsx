@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
 
 import { AppTopBar } from "../../../src/components/mobile/AppTopBar";
@@ -28,11 +28,6 @@ export default function ClassDetailScreen() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const confirmedRoster = useMemo(() => {
-    if (!detail) return [];
-    return detail.enrolledStudents.filter((row) => row.enrollment.status === "Confirmed");
-  }, [detail]);
-
   if (detail === undefined) {
     return (
       <Screen>
@@ -54,6 +49,10 @@ export default function ClassDetailScreen() {
   const teacherNames = detail.teachers.map((teacher) => teacher.name).join(", ") || "Professor a definir";
   const gymName = detail.gyms[0]?.name ?? "Academia";
   const unityAddress = detail.unities[0]?.address ?? "Unidade principal";
+  const confirmedRoster = detail.enrolledStudents.filter(row => row.enrollment === "Confirmed");
+  const confirmed = detail.currentUserEnrollment === "Confirmed";
+  const canChangeEnrollment = role === "student" && !detail.currentUserAttendance &&
+    session.status !== "Cancelled";
 
   async function onConfirmPresence() {
     setSubmitting(true);
@@ -95,35 +94,49 @@ export default function ClassDetailScreen() {
         Aula de {classTemplate?.classType ?? "GI"} para nível {classTemplate?.level ?? "Beginner"} em {gymName}, {unityAddress}. Duração prevista de {classTemplate?.duration ?? "60 min"}.
       </Text>
 
-      <Text className="mt-2 text-base font-semibold text-[#111827]">Alunos confirmados</Text>
-      {confirmedRoster.length === 0 ? (
-        <Text className="text-sm text-[#6B7280]">Nenhum aluno confirmado ainda.</Text>
-      ) : (
-        <View className="gap-2 rounded-2xl bg-[#E5E7EB] p-4">
-          {confirmedRoster.map((entry) => (
-            <View key={entry.enrollment._id} className="flex-row items-center justify-between">
-              <Text className="text-sm text-[#111827]">• {entry.student?.name ?? "Aluno"}</Text>
-              <Text className="text-xs text-[#6B7280]">{entry.attendance?.status ?? "Não marcado"}</Text>
-            </View>
-          ))}
-        </View>
+      {role === "student" && (
+        <Text className="text-sm text-[#374151]">
+          {detail.currentUserAttendance === "Present" ? "Presente" :
+            detail.currentUserAttendance === "Absent" ? "Ausente" :
+            confirmed ? "Presença confirmada por você" : "Presença não confirmada"}
+        </Text>
       )}
-
-      <Pressable onPress={() => setShowConfirmModal(true)} className="mt-3 h-12 items-center justify-center rounded-xl bg-[#111827]">
-        <Text className="text-base font-semibold text-white">Confirmar Presença</Text>
-      </Pressable>
-
-      <Pressable onPress={onCancelPresence} disabled={submitting} className="h-12 items-center justify-center rounded-xl border border-[#D1D5DB] bg-white">
-        <Text className="text-base font-semibold text-[#374151]">Cancelar Presença</Text>
-      </Pressable>
-
-      {(role === "teacher" || role === "admin") && (
+      {canChangeEnrollment && (
         <Pressable
-          onPress={() => router.push(`/teacher/sessions/${session._id}`)}
-          className="h-12 items-center justify-center rounded-xl bg-[#374151]"
+          onPress={confirmed ? onCancelPresence : () => setShowConfirmModal(true)}
+          disabled={submitting}
+          className="mt-3 h-12 items-center justify-center rounded-xl bg-[#111827]"
         >
-          <Text className="text-base font-semibold text-white">Gerenciar Chamada</Text>
+          <Text className="text-base font-semibold text-white">
+            {confirmed ? "Cancelar presença" : "Confirmar presença"}
+          </Text>
         </Pressable>
+      )}
+      {detail.canManageRoster && (
+        <>
+          <Text className="mt-2 text-base font-semibold text-[#111827]">Alunos confirmados</Text>
+          {confirmedRoster.length === 0 ? (
+            <Text className="text-sm text-[#6B7280]">Nenhum aluno confirmado ainda.</Text>
+          ) : (
+            <View className="gap-2 rounded-2xl bg-[#E5E7EB] p-4">
+              {confirmedRoster.map((entry) => (
+                <View key={entry.id} className="flex-row items-center justify-between">
+                  <Text className="text-sm text-[#111827]">{entry.name}</Text>
+                  <Text className="text-xs text-[#6B7280]">
+                    {entry.attendance === "Present" ? "Presente" :
+                      entry.attendance === "Absent" ? "Ausente" : "Não marcado"}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+          <Pressable
+            onPress={() => router.push(`/teacher/sessions/${session._id}`)}
+            className="h-12 items-center justify-center rounded-xl bg-[#374151]"
+          >
+            <Text className="text-base font-semibold text-white">Gerenciar Chamada</Text>
+          </Pressable>
+        </>
       )}
 
       <Modal visible={showConfirmModal} animationType="fade" transparent onRequestClose={() => setShowConfirmModal(false)}>

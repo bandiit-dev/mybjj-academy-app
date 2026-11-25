@@ -124,6 +124,6 @@ export const getAllTeachers = query({
 export const getCurrentTeacher = query({
   args: {},
   handler: async (ctx) => {
-    return (await getCurrentPrincipal(ctx, { skipSubscription: true })).teacher;
+    return (await getCurrentPrincipal(ctx)).teacher;
   }
 });

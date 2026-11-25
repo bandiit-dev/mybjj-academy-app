@@ -3,7 +3,9 @@ import { test } from "node:test";
 import { getStudentAttendanceHistory } from "../convex/attendance";
 import { getStaffClasses } from "../convex/classes";
 import {
+  correctStaffSessionAttendance,
   getClassSessionById,
+  getClassSessionDetail,
   getStaffClassHistory,
   getStaffSessionLog,
   getTeacherClassHistory,
@@ -13,7 +15,7 @@ import {
   recordClassDate,
   saveStaffSessionLog,
 } from "../convex/classSessions";
-import { cancelEnrollment } from "../convex/enrollments";
+import { cancelEnrollment, getMyEnrollmentForSession, getSessionRoster } from "../convex/enrollments";
 import { getOnboardingStatus, selectAcademy } from "../convex/onboarding";
 import { getAllStudents, getStudentById } from "../convex/students";
 import {
@@ -85,6 +87,9 @@ function fixture(subject = "student-login") {
     status: "Scheduled",
   };
   const tables: Record<string, any[]> = {
+    billingAccounts: ["gym", "elsewhere"].map(gymId => ({
+      gymId, status: "active", priceId: "price_test", paidThrough: Date.UTC(2199, 0, 1),
+    })),
     teachers: [
       {
         _id: "teacher",
@@ -243,6 +248,12 @@ function fixture(subject = "student-login") {
         const id = `${table}-${tables[table].length}`;
         tables[table].push({ _id: id, ...record });
         return id;
+      },
+      delete: async (id: string) => {
+        for (const rows of Object.values(tables)) {
+          const index = rows.findIndex(row => row._id === id);
+          if (index >= 0) rows.splice(index, 1);
+        }
       },
       patch: async (id: string, record: any) => {
         Object.assign(
@@ -913,4 +924,79 @@ test("teacher history and monthly totals count only completed sessions for the r
     await handler(getMonthlyTeachingCounts)(admin, { month: "2026-10" }),
     [{ teacherId: "teacher", total: 1 }],
   );
+});
+
+
+test("session details expose a student's own participation and only give authorized staff a minimal roster", async () => {
+  const {ctx, tables} = fixture();
+  tables.students[1].email = "private@example.com";
+  tables.students[1].phone = "21999999999";
+  tables.students[1].dateOfBirth = "2017-01-20";
+  tables.students[1].plan = { type: "Mensal", isActive: true };
+  tables.enrollments.push({
+    _id: "enroll-ana", classSessionId: "monday", studentId: "other-student", status: "Confirmed",
+  });
+  tables.teachers.push(
+    { _id: "unassigned", clerkUserId: "unassigned-login", gymIds: ["gym"], userType: "Normal" },
+    { _id: "admin", clerkUserId: "admin-login", gymIds: ["gym"], userType: "Admin" },
+    { _id: "outsider", clerkUserId: "outside-login", gymIds: ["elsewhere"], userType: "Normal" },
+  );
+  const login = (subject: string) => ({...ctx, auth: {getUserIdentity: async () => ({subject})}});
+  const detail = (subject: string, classSessionId = "monday") =>
+    handler(getClassSessionDetail)(login(subject), {classSessionId});
+
+  const student = await detail("student-login");
+  assert.deepEqual(student.enrolledStudents, []);
+  assert.equal(student.currentUserEnrollment, "Confirmed");
+  assert.equal((await detail("student-login", "tuesday")).currentUserAttendance, "Absent");
+  assert.equal(student.canManageRoster, false);
+  assert.deepEqual((await detail("unassigned-login")).enrolledStudents, []);
+  await assert.rejects(detail("outside-login"), /academy access required/);
+  await assert.rejects(handler(getSessionRoster)(login("student-login"), {classSessionId: "monday"}), /teacher assigned/);
+
+  for (const subject of ["teacher-login", "admin-login"]) {
+    const staff = await detail(subject);
+    assert.deepEqual(staff.enrolledStudents[1], {
+      id: "enroll-ana", name: "Ana", enrollment: "Confirmed", attendance: null,
+    });
+    assert.equal(staff.canManageRoster, true);
+    const roster = await handler(getSessionRoster)(login(subject), {classSessionId: "monday"});
+    assert.deepEqual(roster[1].student, {name: "Ana"});
+  }
+});
+
+test("an expired academy blocks staff and students while preserving sign-in and academy selection", async (t) => {
+  t.mock.method(Date, "now", () => clock);
+  const {ctx, tables} = fixture();
+  tables.billingAccounts[0].paidThrough = clock - 1;
+  const teacher = { ...ctx, auth: {getUserIdentity: async () => ({subject: "teacher-login"})} };
+  assert.equal((await handler(getOnboardingStatus)(ctx, {})).academySubscriptionInactive, true);
+  assert.equal((await handler(getOnboardingStatus)(teacher, {})).academySubscriptionInactive, true);
+  await assert.rejects(handler(getOverview)(ctx, {refreshDay: today}), /SUBSCRIPTION_REQUIRED/);
+  await assert.rejects(handler(getMyEnrollmentForSession)(ctx, {classSessionId: "monday"}), /SUBSCRIPTION_REQUIRED/);
+  await assert.rejects(handler(getStaffClasses)(teacher, {}), /SUBSCRIPTION_REQUIRED/);
+  await assert.rejects(handler(markStaffSessionPresence)(teacher, {
+    sessionId: "monday", studentId: "other-student",
+  }), /SUBSCRIPTION_REQUIRED/);
+  tables.billingAccounts[0].paidThrough = clock + 1;
+  assert.equal((await handler(getOnboardingStatus)(ctx, {})).academySubscriptionInactive, undefined);
+  assert.equal((await handler(getOverview)(ctx, {refreshDay: today})).profile.name, "Igor Miguel");
+});
+
+test("staff can correct an attendance mark while keeping the student's confirmation", async (t) => {
+  t.mock.method(Date, "now", () => clock);
+  const {ctx, tables} = fixture("teacher-login");
+  const correct = (studentId: string, status: string) =>
+    handler(correctStaffSessionAttendance)(ctx, {sessionId: "monday", studentId, status});
+  const log = () => handler(getStaffSessionLog)(ctx, {sessionId: "monday"});
+  const status = (result: any) => result.students.find((student: any) => student.id === "student")?.status;
+  await correct("student", "Present");
+  assert.equal(status(await log()), "Present");
+  await correct("student", "Absent");
+  assert.equal(status(await log()), "Absent");
+  await correct("student", "Unmarked");
+  assert.equal(status(await log()), "Confirmed");
+  assert.equal(tables.enrollments[0].status, "Confirmed");
+  tables.students.push({_id: "outside", gymIds: ["elsewhere"]});
+  await assert.rejects(correct("outside", "Absent"), /alunos da academia/);
 });

@@ -127,7 +127,7 @@ export const cancelEnrollment = mutation({
 export const getMyUpcomingEnrollments = query({
   args: {},
   handler: async (ctx) => {
-    const { student } = await getCurrentPrincipal(ctx, { skipSubscription: true });
+    const { student } = await getCurrentPrincipal(ctx);
     if (!student) {
       return [];
     }
@@ -158,7 +158,7 @@ export const getMyEnrollmentForSession = query({
     classSessionId: v.id("classSessions")
   },
   handler: async (ctx, { classSessionId }) => {
-    const { student } = await getCurrentPrincipal(ctx, { skipSubscription: true });
+    const { student } = await getCurrentPrincipal(ctx);
     if (!student) {
       return null;
     }
@@ -180,7 +180,7 @@ export const getSessionRoster = query({
     status: v.optional(enrollmentStatusValidator)
   },
   handler: async (ctx, { classSessionId, status }) => {
-    await requireSessionTeacherOrAdmin(ctx, classSessionId);
+    const { sessionGymIds } = await requireSessionTeacherOrAdmin(ctx, classSessionId);
 
     const enrollments = await ctx.db
       .query("enrollments")
@@ -189,12 +189,13 @@ export const getSessionRoster = query({
 
     const filtered = status ? enrollments.filter((enrollment) => enrollment.status === status) : enrollments;
 
-    const students = await Promise.all(filtered.map((enrollment) => ctx.db.get(enrollment.studentId)));
-
-    return filtered.map((enrollment, index) => ({
-      enrollment,
-      student: students[index]
+    const roster = await Promise.all(filtered.map(async enrollment => {
+      const student = await ctx.db.get(enrollment.studentId);
+      if (!student?.gymIds.some(id => sessionGymIds.includes(id))) return null;
+      const { _id, studentId, status } = enrollment;
+      return { enrollment: { _id, studentId, status }, student: { name: student.name } };
     }));
+    return roster.filter(row => row !== null);
   }
 });
 
@@ -209,24 +210,37 @@ export const getMonthlyPresence = query({
     const sessions = (await ctx.db.query("classSessions")
       .withIndex("by_sessionDate", q=>q.gte("sessionDate",start).lt("sessionDate",end)).collect())
       .filter(session=>session.status!=="Cancelled" && session.gymIds.some(id=>gymIds.has(id)));
-    const groups = await Promise.all(sessions.map(async session=>({session,
-      enrollments: await ctx.db.query("enrollments").withIndex("by_classSessionId", q=>q.eq("classSessionId",session._id)).collect()
-    })));
-    const studentIds = [...new Set(groups.flatMap(group=>group.enrollments.filter(enrollment=>enrollment.status==="Confirmed").map(enrollment=>enrollment.studentId)))];
-    const students = new Map(await Promise.all(studentIds.map(async id=>[id,await ctx.db.get(id)] as const)));
-    const enrolledStudents = new Set<string>();
-    let totalEnrollments = 0;
-    for (const {session, enrollments} of groups) {
-      const counted = new Set<string>();
-      for (const enrollment of enrollments) {
-        if (enrollment.status!=="Confirmed" || counted.has(enrollment.studentId)) continue;
-        const student = students.get(enrollment.studentId);
-        if (!student || !session.gymIds.some(id=>gymIds.has(id)&&student.gymIds.includes(id))) continue;
-        counted.add(enrollment.studentId);
-        enrolledStudents.add(enrollment.studentId);
-        totalEnrollments++;
+    const groups = await Promise.all(sessions.map(async session => {
+      const [enrollments, attendance] = await Promise.all([
+        ctx.db.query("enrollments").withIndex("by_classSessionId", q => q.eq("classSessionId", session._id)).collect(),
+        ctx.db.query("attendance").withIndex("by_classSessionId", q => q.eq("classSessionId", session._id)).collect(),
+      ]);
+      const statuses = new Map<Id<"students">, "Confirmed" | "Present" | "Absent">();
+      for (const row of enrollments) {
+        if (row.status === "Confirmed") statuses.set(row.studentId, "Confirmed");
+      }
+      for (const row of attendance) statuses.set(row.studentId, row.status);
+      return { session, statuses };
+    }));
+    const studentIds = new Set(groups.flatMap(({ statuses }) => [...statuses.keys()]));
+    const students = new Map(await Promise.all([...studentIds].map(async id => [id, await ctx.db.get(id)] as const)));
+    const presentStudents = new Set<Id<"students">>();
+    let verifiedPresences = 0;
+    let pendingConfirmations = 0;
+
+    for (const { session, statuses } of groups) {
+      for (const [studentId, status] of statuses) {
+        if (status === "Absent") continue;
+        const student = students.get(studentId);
+        if (!student?.gymIds.some(id => gymIds.has(id) && session.gymIds.includes(id))) continue;
+        if (status === "Confirmed") {
+          pendingConfirmations++;
+        } else {
+          verifiedPresences++;
+          presentStudents.add(studentId);
+        }
       }
     }
-    return {month, totalEnrollments, studentCount: enrolledStudents.size};
+    return { month, verifiedPresences, pendingConfirmations, studentCount: presentStudents.size };
   }
 });

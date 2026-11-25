@@ -114,6 +114,8 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
     (/^\/alunos\/[^/]+$/.test(pathname) && pathname !== "/alunos/novo") ||
     (/^\/aulas(?:\/[^/]+)?$/.test(pathname) && pathname !== "/aulas/nova");
   const studentRoute = pathname === "/aluno" || pathname.startsWith("/aluno/");
+  const academySubscriptionInactive =
+    (studentAccount || teacherAccount) && onboarding?.academySubscriptionInactive;
 
   const resolveAccount = useAction(api.onboarding.resolvePortalAccount);
   const accountKey =
@@ -175,7 +177,7 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
     if (!selectionReady) return;
     if (clerk.isLoaded && !clerk.isSignedIn && pathname !== "/")
       router.replace(`/${selection}`);
-    if (!isAuthenticated || onboarding === undefined || switching) return;
+    if (!isAuthenticated || onboarding === undefined || switching || academySubscriptionInactive) return;
     if (onboarding.status === "link_required") {
       if (onboarding.profileType === "student") return;
       if (!pathname.startsWith("/onboarding"))
@@ -219,6 +221,7 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
     studentRoute,
     teacherAccount,
     teacherRoute,
+    academySubscriptionInactive,
     pathname,
     router,
     selection,
@@ -316,7 +319,8 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
       </main>
     );
   }
-  if (studentAccount && onboarding.studentAccessDisabled) {
+  const studentAccessDisabled = studentAccount && onboarding.studentAccessDisabled;
+  if (studentAccessDisabled || academySubscriptionInactive) {
     return (
       <AcademySwitchContext.Provider
         value={{ activeGymId, switchAcademy, error: switchError }}
@@ -324,8 +328,12 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
         <main className="auth-state">
           <div className="auth-denied">
             <BrandLogo className="auth-brand-logo" />
-            <h1>Acesso desativado</h1>
-            <p>Entre em contato com a academia para reativar seu acesso.</p>
+            <h1>{studentAccessDisabled ? "Acesso desativado" : "Assinatura da academia inativa"}</h1>
+            <p>
+              {studentAccessDisabled
+                ? "Entre em contato com a academia para reativar seu acesso."
+                : "Entre em contato com o responsável pela academia para regularizar o acesso ao portal."}
+            </p>
             <AcademySwitcher />
             <SignOutButton redirectUrl="/">
               <button className="button secondary" type="button">

@@ -30,7 +30,7 @@ import {
   staffHasClassScope,
 } from "./classes";
 import { academyToday, addPlanMonths, assertPlanDate } from "./lib/studentPlans";
-import { writeAttendance } from "./attendance";
+import { clearAttendance, writeAttendance } from "./attendance";
 
 const classSessionStatusValidator = v.union(
   v.literal("Scheduled"),
@@ -264,58 +264,71 @@ export const getClassSessionDetail = query({
     classSessionId: v.id("classSessions")
   },
   handler: async (ctx, { classSessionId }) => {
-    const principal = await getCurrentPrincipal(ctx);
-
+    const { principal, gymIds } = await getAccessibleGymIds(ctx);
     const session = await ctx.db.get(classSessionId);
-    if (!session) {
-      return null;
-    }
+    if (!session) return null;
+    const sessionGyms = new Set(session.gymIds.filter(id => gymIds.has(id)));
+    if (!sessionGyms.size) throw new Error("Forbidden: academy access required");
 
-    const allowed = new Set([...(principal.teacher?.gymIds ?? []), ...(principal.student?.gymIds ?? [])]);
-    if (!session.gymIds.some(id => allowed.has(id))) throw new Error("Forbidden: academy access required");
-    const classTemplate = await ctx.db.get(session.classId);
-
-    const [teachers, gyms, unities, enrollments, attendanceRows] = await Promise.all([
-      Promise.all(session.teacherIds.map((id) => ctx.db.get(id))),
-      Promise.all(session.gymIds.map((id) => ctx.db.get(id))),
-      Promise.all(session.unityIds.map((id) => ctx.db.get(id))),
-      ctx.db
-        .query("enrollments")
-        .withIndex("by_classSessionId", (q) => q.eq("classSessionId", classSessionId))
-        .collect(),
-      ctx.db
-        .query("attendance")
-        .withIndex("by_classSessionId", (q) => q.eq("classSessionId", classSessionId))
-        .collect()
+    const canManageRoster = Boolean(principal.isAdmin ||
+      (principal.teacher && session.teacherIds.includes(principal.teacher._id)));
+    const studentId = principal.student?._id;
+    const [template, teachers, gyms, units, enrollments, attendance] = await Promise.all([
+      ctx.db.get(session.classId),
+      Promise.all(session.teacherIds.map(id => ctx.db.get(id))),
+      Promise.all([...sessionGyms].map(id => ctx.db.get(id))),
+      Promise.all(session.unityIds.map(id => ctx.db.get(id))),
+      canManageRoster
+        ? ctx.db.query("enrollments").withIndex("by_classSessionId", q => q.eq("classSessionId", classSessionId)).collect()
+        : studentId
+          ? ctx.db.query("enrollments").withIndex("by_classSessionId_studentId", q => q.eq("classSessionId", classSessionId).eq("studentId", studentId)).collect()
+          : [],
+      canManageRoster
+        ? ctx.db.query("attendance").withIndex("by_classSessionId", q => q.eq("classSessionId", classSessionId)).collect()
+        : studentId
+          ? ctx.db.query("attendance").withIndex("by_classSessionId_studentId", q => q.eq("classSessionId", classSessionId).eq("studentId", studentId)).collect()
+          : [],
     ]);
-
-    const students = await Promise.all(enrollments.map((enrollment) => ctx.db.get(enrollment.studentId)));
-    const attendanceByStudentId = new Map(attendanceRows.map((row) => [row.studentId, row]));
-
-    const roster = enrollments.map((enrollment, index) => {
-      const student = students[index];
-      const attendance = attendanceByStudentId.get(enrollment.studentId) ?? null;
-
-      return {
-        enrollment,
-        student,
-        attendance
-      };
-    });
-
-    const currentStudentId = principal.student?._id;
-
+    const scopedTemplate = template?.gymIds.some(id => sessionGyms.has(id)) ? template : null;
+    const attendanceByStudent = new Map(attendance.map(row => [row.studentId, row.status]));
+    const enrolledStudents = canManageRoster
+      ? (await Promise.all(enrollments.map(async enrollment => {
+          const student = await ctx.db.get(enrollment.studentId);
+          if (!student?.gymIds.some(id => sessionGyms.has(id))) return null;
+          return {
+            id: enrollment._id,
+            name: student.name,
+            enrollment: enrollment.status,
+            attendance: attendanceByStudent.get(enrollment.studentId) ?? null,
+          };
+        }))).filter(row => row !== null)
+      : [];
     return {
-      session,
-      classTemplate,
-      teachers: teachers.filter((teacher) => teacher !== null),
-      gyms: gyms.filter((gym) => gym !== null),
-      unities: unities.filter((unity) => unity !== null),
-      enrolledStudents: roster,
-      currentUserEnrollment:
-        currentStudentId === undefined
-          ? null
-          : enrollments.find((enrollment) => enrollment.studentId === currentStudentId) ?? null
+      session: {
+        _id: session._id,
+        sessionDate: session.sessionDate,
+        startsAt: session.startsAt,
+        endsAt: session.endsAt,
+        status: session.status,
+      },
+      classTemplate: scopedTemplate && {
+        classType: scopedTemplate.classType,
+        level: scopedTemplate.level,
+        duration: scopedTemplate.duration,
+      },
+      teachers: teachers.flatMap(teacher =>
+        teacher?.gymIds.some(id => sessionGyms.has(id)) ? [{ name: teacher.name }] : []
+      ),
+      gyms: gyms.flatMap(gym => gym ? [{ name: gym.name }] : []),
+      unities: units.flatMap(unit =>
+        unit?.gymId && sessionGyms.has(unit.gymId) ? [{ address: unit.address }] : []
+      ),
+      canManageRoster,
+      enrolledStudents,
+      currentUserEnrollment: studentId
+        ? enrollments.find(row => row.studentId === studentId)?.status ?? null
+        : null,
+      currentUserAttendance: studentId ? attendanceByStudent.get(studentId) ?? null : null,
     };
   }
 });
@@ -474,10 +487,11 @@ export const getStaffSessionLog = query({
   },
 });
 
-async function markSessionStudentsPresent(
+async function setSessionStudentAttendance(
   ctx: MutationCtx,
   sessionId: Id<"classSessions">,
   studentIds: Id<"students">[],
+  status: "Present" | "Absent" | "Unmarked" = "Present",
 ) {
   const { staff, session, sessionGyms } = await staffHistorySession(
     ctx,
@@ -489,6 +503,10 @@ async function markSessionStudentsPresent(
     students.some((student) => !student?.gymIds.some((id) => sessionGyms.has(id)))
   ) {
     throw new ConvexError("Selecione apenas alunos da academia desta aula.");
+  }
+  if (status === "Unmarked") {
+    await Promise.all(uniqueIds.map(studentId => clearAttendance(ctx, sessionId, studentId)));
+    return;
   }
   const markedByTeacherId =
     staff.teacher?._id ??
@@ -502,7 +520,7 @@ async function markSessionStudentsPresent(
       writeAttendance(ctx, {
         classSessionId: sessionId,
         studentId,
-        status: "Present",
+        status,
         markedByTeacherId,
       }),
     ),
@@ -512,7 +530,7 @@ async function markSessionStudentsPresent(
 export const markStaffSessionPresence = mutation({
   args: { sessionId: v.id("classSessions"), studentId: v.id("students") },
   handler: (ctx, { sessionId, studentId }) =>
-    markSessionStudentsPresent(ctx, sessionId, [studentId]),
+    setSessionStudentAttendance(ctx, sessionId, [studentId]),
 });
 
 export const markStaffSessionPresences = mutation({
@@ -521,7 +539,17 @@ export const markStaffSessionPresences = mutation({
     studentIds: v.array(v.id("students")),
   },
   handler: (ctx, { sessionId, studentIds }) =>
-    markSessionStudentsPresent(ctx, sessionId, studentIds),
+    setSessionStudentAttendance(ctx, sessionId, studentIds),
+});
+
+export const correctStaffSessionAttendance = mutation({
+  args: {
+    sessionId: v.id("classSessions"),
+    studentId: v.id("students"),
+    status: v.union(v.literal("Present"), v.literal("Absent"), v.literal("Unmarked")),
+  },
+  handler: (ctx, { sessionId, studentId, status }) =>
+    setSessionStudentAttendance(ctx, sessionId, [studentId], status),
 });
 
 export const recordClassDate = mutation({

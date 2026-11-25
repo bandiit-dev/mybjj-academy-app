@@ -92,12 +92,16 @@ export const getOnboardingStatus = query({
       const currentStudent = active?.profileType === "student"
         ? students.find(profile => profile._id === active.profile._id)
         : !active && !teacher ? student : null;
+      const billing = active
+        ? await ctx.db.query("billingAccounts").withIndex("by_gymId", q => q.eq("gymId", active.gymId)).unique()
+        : null;
       return {
         status: "ready" as const,
         isAdmin: active ? active.role === "admin" : teacher?.userType === "Admin" || student?.userType === "Admin",
         profileType: active?.profileType ?? (teacher ? "teacher" as const : "student" as const),
         displayName: active?.profile.name ?? teacher?.name ?? student?.name ?? identity.name ?? "Usuário",
         ...(isStudentAccessDisabled(currentStudent) ? { studentAccessDisabled: true } : {}),
+        ...(!hasPaidPortalAccess(billing) ? { academySubscriptionInactive: true } : {}),
         ...(memberships.size > 1 ? { activeGymId: active?.gymId } : {}),
       };
     }

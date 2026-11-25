@@ -201,7 +201,7 @@ export const getAllStudents = query({
 export const getCurrentStudent = query({
   args: {},
   handler: async (ctx) => {
-    return withStudentPlan((await getCurrentPrincipal(ctx, { skipSubscription: true })).student);
+    return withStudentPlan((await getCurrentPrincipal(ctx)).student);
   }
 });
 
