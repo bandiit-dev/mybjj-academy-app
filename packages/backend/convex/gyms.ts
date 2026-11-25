@@ -55,6 +55,7 @@ export const updateGym = mutation({
     gymId: v.id("gyms"),
     teamName: v.optional(v.string()),
     studentPaymentDueDay: v.optional(v.union(v.number(), v.null())),
+    studentPaymentRemindersEnabled: v.optional(v.boolean()),
     name: v.optional(v.string()),
     cnpj: v.optional(v.string()),
     phone: v.optional(v.string()),
@@ -80,6 +81,11 @@ export const updateGym = mutation({
       throw new Error("Gym not found");
     }
     if (studentPaymentDueDay != null) validateDueDay(studentPaymentDueDay);
+    const effectiveDueDay =
+      studentPaymentDueDay === undefined ? gym.studentPaymentDueDay : studentPaymentDueDay;
+    if ((patch.studentPaymentRemindersEnabled ?? gym.studentPaymentRemindersEnabled) && effectiveDueDay == null) {
+      throw new Error("Defina o vencimento da mensalidade para ativar os lembretes.");
+    }
 
     await ctx.db.patch(gymId, {
       ...patch,

@@ -14,21 +14,22 @@ export function getResendClient(): { resend: Resend; fromEmail: string } {
 
   return {
     resend: new Resend(apiKey),
-    fromEmail
+    fromEmail,
   };
 }
 
-export async function sendSystemEmail(params: {
+export async function sendSystemEmail({
+  idempotencyKey,
+  ...message
+}: {
   to: string;
   subject: string;
-  html: string;
-}) {
+  idempotencyKey?: string;
+} & ({ html: string; text?: string } | { html?: string; text: string })) {
   const { resend, fromEmail } = getResendClient();
 
-  return resend.emails.send({
-    from: fromEmail,
-    to: params.to,
-    subject: params.subject,
-    html: params.html
-  });
+  return resend.emails.send(
+    { ...message, from: fromEmail },
+    idempotencyKey ? { idempotencyKey } : undefined,
+  );
 }

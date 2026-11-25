@@ -143,7 +143,9 @@ function Section({
 function friendlyError(cause: unknown) {
   const message = cause instanceof Error ? cause.message : "";
   if (
-    /plano|pagamento|JPG|PNG|2 MB|ler a imagem|carregar a imagem/.test(message)
+    /plano|pagamento|vencimento da mensalidade|JPG|PNG|2 MB|ler a imagem|carregar a imagem/.test(
+      message,
+    )
   )
     return message;
   if (message.includes("already has an account or pending invitation"))
@@ -1210,6 +1212,8 @@ export function EditAcademyForm() {
             studentPaymentDueDay: d.get("studentPaymentDueDay")
               ? Number(d.get("studentPaymentDueDay"))
               : null,
+            studentPaymentRemindersEnabled:
+              d.get("studentPaymentRemindersEnabled") === "on",
             branding: {
               logoUrl: (await uploadImage(d, "logoUrl")) || undefined,
               primaryColor: String(d.get("primaryColor")) || undefined,
@@ -1271,6 +1275,19 @@ export function EditAcademyForm() {
             curtos, vale o último dia do mês.
           </small>
         </label>
+        <label className="account-access-option">
+          <input
+            name="studentPaymentRemindersEnabled"
+            type="checkbox"
+            defaultChecked={gym.studentPaymentRemindersEnabled}
+            aria-describedby="monthly-reminders-help"
+          />
+          Enviar lembretes de mensalidade por e-mail
+        </label>
+        <p className="account-access-help" id="monthly-reminders-help">
+          Envia um lembrete três dias antes do vencimento aos alunos ativos com
+          e-mail cadastrado e mensalidade em aberto.
+        </p>
       </Section>
       <Section title="Branding">
         <ImageFileField

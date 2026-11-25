@@ -21,6 +21,19 @@ Convex backend package for MyBJJAcademy.
 - `convex/{gyms,unities,teams,teachers,students}.ts`: existing entity modules
 - `src/resend.ts`: base Resend integration utility
 
+## Monthly payment reminders
+
+Set `RESEND_API_KEY` and `RESEND_FROM_EMAIL` in the Convex deployment that
+will send the reminders. The sender must use a domain verified in Resend.
+Academy administrators can set the due day and enable email reminders in
+**Academia → Editar**. Reminders are disabled by default.
+
+The Convex job runs daily at 09:15 Brasília time. It checks the academy's due
+date and sends a reminder three days before the deadline for active monthly
+students with a contact email and an unpaid period. A student login is optional.
+Each send is rechecked against recent payments and recorded in
+`monthlyPaymentReminders`. Retries use the same Resend idempotency key.
+
 ## Student registration
 
 The admin form saves students without app access by default. Email and phone are

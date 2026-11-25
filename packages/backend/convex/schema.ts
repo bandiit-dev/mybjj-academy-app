@@ -63,6 +63,7 @@ export default defineSchema({
   gyms: defineTable({
     teamName: v.optional(v.string()),
     studentPaymentDueDay: v.optional(v.number()),
+    studentPaymentRemindersEnabled: v.optional(v.boolean()),
     name: v.string(),
     cnpj: v.string(),
     phone: v.string(),
@@ -80,7 +81,8 @@ export default defineSchema({
     updatedAt: v.number()
   })
     .index("by_cnpj", ["cnpj"])
-    .index("by_email", ["email"]),
+    .index("by_email", ["email"])
+    .index("by_studentPaymentRemindersEnabled", ["studentPaymentRemindersEnabled"]),
 
   unities: defineTable({
     name: v.optional(v.string()),
@@ -158,6 +160,21 @@ export default defineSchema({
     createdAt: v.number(), updatedAt: v.number()
   }).index("by_studentId", ["studentId"])
     .index("by_period", ["studentId", "planType", "periodStart", "periodEnd"]),
+
+  monthlyPaymentReminders: defineTable({
+    studentId: v.id("students"),
+    gymId: v.id("gyms"),
+    month: v.string(),
+    dueDate: v.string(),
+    recipient: v.string(),
+    subject: v.string(),
+    text: v.string(),
+    attempts: v.number(),
+    retryAfter: v.number(),
+    providerId: v.optional(v.string()),
+    sentAt: v.optional(v.number()),
+    failedAt: v.optional(v.number()),
+  }).index("by_student_gym_month", ["studentId", "gymId", "month"]),
 
   classes: defineTable({
     teacherIds: v.array(v.id("teachers")),

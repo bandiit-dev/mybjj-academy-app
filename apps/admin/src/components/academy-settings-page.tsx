@@ -89,6 +89,14 @@ export function AcademySettingsPage() {
                       : `Dia ${gym.studentPaymentDueDay} de cada mês`}
                   </strong>
                 </label>
+                <label className="academy-field">
+                  <span>Lembretes de mensalidade por e-mail</span>
+                  <strong>
+                    {gym.studentPaymentRemindersEnabled
+                      ? "Ativados"
+                      : "Desativados"}
+                  </strong>
+                </label>
               </div>
             </Card>
             <Card

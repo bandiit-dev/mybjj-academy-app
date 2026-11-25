@@ -3,6 +3,9 @@ import { test } from "node:test";
 import { getStudentBilling, initializeExistingPlans, setPayment, setPlanActive } from "../convex/studentPlans";
 import { getAllStudents, updateStudent } from "../convex/students";
 import { updateGym } from "../convex/gyms";
+import { claim, finish, queuePage } from "../convex/monthlyReminders";
+import { send } from "../convex/monthlyReminderEmails";
+import { getFunctionName } from "convex/server";
 import { addPlanMonths, academyToday, getStudentPlan, monthlyPaymentDueDate, periodAt, scheduledPlanPeriods, validateStudentPlan } from "../convex/lib/studentPlans";
 
 const handler = (fn: unknown) => (fn as { _handler: (ctx: any, args: any) => Promise<any> })._handler;
@@ -14,7 +17,7 @@ function context({admin = true, authenticated = true, otherAcademy = false} = {}
     gyms: [{_id:"gym_1"}, {_id:"gym_2"}],
     teachers: admin ? [{_id:"teacher_1",clerkUserId:"owner",userType:"Admin",gymIds:["gym_1"]}] : [],
     students: [{_id:"student_1",clerkUserId:"student_user",gymIds:[otherAcademy?"gym_2":"gym_1"],plan:{...monthly},userType:"Normal"}],
-    studentPayments: []
+    studentPayments: [], monthlyPaymentReminders: []
   };
   const db = {
     get: async (id: string) => Object.values(tables).flat().find(row=>row._id===id)??null,
@@ -26,6 +29,11 @@ function context({admin = true, authenticated = true, otherAcademy = false} = {}
           apply(index);return chain;
         },
         collect: async ()=>rows,
+        first: async () => rows[0] ?? null,
+        paginate: async ({ cursor, numItems }: { cursor: string | null; numItems: number }) => {
+          const end = Number(cursor ?? 0) + numItems;
+          return { page: rows.slice(Number(cursor ?? 0), end), isDone: end >= rows.length, continueCursor: String(end) };
+        },
         unique: async ()=>{assert.ok(rows.length<=1);return rows[0]??null;}
       };
       return chain;
@@ -93,8 +101,85 @@ test("the academy administrator can save and clear a valid monthly due day", asy
   await update(ctx, { gymId: "gym_1", studentPaymentDueDay: 31 });
   await update(ctx, { gymId: "gym_1", name: "Academia A" });
   assert.equal(ctx.tables.gyms[0].studentPaymentDueDay, 31);
-  await update(ctx, { gymId: "gym_1", studentPaymentDueDay: null });
+  await update(ctx, { gymId: "gym_1", studentPaymentRemindersEnabled: true });
+  assert.equal(ctx.tables.gyms[0].studentPaymentRemindersEnabled, true);
+  await assert.rejects(update(ctx, { gymId: "gym_1", studentPaymentDueDay: null }), /ativar os lembretes/);
+  await update(ctx, { gymId: "gym_1", studentPaymentDueDay: null, studentPaymentRemindersEnabled: false });
   assert.equal(ctx.tables.gyms[0].studentPaymentDueDay, undefined);
+});
+
+test("monthly reminders use the academy deadline and recheck payments before sending", async (t) => {
+  const ctx = context();
+  Object.assign(ctx.tables.gyms[0], {
+    name: "Academia Centro", studentPaymentDueDay: 31, studentPaymentRemindersEnabled: true,
+  });
+  Object.assign(ctx.tables.students[0], {
+    name: "Maria", email: "responsavel@example.com", clerkUserId: undefined,
+  });
+  const jobs: any[] = [];
+  const reminderCtx = {
+    ...ctx,
+    scheduler: {
+      runAt: async (_at: number, _fn: unknown, args: unknown) => { jobs.push(args); },
+      runAfter: async (_delay: number, _fn: unknown, args: unknown) => { jobs.push(args); },
+    },
+  };
+  const original = { key: process.env.RESEND_API_KEY, from: process.env.RESEND_FROM_EMAIL };
+  process.env.RESEND_API_KEY = "re_test";
+  process.env.RESEND_FROM_EMAIL = "test@example.com";
+  t.after(() => {
+    if (original.key === undefined) delete process.env.RESEND_API_KEY;
+    else process.env.RESEND_API_KEY = original.key;
+    if (original.from === undefined) delete process.env.RESEND_FROM_EMAIL;
+    else process.env.RESEND_FROM_EMAIL = original.from;
+  });
+  let now = Date.parse("2024-02-26T12:15:00Z");
+  t.mock.method(Date, "now", () => now);
+  const args = { studentId: "student_1", gymId: "gym_1", day: "2024-02-26" };
+  await handler(queuePage)(reminderCtx, {});
+  assert.deepEqual(jobs, [args]);
+  const reserve = () => handler(claim)(reminderCtx, args);
+  const targetPayment = { ...periodAt(monthly, 1), studentId: args.studentId, paid: true };
+  ctx.tables.studentPayments.push(targetPayment);
+  assert.equal(await reserve(), null);
+  targetPayment.paid = false;
+  ctx.tables.students[0].plan.isActive = false;
+  assert.equal(await reserve(), null);
+  ctx.tables.students[0].plan.isActive = true;
+  ctx.tables.gyms[0].studentPaymentRemindersEnabled = false;
+  assert.equal(await reserve(), null);
+  ctx.tables.gyms[0].studentPaymentRemindersEnabled = true;
+  assert.equal(await handler(claim)(reminderCtx, { ...args, day: "2024-02-25" }), null);
+
+  const requests: { key: string | null; body: string }[] = [];
+  t.mock.method(globalThis, "fetch", async (_url: string, request: RequestInit) => {
+    requests.push({
+      key: new Headers(request.headers).get("Idempotency-Key"),
+      body: String(request.body),
+    });
+    return requests.length === 1
+      ? Response.json({ name: "rate_limit_exceeded", message: "Retry later" }, { status: 429 })
+      : Response.json({ id: "sent_1" });
+  });
+  const sendCtx = {
+    ...reminderCtx,
+    runMutation: (fn: Parameters<typeof getFunctionName>[0], payload: unknown) =>
+      handler(getFunctionName(fn) === "monthlyReminders:claim" ? claim : finish)(reminderCtx, payload),
+  };
+  await handler(send)(sendCtx, args);
+  assert.equal(requests.length, 1);
+  assert.equal(ctx.tables.monthlyPaymentReminders[0].month, "2024-02");
+  assert.equal(ctx.tables.monthlyPaymentReminders[0].failedAt, now);
+  assert.equal(JSON.parse(requests[0].body).to, "responsavel@example.com");
+  assert.match(JSON.parse(requests[0].body).text, /29\/02\/2024/);
+  await handler(send)(sendCtx, args);
+  assert.equal(requests.length, 1);
+  now += 5 * 60_000;
+  await handler(send)(sendCtx, jobs[1]);
+  assert.deepEqual(requests[1], requests[0]);
+  assert.equal(ctx.tables.monthlyPaymentReminders[0].providerId, "sent_1");
+  assert.equal(await reserve(), null);
+  assert.equal(ctx.tables.monthlyPaymentReminders.length, 1);
 });
 
 test("monthly due dates clamp to the month end and the first enrollment date", () => {
