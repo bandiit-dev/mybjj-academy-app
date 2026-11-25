@@ -13,7 +13,8 @@ test("the root route is public and serves the portal instead of hosted authentic
   const response = await fetch(new URL("/", base), { redirect: "manual" });
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("location"), null);
-  assert.match(await response.text(), /MyBJJAcademy Admin/);
+  assert.equal(response.headers.get("x-robots-tag"), "noindex");
+  assert.match(await response.text(), /Portal administrativo \| My BJJ Academy/);
 });
 
 for (const path of [

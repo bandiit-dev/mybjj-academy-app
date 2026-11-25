@@ -36,13 +36,27 @@
   }
 }
 
+@keyframes hero-entrance {
+  from {
+    transform: translateY(18px);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   html {
     scroll-behavior: smooth;
   }
 
   [data-hero-copy],
-  [data-hero-preview] > *,
+  [data-hero-preview] > :last-child {
+    animation: hero-entrance 850ms ease-out;
+  }
+
+  [data-hero-preview] > [aria-hidden="true"],
   [data-scroll-reveal="entered"] {
     animation: entrance 850ms ease-in backwards;
   }
@@ -57,9 +71,5 @@
 
   [data-hero-preview] > :nth-child(3) {
     animation-delay: 380ms;
-  }
-
-  [data-hero-preview] > :nth-child(4) {
-    animation-delay: 480ms;
   }
 }

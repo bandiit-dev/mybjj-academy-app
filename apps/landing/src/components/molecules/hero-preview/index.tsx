@@ -23,8 +23,10 @@ export function HeroPreview() {
           asset="hero-dashboard.png"
           width={1920}
           height={962}
-          alt="Painel do MyBJJ Academy com visão geral de alunos, aulas e presença"
+          alt="Painel do My BJJ Academy com visão geral de alunos, aulas e presença"
           className="block h-auto w-full"
+          sizes="(min-width: 1190px) 1086px, (min-width: 1024px) calc(100vw - 104px), calc(100vw - 52px)"
+          priority
         />
       </div>
     </div>

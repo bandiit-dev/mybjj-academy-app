@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BrandLogo } from "@/components/atoms/brand-logo";
 import { DesignImage } from "@/components/atoms/design-image";
+import { instagramUrl, siteName } from "@/lib/site-metadata";
 
 const contactUrl = "mailto:contato@mybjjacademy.com.br";
 
@@ -38,10 +39,7 @@ export function SiteFooter({ home = false }: { home?: boolean }) {
           className="mt-10 max-w-full lg:mt-[53px]"
         />
         <div className="mt-[35px] grid items-center gap-5 text-[#f0f0f0] sm:grid-cols-[1fr_auto_1fr]">
-          <a
-            href="https://www.instagram.com/mybjjacademyapp/"
-            className="justify-self-start"
-          >
+          <a href={instagramUrl} className="justify-self-start">
             <DesignImage
               asset="09216.svg"
               width={30}
@@ -54,7 +52,7 @@ export function SiteFooter({ home = false }: { home?: boolean }) {
             <Link href="/termos-de-uso">Termos de Uso</Link>
           </div>
           <p className="text-xs sm:text-right">
-            © 2026 MYBJJ ACADEMY. Todos os direitos reservados.
+            © 2026 {siteName}. Todos os direitos reservados.
           </p>
         </div>
       </div>

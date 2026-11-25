@@ -6,6 +6,9 @@ type DesignImageProps = {
   height: number;
   alt?: string;
   className?: string;
+  sizes?: string;
+  priority?: boolean;
+  loading?: "eager" | "lazy";
 };
 
 export function DesignImage({
@@ -14,6 +17,9 @@ export function DesignImage({
   height,
   alt = "",
   className,
+  sizes,
+  priority,
+  loading,
 }: DesignImageProps) {
   return (
     <Image
@@ -22,8 +28,9 @@ export function DesignImage({
       height={height}
       alt={alt}
       className={className}
-      loading="eager"
-      unoptimized
+      sizes={sizes}
+      priority={priority}
+      loading={loading}
     />
   );
 }

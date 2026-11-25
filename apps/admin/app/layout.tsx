@@ -10,8 +10,9 @@ const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 
 export const metadata: Metadata = {
   icons: { icon: "/images/favicon.ico", shortcut: "/images/favicon.ico" },
-  title: "MyBJJAcademy Admin",
-  description: "Admin portal base scaffold",
+  title: "Portal administrativo | My BJJ Academy",
+  description: "Portal administrativo do My BJJ Academy.",
+  robots: { index: false },
 };
 
 export default function RootLayout({

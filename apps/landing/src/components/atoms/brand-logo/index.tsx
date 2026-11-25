@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { siteName } from "@/lib/site-metadata";
 import { DesignImage } from "../design-image";
 
 export function BrandLogo({
@@ -9,12 +10,13 @@ export function BrandLogo({
   href?: string;
 }) {
   return (
-    <Link href={href} aria-label="MyBJJ Academy — início">
+    <Link href={href} aria-label={`${siteName} — início`}>
       <DesignImage
         asset="d98b8.png"
-        alt="MyBJJ Academy"
+        alt={siteName}
         width={footer ? 271 : 200}
         height={footer ? 45 : 34}
+        loading={footer ? "lazy" : "eager"}
         className="h-auto"
       />
     </Link>
