@@ -4,8 +4,11 @@ import { BrandLogo } from "@/components/atoms/brand-logo";
 
 export function SiteHeader({ home = false }: { home?: boolean }) {
   const homePath = home ? "" : "/";
+  const radius = home ? "xl" : "lg";
   return (
-    <header className="mx-auto flex max-w-[1262px] flex-wrap items-center justify-center gap-x-6 gap-y-4 px-4 pt-4 sm:justify-between lg:relative lg:pl-[71px] lg:pr-0">
+    <header
+      className={`relative z-10 mx-auto flex max-w-[1262px] flex-wrap items-center justify-center gap-x-6 gap-y-4 px-4 pt-4 sm:justify-between ${home ? "text-white min-[1200px]:pt-[26px]" : ""} lg:pl-[71px] min-[1300px]:pr-0`}
+    >
       <BrandLogo href={`${homePath}#inicio`} />
       <nav
         aria-label="Navegação principal"
@@ -16,10 +19,12 @@ export function SiteHeader({ home = false }: { home?: boolean }) {
         <Link href={`${homePath}#faq`}>FAQ</Link>
       </nav>
       <div className="flex gap-3.5">
-        <ActionLink subtle className="min-w-[100px]">
+        <ActionLink subtle radius={radius} className="min-w-[100px]">
           Entrar
         </ActionLink>
-        <ActionLink className="min-w-[156px]">Começar agora</ActionLink>
+        <ActionLink radius={radius} className="min-w-[156px]">
+          Começar agora
+        </ActionLink>
       </div>
     </header>
   );
