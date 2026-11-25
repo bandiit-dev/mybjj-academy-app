@@ -5,7 +5,7 @@ import { isStudentPresent } from "./attendance";
 import { classTitle, recurringTime } from "./classes";
 import { movedSessions } from "./classSessions";
 import { confirmStudentEnrollment } from "./enrollments";
-import { getCurrentPrincipal } from "./lib/auth";
+import { assertSelectedStudent, getCurrentPrincipal } from "./lib/auth";
 import {
   academyToday,
   academyStudentDueDay,
@@ -117,6 +117,7 @@ async function schedule(
           : [null, null];
         return {
           classId: entry.classId,
+          studentId: student._id,
           sessionId: entry.sessionId,
           scheduleStatus: entry.scheduleStatus,
           startsAt: entry.startsAt,
@@ -295,12 +296,14 @@ export const getSchedule = query({
 
 export const confirmClass = mutation({
   args: {
+    studentId: v.optional(v.id("students")),
     sessionId: v.optional(v.id("classSessions")),
     classId: v.optional(v.id("classes")),
     date: v.optional(v.string()),
   },
-  handler: async (ctx, { sessionId: requestedSessionId, classId, date }) => {
+  handler: async (ctx, { sessionId: requestedSessionId, classId, date, studentId }) => {
     const student = await currentStudent(ctx);
+    assertSelectedStudent(student, studentId);
     const now = Date.now();
     const today = academyToday(now);
     let sessionId;

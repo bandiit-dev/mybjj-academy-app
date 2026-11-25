@@ -6,6 +6,7 @@ import { tokenCache } from "@clerk/expo/token-cache";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 
 import { api } from "../lib/convex";
+import { ProfileSwitcher } from "../components/feature/ProfileSwitcher";
 import { env } from "../utils/env";
 
 type AppProvidersProps = {
@@ -32,6 +33,7 @@ function AcademyAccessGate({ children }: AppProvidersProps) {
           {onboarding.studentAccessDisabled ? "Acesso desativado" : "Assinatura da academia inativa"}
         </Text>
         <Text className="text-center">Entre em contato com o responsável pela academia para regularizar o acesso.</Text>
+        <ProfileSwitcher />
         <Pressable onPress={() => void signOut()} accessibilityRole="button">
           <Text className="font-semibold">Sair</Text>
         </Pressable>

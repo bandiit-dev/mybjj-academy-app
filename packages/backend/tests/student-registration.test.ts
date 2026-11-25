@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createStudent, createStudentWithoutAccount, getGraduationHistory, getStudentDetailsForStaff, updateStudent } from "../convex/students";
-import { getOnboardingStatus, listAcademyAccess, selectAcademy, linkExistingProfile, resolvePortalAccount, resolveVerifiedProfile } from "../convex/onboarding";
+import { getFunctionName } from "convex/server";
+import { createStudent, createStudentWithoutAccount, getGraduationHistory, getStudentDetailsForStaff, revokeGuardianAccess, updateStudent } from "../convex/students";
+import { getOnboardingStatus, listAcademyAccess, listProfileAccess, selectAcademy, linkExistingProfile, resolvePortalAccount, resolveVerifiedProfile } from "../convex/onboarding";
 import { assertInvitationAllowed, insertInvitedStudent, insertInvitedTeacher, inviteExistingStudent, inviteStudent, inviteTeacher, updateInvitedStudent } from "../convex/provisioning";
 import { getCurrentPrincipal, requireAdmin } from "../convex/lib/auth";
 import { BELTS, assertDateOfBirth, beltValidator, teacherClassTypeValidator } from "../convex/lib/validators";
@@ -411,4 +412,103 @@ test("the active academy scopes admin privileges and supports multiple profiles 
   await assert.rejects(handler(insertInvitedTeacher)(ctx, {
     ...profile, email: "other@example.com", invitationId: "inv_other",
   }), /admin role required/);
+});
+
+test("siblings share one pending guardian invitation and keep separate profiles", async t => {
+  const ctx = context();
+  const originalSecret = process.env.CLERK_SECRET_KEY;
+  process.env.CLERK_SECRET_KEY = "test-secret";
+  t.after(() => {
+    if (originalSecret === undefined) delete process.env.CLERK_SECRET_KEY;
+    else process.env.CLERK_SECRET_KEY = originalSecret;
+  });
+  let invitations = 0;
+  let joined = false;
+  t.mock.method(globalThis, "fetch", async (url: string, options?: RequestInit) => {
+    if (!options?.method && new URL(url).pathname === "/v1/invitations") {
+      assert.equal(new URL(url).searchParams.get("query"), "parent@example.com");
+      return Response.json({data: [{
+        id: "family_invite", email_address: "parent@example.com", status: "pending",
+      }]});
+    }
+    if (!options?.method) {
+      assert.equal(new URL(url).searchParams.get("email_address"), "parent@example.com");
+      return Response.json(joined ? [{
+        id: "parent", email_addresses: [{email_address: "parent@example.com", verification: {status: "verified"}}],
+      }] : []);
+    }
+    assert.equal(options.method, "POST");
+    assert.equal(new URL(url).pathname, "/v1/invitations");
+    assert.equal(JSON.parse(String(options.body)).email_address, "parent@example.com");
+    if (invitations) return Response.json({errors: [{code: "duplicate_record"}]}, {status: 400});
+    invitations++;
+    return Response.json({id: "family_invite"});
+  });
+  const second = await handler(createStudentWithoutAccount)(ctx, {...profile, name: "Lucas"});
+  const action = {
+    ...ctx,
+    runQuery: (_fn: unknown, args: unknown) => handler(assertInvitationAllowed)(ctx, args),
+    runMutation: (fn: any, args: unknown) => {
+      const isEdit = getFunctionName(fn) === "provisioning:updateInvitedStudent";
+      return handler(isEdit ? updateInvitedStudent : insertInvitedStudent)(ctx, args);
+    },
+  };
+  const guardian = {guardianEmail: " Parent@example.com ", redirectUrl: "https://example.com/", email: ""};
+  const first = await handler(inviteStudent)(action, {
+    ...profile, ...guardian, name: "Ana", email: "ana@example.com",
+  });
+  await handler(revokeGuardianAccess)(ctx, {studentId: first});
+  await handler(inviteExistingStudent)(action, {
+    ...profile, ...guardian, studentId: first, name: "Ana", email: "ana@example.com",
+  });
+  await handler(inviteExistingStudent)(action, {...profile, ...guardian, studentId: second, name: "Lucas"});
+  assert.equal(invitations, 1);
+  assert.equal(ctx.tables.students.find(item => item._id === first).clerkUserId, "invitation:family_invite");
+  assert.equal(ctx.tables.students.find(item => item._id === second).clerkUserId, "invitation:family_invite");
+  assert.equal(ctx.tables.students.find(item => item._id === second).email, "");
+
+  const account = (subject: string, email: string) => ({
+    ...ctx, auth: {getUserIdentity: async () => ({subject, email, emailVerified: true})},
+  });
+  const personal = account("personal", "ana@example.com");
+  assert.equal((await handler(getOnboardingStatus)(personal, {})).status, "needs_academy");
+  await assert.rejects(handler(linkExistingProfile)(personal, {}), /No profile matches/);
+  const parent = account("parent", "parent@example.com");
+  await handler(linkExistingProfile)(parent, {});
+  assert.equal(ctx.tables.students.filter(row => row.clerkUserId === "parent").length, 2);
+  joined = true;
+
+  const options = await handler(listProfileAccess)(parent, {});
+  assert.deepEqual(options.map((option: any) => [option.name, option.gymId]).sort(), [
+    ["Ana", "gym_1"], ["Lucas", "gym_1"],
+  ]);
+  await handler(selectAcademy)(parent, {gymId: "gym_1", studentId: first});
+  assert.equal((await getCurrentPrincipal(parent)).student?._id, first);
+  await handler(selectAcademy)(parent, {gymId: "gym_1", studentId: second});
+  assert.equal((await getCurrentPrincipal(parent)).student?._id, second);
+  await assert.rejects(handler(selectAcademy)(parent, {gymId: "gym_1", studentId: "unrelated"}), /academy access required/);
+  await assert.rejects(handler(revokeGuardianAccess)(parent, {studentId: second}), /administrator access required/);
+  await handler(revokeGuardianAccess)(ctx, {studentId: second});
+  assert.equal((await getCurrentPrincipal(parent)).student?._id, first);
+  assert.equal(ctx.tables.students.find(row => row._id === second).clerkUserId, undefined);
+  assert.equal(ctx.tables.students.find(row => row._id === second).plan.isActive, true);
+
+  const third = await handler(inviteStudent)(action, {...profile, ...guardian, name: "Júlia"});
+  assert.equal(ctx.tables.students.find(row => row._id === third).clerkUserId, "parent");
+  assert.equal(invitations, 1);
+});
+
+test("a teacher can also select a guardian-linked child in the same academy", async () => {
+  const ctx = context();
+  const id = await handler(insertInvitedStudent)(ctx, {
+    ...profile, email: "", guardianEmail: "owner@example.com", existingClerkUserId: "user_1",
+  });
+  assert.equal((await getCurrentPrincipal(ctx)).isAdmin, true);
+  await handler(selectAcademy)(ctx, {gymId: "gym_1", studentId: id});
+  const child = await getCurrentPrincipal(ctx);
+  assert.equal(child.isAdmin, false);
+  assert.equal(child.student?._id, id);
+  assert.equal(child.teacher, null);
+  await handler(selectAcademy)(ctx, {gymId: "gym_1"});
+  assert.equal((await getCurrentPrincipal(ctx)).isAdmin, true);
 });

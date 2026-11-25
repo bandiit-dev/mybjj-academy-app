@@ -153,7 +153,9 @@ function friendlyError(cause: unknown) {
   if (message.includes("dateOfBirth"))
     return "Informe uma data de nascimento válida, até a data de hoje.";
   if (message.includes("valid email"))
-    return "Informe um e-mail válido para criar a conta do aluno.";
+    return "Informe um e-mail válido para liberar o acesso.";
+  if (message.includes("O acesso do responsável mudou"))
+    return "O acesso do responsável mudou. Tente salvar novamente.";
   if (message.includes("Unauthorized"))
     return "Sua sessão expirou. Entre novamente para continuar.";
   if (message.includes("Forbidden") || message.includes("admin role required"))
@@ -491,6 +493,31 @@ export function AddProfessorForm() {
   );
 }
 
+function GuardianAccessFields({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <>
+      <label className="account-access-option">
+        <input type="checkbox" checked={checked} onChange={event => onChange(event.target.checked)} />
+        Acesso pelo responsável
+      </label>
+      {checked && (
+        <>
+          <Field name="guardianEmail" label="E-mail do responsável" type="email" required />
+          <p className="account-access-help">
+            Use o mesmo e-mail para vincular outros alunos. O responsável poderá alternar entre os perfis e receber os lembretes de mensalidade.
+          </p>
+        </>
+      )}
+    </>
+  );
+}
+
 export function AddStudentForm() {
   const uploadImage = useImageUpload();
   const gyms = useQuery(api.gyms.getAllGyms);
@@ -498,6 +525,7 @@ export function AddStudentForm() {
   const invite = useAction(api.provisioning.inviteStudent);
   const create = useMutation(api.students.createStudentWithoutAccount);
   const [createAccount, setCreateAccount] = useState(false);
+  const [guardianAccess, setGuardianAccess] = useState(false);
   const submit = useSubmit("/alunos");
   return (
     <Shell
@@ -509,7 +537,8 @@ export function AddStudentForm() {
       onSubmit={async (d) =>
         submit.run(async () => {
           const email = String(d.get("email") ?? "").trim();
-          if (createAccount) assertInvitationEmail(email);
+          const guardianEmail = guardianAccess ? String(d.get("guardianEmail") ?? "").trim() : undefined;
+          if (createAccount) assertInvitationEmail(guardianEmail ?? email);
 
           const profile = {
             plan: readStudentPlan(d),
@@ -524,7 +553,7 @@ export function AddStudentForm() {
             picture: await uploadImage(d, "picture"),
           };
           return createAccount
-            ? invite({ ...profile, redirectUrl: `${window.location.origin}/` })
+            ? invite({ ...profile, guardianEmail, redirectUrl: `${window.location.origin}/` })
             : create(profile);
         })
       }
@@ -536,7 +565,7 @@ export function AddStudentForm() {
           <Field
             name="email"
             label="E-mail"
-            required={createAccount}
+            required={createAccount && !guardianAccess}
             type="email"
           />
           <Field name="phone" label="Telefone" />
@@ -580,9 +609,10 @@ export function AddStudentForm() {
         </label>
         <p className="account-access-help" id="account-access-help">
           {createAccount
-            ? "Informe o e-mail de acesso. Se já houver uma conta, ela receberá acesso a esta academia. Caso contrário, enviaremos um convite."
+            ? "O acesso será vinculado a uma conta existente ou enviado por convite."
             : "O aluno será cadastrado sem acesso ao aplicativo. E-mail e telefone são opcionais."}
         </p>
+        {createAccount && <GuardianAccessFields checked={guardianAccess} onChange={setGuardianAccess} />}
       </Section>
     </Shell>
   );
@@ -735,7 +765,9 @@ export function EditStudentForm({ studentId }: { studentId: Id<"students"> }) {
   const units = useQuery(api.unities.getAllUnities);
   const update = useMutation(api.students.updateStudent);
   const invite = useAction(api.provisioning.inviteExistingStudent);
+  const revokeGuardian = useMutation(api.students.revokeGuardianAccess);
   const [createAccount, setCreateAccount] = useState(false);
+  const [guardianAccess, setGuardianAccess] = useState(false);
   const submit = useSubmit("/alunos");
   if (student === undefined || gyms === undefined || units === undefined)
     return <LoadingForm title="Editar Aluno" />;
@@ -768,6 +800,7 @@ export function EditStudentForm({ studentId }: { studentId: Id<"students"> }) {
                 ...profile,
                 gymId,
                 unityId,
+                guardianEmail: guardianAccess ? String(data.get("guardianEmail") ?? "").trim() : undefined,
                 redirectUrl: `${window.location.origin}/`,
               })
             : update({ ...profile, gymIds: [gymId], unityIds: [unityId] });
@@ -791,7 +824,7 @@ export function EditStudentForm({ studentId }: { studentId: Id<"students"> }) {
           <Field
             name="email"
             label="E-mail"
-            required={shouldInvite || Boolean(student.clerkUserId)}
+            required={(shouldInvite && !guardianAccess) || Boolean(student.clerkUserId && !student.guardianEmail)}
             type="email"
             defaultValue={student.email}
           />
@@ -839,7 +872,20 @@ export function EditStudentForm({ studentId }: { studentId: Id<"students"> }) {
         detailsHref={`/alunos/${studentId}`}
       />
       <Section title="Acesso ao aplicativo">
-        {student.clerkUserId ? (
+        {student.guardianEmail ? (
+          <>
+            <p className="account-access-help">
+              {student.clerkUserId?.startsWith("invitation:") ? "Convite do responsável pendente" : "Acesso pelo responsável"} · {student.guardianEmail}
+            </p>
+            <button type="button" className="button secondary" disabled={submit.busy} onClick={() => {
+              if (window.confirm("Remover o acesso do responsável a este aluno?")) {
+                void submit.run(() => revokeGuardian({ studentId }));
+              }
+            }}>
+              Remover acesso do responsável
+            </button>
+          </>
+        ) : student.clerkUserId ? (
           <p className="account-access-help">
             {student.clerkUserId.startsWith("invitation:")
               ? "Um convite de acesso já foi enviado para este aluno."
@@ -859,9 +905,10 @@ export function EditStudentForm({ studentId }: { studentId: Id<"students"> }) {
             </label>
             <p className="account-access-help" id="edit-account-access-help">
               {createAccount
-                ? "Informe o e-mail de acesso. Se já houver uma conta, ela receberá acesso a esta academia. Caso contrário, enviaremos um convite."
+                ? "O acesso será vinculado a uma conta existente ou enviado por convite."
                 : "O aluno continuará sem acesso ao aplicativo. E-mail e telefone são opcionais."}
             </p>
+            {shouldInvite && <GuardianAccessFields checked={guardianAccess} onChange={setGuardianAccess} />}
           </>
         )}
       </Section>

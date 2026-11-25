@@ -1,6 +1,7 @@
 import { hasPaidPortalAccess, paidGymIds } from "./portalBilling";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
+import { ConvexError } from "convex/values";
 
 type AuthIdentity = {
   subject: string;
@@ -34,6 +35,12 @@ export function isStudentAccessDisabled(student: Doc<"students"> | null | undefi
   return student?.userType !== "Admin" && student?.plan?.isActive === false;
 }
 
+export function assertSelectedStudent(student: Doc<"students">, expected?: Id<"students">) {
+  if (expected === undefined ? Boolean(student.guardianEmail) : student._id !== expected) {
+    throw new ConvexError("O perfil selecionado mudou. Abra a aula novamente para confirmar.");
+  }
+}
+
 export function academyMemberships({
   teachers,
   students,
@@ -65,14 +72,29 @@ export function academySelection(ctx: AuthCtx, clerkUserId: string) {
     .unique();
 }
 
-export async function resolveAcademyMembership(ctx: AuthCtx, clerkUserId: string) {
-  const profiles = await getProfilesByClerkId(ctx, clerkUserId);
+export function getAcademyChoices(profiles: Awaited<ReturnType<typeof getProfilesByClerkId>>) {
   const memberships = academyMemberships(profiles);
   const choices = [...memberships.values()];
+  for (const profile of profiles.students) {
+    if (profile.userType === "Admin") continue;
+    for (const gymId of new Set(profile.gymIds)) {
+      if (memberships.get(gymId)?.profile._id !== profile._id) {
+        choices.push({ gymId, profile, role: "student", profileType: "student" });
+      }
+    }
+  }
+  return { memberships, choices };
+}
+
+export async function resolveAcademyMembership(ctx: AuthCtx, clerkUserId: string) {
+  const profiles = await getProfilesByClerkId(ctx, clerkUserId);
+  const { memberships, choices } = getAcademyChoices(profiles);
   let active = choices[0];
   if (choices.length > 1) {
     const saved = await academySelection(ctx, clerkUserId);
-    const selected = saved && memberships.get(saved.gymId);
+    const selected = saved?.studentId
+      ? choices.find(choice => choice.gymId === saved.gymId && choice.role === "student" && choice.profile._id === saved.studentId)
+      : saved && memberships.get(saved.gymId);
     if (selected) {
       active = selected;
     } else if (active?.role === "admin") {
@@ -84,7 +106,7 @@ export async function resolveAcademyMembership(ctx: AuthCtx, clerkUserId: string
       if (paid !== -1) active = admins[paid];
     }
   }
-  return { ...profiles, memberships, active };
+  return { ...profiles, memberships, choices, active };
 }
 
 export async function getCurrentPrincipal(ctx: AuthCtx, options: {skipSubscription?: boolean} = {}) {

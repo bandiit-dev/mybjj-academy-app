@@ -46,7 +46,7 @@ function duePeriod(
 }
 
 function contactEmail(student: Doc<"students">) {
-  const email = student.email.trim();
+  const email = (student.guardianEmail ?? student.email).trim();
   try {
     assertInvitationEmail(email);
     return email;

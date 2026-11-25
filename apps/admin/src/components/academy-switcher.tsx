@@ -7,9 +7,21 @@ import { createContext, useContext } from "react";
 
 type AcademyRole = "admin" | "teacher" | "student";
 
+export function academyProfileKey(
+  gymId?: Id<"gyms">,
+  studentId?: Id<"students">,
+) {
+  return `${gymId ?? ""}:${studentId ?? ""}`;
+}
+
 export const AcademySwitchContext = createContext<{
   activeGymId?: Id<"gyms">;
-  switchAcademy: (gymId: Id<"gyms">, role: AcademyRole) => void;
+  activeStudentId?: Id<"students">;
+  switchAcademy: (
+    gymId: Id<"gyms">,
+    role: AcademyRole,
+    studentId?: Id<"students">,
+  ) => void;
   error: string;
 } | null>(null);
 
@@ -18,7 +30,7 @@ const labels = { admin: "Admin", teacher: "Professor", student: "Aluno" };
 export function AcademySwitcher() {
   const context = useContext(AcademySwitchContext);
   const academies = useQuery(
-    api.onboarding.listAcademyAccess,
+    api.onboarding.listProfileAccess,
     context?.activeGymId ? {} : "skip",
   );
   if (!context || !academies || academies.length < 2) return null;
@@ -26,20 +38,34 @@ export function AcademySwitcher() {
   return (
     <div className="academy-switcher">
       <label>
-        <span className="sr-only">Trocar academia</span>
+        <span className="sr-only">Trocar academia ou perfil</span>
         <select
           className="academy-selector"
-          value={context.activeGymId}
+          value={academyProfileKey(
+            context.activeGymId,
+            context.activeStudentId,
+          )}
           onChange={(event) => {
             const academy = academies.find(
-              ({ gymId }) => gymId === event.target.value,
+              ({ gymId, studentId }) =>
+                academyProfileKey(gymId, studentId) === event.target.value,
             );
-            if (academy) context.switchAcademy(academy.gymId, academy.role);
+            if (academy)
+              context.switchAcademy(
+                academy.gymId,
+                academy.role,
+                academy.studentId,
+              );
           }}
         >
-          {academies.map(({ gymId, role, name }) => (
-            <option key={gymId} value={gymId}>
-              {name} · {labels[role]}
+          {academies.map(({ gymId, gymName, role, name, studentId }) => (
+            <option
+              key={academyProfileKey(gymId, studentId)}
+              value={academyProfileKey(gymId, studentId)}
+            >
+              {role === "student"
+                ? `${name} · ${gymName}`
+                : `${gymName} · ${labels[role]}`}
             </option>
           ))}
         </select>

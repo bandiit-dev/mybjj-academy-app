@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
 import { AppTopBar } from "../../src/components/mobile/AppTopBar";
+import { ProfileSwitcher } from "../../src/components/feature/ProfileSwitcher";
 import { LoadingState } from "../../src/components/ui/State";
 import { Screen } from "../../src/components/ui/Screen";
 import { useCurrentProfile } from "../../src/features/profile/hooks/useCurrentProfile";
@@ -55,6 +56,7 @@ export default function ProfileScreen() {
   return (
     <Screen>
       <AppTopBar title="Meu Perfil" />
+      <ProfileSwitcher />
 
       <View className="gap-2 rounded-2xl bg-[#E5E7EB] p-4">
         <Text className="text-sm text-[#4B5563]">Tipo de usuário: {role}</Text>

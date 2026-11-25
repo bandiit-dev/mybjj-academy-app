@@ -55,9 +55,10 @@ export default function ClassDetailScreen() {
     session.status !== "Cancelled";
 
   async function onConfirmPresence() {
+    if (!detail?.currentStudentId) return;
     setSubmitting(true);
     try {
-      await confirmEnrollment({ classSessionId: session._id });
+      await confirmEnrollment({ classSessionId: session._id, studentId: detail.currentStudentId });
       setShowConfirmModal(false);
     } finally {
       setSubmitting(false);
@@ -65,9 +66,10 @@ export default function ClassDetailScreen() {
   }
 
   async function onCancelPresence() {
+    if (!detail?.currentStudentId) return;
     setSubmitting(true);
     try {
-      await cancelEnrollment({ classSessionId: session._id });
+      await cancelEnrollment({ classSessionId: session._id, studentId: detail.currentStudentId });
     } finally {
       setSubmitting(false);
     }

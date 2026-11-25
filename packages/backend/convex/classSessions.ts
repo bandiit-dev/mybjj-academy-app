@@ -329,6 +329,7 @@ export const getClassSessionDetail = query({
         ? enrollments.find(row => row.studentId === studentId)?.status ?? null
         : null,
       currentUserAttendance: studentId ? attendanceByStudent.get(studentId) ?? null : null,
+      currentStudentId: studentId ?? null,
     };
   }
 });

@@ -3,6 +3,7 @@ import { ConvexError, v } from "convex/values";
 
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import {
+  assertSelectedStudent,
   getCurrentPrincipal,
   requireAdmin,
   requireSessionTeacherOrAdmin
@@ -61,9 +62,10 @@ export async function confirmStudentEnrollment(
 }
 
 export const confirmEnrollment = mutation({
-  args: { classSessionId: v.id("classSessions") },
-  handler: async (ctx, { classSessionId }) => {
+  args: { classSessionId: v.id("classSessions"), studentId: v.optional(v.id("students")) },
+  handler: async (ctx, { classSessionId, studentId }) => {
     const student = requireCurrentStudent(await getCurrentPrincipal(ctx));
+    assertSelectedStudent(student, studentId);
     const session = await ctx.db.get(classSessionId);
 
     if (!session || !session.gymIds.some(gymId => student.gymIds.includes(gymId))) {
@@ -79,11 +81,13 @@ export const confirmEnrollment = mutation({
 
 export const cancelEnrollment = mutation({
   args: {
-    classSessionId: v.id("classSessions")
+    classSessionId: v.id("classSessions"),
+    studentId: v.optional(v.id("students"))
   },
-  handler: async (ctx, { classSessionId }) => {
+  handler: async (ctx, { classSessionId, studentId }) => {
     const principal = await getCurrentPrincipal(ctx);
     const student = requireCurrentStudent(principal);
+    assertSelectedStudent(student, studentId);
 
     const existing = await ctx.db
       .query("enrollments")

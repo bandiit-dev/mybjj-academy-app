@@ -1099,3 +1099,33 @@ test("schedule changes require authorized staff and protect future recurring dat
   await assert.rejects(handler(confirmClass)(student, { sessionId: cancelledSession }), /não está disponível/);
   await assert.rejects(handler(recordClassDate)(ctx, { classId, date }), /Já existe um registro/);
 });
+
+test("switching siblings keeps schedules, payments and attendance scoped to the selected child", async (t) => {
+  t.mock.method(Date, "now", () => clock);
+  const {ctx, tables} = fixture();
+  tables.gyms = [{_id: "gym", name: "Academia"}];
+  tables.academySelections = [];
+  tables.students[0].guardianEmail = "parent@example.com";
+  tables.students[1].guardianEmail = "parent@example.com";
+  tables.students[1].clerkUserId = "student-login";
+  tables.students[1].plan = { type: "Mensal", startDate: "2026-10-10", isActive: true };
+  await handler(selectAcademy)(ctx, {gymId: "gym", studentId: "student"});
+  const first = await handler(getOverview)(ctx, {refreshDay: today});
+  assert.equal(first.profile.name, "Igor Miguel");
+  assert.equal(first.payments.lastPayment, "2026-11-10");
+  await handler(selectAcademy)(ctx, {gymId: "gym", studentId: "other-student"});
+  const second = await handler(getOverview)(ctx, {refreshDay: today});
+  assert.equal(second.profile.name, "Ana");
+  assert.equal(second.payments.lastPayment, "2026-11-17");
+  assert.equal(second.classes[0].studentId, "other-student");
+  assert.equal(second.week.total, 0);
+  await assert.rejects(handler(confirmClass)(ctx, {sessionId: "monday", studentId: "student"}), /perfil selecionado mudou/);
+  await assert.rejects(handler(cancelEnrollment)(ctx, {classSessionId: "monday", studentId: "student"}), /perfil selecionado mudou/);
+  await assert.rejects(handler(confirmClass)(ctx, {sessionId: "monday"}), /perfil selecionado mudou/);
+  await handler(confirmClass)(ctx, {sessionId: "monday", studentId: "other-student"});
+  assert.equal(tables.enrollments.at(-1)?.studentId, "other-student");
+  assert.equal(tables.enrollments[0].status, "Confirmed");
+  await handler(cancelEnrollment)(ctx, {classSessionId: "monday", studentId: "other-student"});
+  assert.equal(tables.enrollments.at(-1)?.status, "Cancelled");
+  assert.equal(tables.enrollments[0].status, "Confirmed");
+});

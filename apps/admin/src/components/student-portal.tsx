@@ -198,7 +198,7 @@ function ClassRow({
               aria-label={`Cancelar confirmação em ${entry.title}, às ${hour.format(entry.startsAt)}`}
               onClick={() =>
                 updatePresence(
-                  () => cancel({ classSessionId }),
+                  () => cancel({ classSessionId, studentId: entry.studentId }),
                   "Não foi possível cancelar a confirmação. Tente novamente.",
                 )
               }
@@ -221,8 +221,8 @@ function ClassRow({
                 () =>
                   confirm(
                     entry.sessionId
-                      ? { sessionId: entry.sessionId }
-                      : { classId: entry.classId, date },
+                      ? { sessionId: entry.sessionId, studentId: entry.studentId }
+                      : { classId: entry.classId, date, studentId: entry.studentId },
                   ),
                 "Não foi possível confirmar a presença. Tente novamente.",
               )

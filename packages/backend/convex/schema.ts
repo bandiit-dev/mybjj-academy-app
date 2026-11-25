@@ -31,6 +31,7 @@ export default defineSchema({
   academySelections: defineTable({
     clerkUserId: v.string(),
     gymId: v.id("gyms"),
+    studentId: v.optional(v.id("students")),
   }).index("by_clerkUserId", ["clerkUserId"]),
 
   billingAccounts: defineTable({
@@ -129,6 +130,7 @@ export default defineSchema({
   students: defineTable({
     plan: v.optional(studentPlanValidator),
     clerkUserId: v.optional(v.string()),
+    guardianEmail: v.optional(v.string()),
     dateOfBirth: v.optional(v.string()),
     name: v.string(),
     email: v.string(),
@@ -143,6 +145,7 @@ export default defineSchema({
     updatedAt: v.number()
   })
     .index("by_clerkUserId", ["clerkUserId"])
+    .index("by_guardianEmail", ["guardianEmail"])
     .index("by_email", ["email"]),
 
   studentGraduations: defineTable({

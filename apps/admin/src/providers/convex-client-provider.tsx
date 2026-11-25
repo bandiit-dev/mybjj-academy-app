@@ -25,6 +25,7 @@ import { BrandLogo } from "@/components/brand-logo";
 import {
   AcademySwitchContext,
   AcademySwitcher,
+  academyProfileKey,
 } from "@/components/academy-switcher";
 
 function PortalAccessGate({ children }: { children: React.ReactNode }) {
@@ -61,9 +62,12 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
   );
   const activeGymId =
     onboarding?.status === "ready" ? onboarding.activeGymId : undefined;
+  const activeStudentId =
+    onboarding?.status === "ready" ? onboarding.activeStudentId : undefined;
+  const activeProfileKey = academyProfileKey(activeGymId, activeStudentId);
   const selectAcademy = useMutation(api.onboarding.selectAcademy);
   const [switching, setSwitching] = useState<{
-    gymId: Id<"gyms">;
+    profileKey: string;
     route: string;
   }>();
   const [switchError, setSwitchError] = useState("");
@@ -71,31 +75,33 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
   async function switchAcademy(
     gymId: Id<"gyms">,
     role: "admin" | "teacher" | "student",
+    studentId?: Id<"students">,
   ) {
-    if (switching || gymId === activeGymId) return;
+    const profileKey = academyProfileKey(gymId, studentId);
+    if (switching || profileKey === activeProfileKey) return;
     const route =
       role === "student" ? "/aluno" : role === "teacher" ? "/aulas" : "/";
     setSwitchError("");
-    setSwitching({ gymId, route });
+    setSwitching({ profileKey, route });
     try {
-      await selectAcademy({ gymId });
+      await selectAcademy({ gymId, studentId });
       router.replace(route);
     } catch {
-      setSwitchError("Não foi possível trocar de academia. Tente novamente.");
+      setSwitchError("Não foi possível trocar de perfil. Tente novamente.");
       setSwitching(undefined);
     }
   }
 
   useEffect(() => {
-    if (switching?.gymId === activeGymId && switching?.route === pathname) {
+    if (switching?.profileKey === activeProfileKey && switching.route === pathname) {
       setSwitching(undefined);
     }
-  }, [activeGymId, pathname, switching]);
+  }, [activeProfileKey, pathname, switching]);
 
   const scopedChildren = (
     <AcademySwitchContext.Provider
-      key={activeGymId}
-      value={{ activeGymId, switchAcademy, error: switchError }}
+      key={activeProfileKey}
+      value={{ activeGymId, activeStudentId, switchAcademy, error: switchError }}
     >
       {children}
     </AcademySwitchContext.Provider>
@@ -323,7 +329,7 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
   if (studentAccessDisabled || academySubscriptionInactive) {
     return (
       <AcademySwitchContext.Provider
-        value={{ activeGymId, switchAcademy, error: switchError }}
+        value={{ activeGymId, activeStudentId, switchAcademy, error: switchError }}
       >
         <main className="auth-state">
           <div className="auth-denied">

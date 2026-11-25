@@ -110,6 +110,9 @@ export const updateStudent = mutation({
     if (patch.clerkUserId !== undefined && patch.clerkUserId !== authResult.targetStudent.clerkUserId) {
       throw new Error("Forbidden: use the invitation flow to link student accounts");
     }
+    if (authResult.targetStudent.guardianEmail && patch.userType === "Admin") {
+      throw new Error("Forbidden: a guardian-linked profile cannot grant administrative access");
+    }
     if (patch.gymIds) assertAdminGymScope(authResult, patch.gymIds);
     const adminGymIds = new Set([...(authResult.teacher?.gymIds ?? []), ...(authResult.student?.gymIds ?? [])]);
     if (!authResult.targetStudent.gymIds.every((gymId: Id<"gyms">) => adminGymIds.has(gymId))) {
@@ -128,6 +131,23 @@ export const updateStudent = mutation({
 
     return studentId;
   }
+});
+
+export const revokeGuardianAccess = mutation({
+  args: { studentId: v.id("students") },
+  handler: async (ctx, { studentId }) => {
+    const { isAdmin, teacher, student, targetStudent } = await requireStudentOrAdmin(ctx, studentId);
+    const academyIds = new Set([...(teacher?.gymIds ?? []), ...(student?.gymIds ?? [])]);
+    if (!isAdmin || !targetStudent.gymIds.every(id => academyIds.has(id))) {
+      throw new Error("Forbidden: academy administrator access required");
+    }
+    if (!targetStudent.guardianEmail) return;
+    await ctx.db.patch(studentId, {
+      guardianEmail: undefined,
+      clerkUserId: undefined,
+      updatedAt: Date.now(),
+    });
+  },
 });
 
 export const getStudentById = query({

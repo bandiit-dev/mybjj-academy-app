@@ -17,6 +17,7 @@ import type * as enrollments from "../enrollments.js";
 import type * as gyms from "../gyms.js";
 import type * as http from "../http.js";
 import type * as images from "../images.js";
+import type * as lib_accountInvitations from "../lib/accountInvitations.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_imageValidation from "../lib/imageValidation.js";
 import type * as lib_portalBilling from "../lib/portalBilling.js";
@@ -53,6 +54,7 @@ declare const fullApi: ApiFromModules<{
   gyms: typeof gyms;
   http: typeof http;
   images: typeof images;
+  "lib/accountInvitations": typeof lib_accountInvitations;
   "lib/auth": typeof lib_auth;
   "lib/imageValidation": typeof lib_imageValidation;
   "lib/portalBilling": typeof lib_portalBilling;

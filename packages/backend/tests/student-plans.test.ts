@@ -17,7 +17,7 @@ function context({admin = true, authenticated = true, otherAcademy = false} = {}
     gyms: [{_id:"gym_1"}, {_id:"gym_2"}],
     teachers: admin ? [{_id:"teacher_1",clerkUserId:"owner",userType:"Admin",gymIds:["gym_1"]}] : [],
     students: [{_id:"student_1",clerkUserId:"student_user",gymIds:[otherAcademy?"gym_2":"gym_1"],plan:{...monthly},userType:"Normal"}],
-    unities: [], studentPayments: [], monthlyPaymentReminders: []
+    academySelections: [], unities: [], studentPayments: [], monthlyPaymentReminders: []
   };
   const db = {
     get: async (id: string) => Object.values(tables).flat().find(row=>row._id===id)??null,
