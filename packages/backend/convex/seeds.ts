@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 
 import type { Id } from "./_generated/dataModel";
-import { mutation } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
 import { toIsoDate } from "./lib/validators";
 
 function assertSeedSecret(secret: string) {
@@ -26,7 +26,7 @@ function atUtc(dateIso: string, hour: number, minute: number): number {
   return new Date(`${dateIso}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00.000Z`).getTime();
 }
 
-export const seedDemoData = mutation({
+export const seedDemoData = internalMutation({
   args: {
     secret: v.string(),
     adminClerkUserId: v.optional(v.string()),

@@ -170,13 +170,11 @@ This mutation creates:
 - 2 class sessions
 - enrollment + attendance sample records
 
-It is protected by `SEED_SECRET`.
+This internal mutation is available through the Convex CLI or dashboard. It requires `SEED_SECRET` on the development deployment.
 
 ### Seed Env
 
-Add in `packages/backend/.env.local`:
-
-- `SEED_SECRET=your_local_seed_secret`
+Set `SEED_SECRET` on your development deployment through the Convex dashboard. Leave it unset in production.
 
 ### Seed Command
 
