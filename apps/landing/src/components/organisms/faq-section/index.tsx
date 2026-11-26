@@ -1,12 +1,24 @@
 import Link from "next/link";
-import { FaqItem } from "@/components/molecules/faq-item";
+import { AnalyticsLink } from "@/components/atoms/analytics-link";
+import { FaqItem, type FaqTopic } from "@/components/molecules/faq-item";
 
 const whatsappUrl = "https://wa.me/5521971340128";
 const linkStyle =
   "font-medium text-black underline decoration-[#9d9d9d] underline-offset-4 hover:decoration-current";
 
-const questions = [
+const whatsappClick = {
+  event: "contact_click",
+  contact_method: "whatsapp",
+  cta_location: "faq",
+} as const;
+
+const questions: {
+  topic: FaqTopic;
+  question: string;
+  answer: React.ReactNode;
+}[] = [
   {
+    topic: "trial",
     question: "Como funciona o teste grátis de 7 dias?",
     answer: (
       <p>
@@ -17,20 +29,26 @@ const questions = [
     ),
   },
   {
+    topic: "plans",
     question: "Qual plano faz sentido para minha academia?",
     answer: (
       <p>
         O Starter atende academias com até 50 alunos ativos. O Full atende
         academias que precisam de mais vagas e permite alunos ativos ilimitados.
         Se você já assina e precisa mudar de plano,{" "}
-        <a href={whatsappUrl} className={linkStyle}>
+        <AnalyticsLink
+          href={whatsappUrl}
+          className={linkStyle}
+          tracking={whatsappClick}
+        >
           fale com a gente
-        </a>
+        </AnalyticsLink>
         .
       </p>
     ),
   },
   {
+    topic: "privacy",
     question: "Como vocês protegem os dados da minha academia?",
     answer: (
       <p>
@@ -44,6 +62,7 @@ const questions = [
     ),
   },
   {
+    topic: "installation",
     question: "Preciso instalar algum programa?",
     answer: (
       <p>
@@ -53,23 +72,37 @@ const questions = [
     ),
   },
   {
+    topic: "support",
     question: "Como funciona o suporte?",
     answer: (
       <p>
         Para tirar dúvidas sobre o cadastro ou o uso do portal, fale com a gente
         pelo{" "}
-        <a href={whatsappUrl} className={linkStyle}>
+        <AnalyticsLink
+          href={whatsappUrl}
+          className={linkStyle}
+          tracking={whatsappClick}
+        >
           WhatsApp
-        </a>{" "}
+        </AnalyticsLink>{" "}
         ou pelo{" "}
-        <a href="mailto:contato@mybjjacademy.com.br" className={linkStyle}>
+        <AnalyticsLink
+          href="mailto:contato@mybjjacademy.com.br"
+          className={linkStyle}
+          tracking={{
+            event: "contact_click",
+            contact_method: "email",
+            cta_location: "faq",
+          }}
+        >
           e-mail de atendimento
-        </a>
+        </AnalyticsLink>
         . O plano Full inclui suporte dedicado.
       </p>
     ),
   },
   {
+    topic: "cancellation",
     question: "Posso cancelar a assinatura quando quiser?",
     answer: (
       <p>
@@ -102,16 +135,25 @@ export function FaqSection() {
           </h2>
           <p className="mt-3 text-base leading-relaxed text-[#515151]">
             Não encontrou sua resposta?{" "}
-            <a href={whatsappUrl} className={linkStyle}>
+            <AnalyticsLink
+              href={whatsappUrl}
+              className={linkStyle}
+              tracking={whatsappClick}
+            >
               Fale conosco pelo WhatsApp
-            </a>
+            </AnalyticsLink>
             .
           </p>
         </header>
 
         <div className="mt-9 grid gap-2.5 sm:mt-[46px]">
-          {questions.map(({ question, answer }, index) => (
-            <FaqItem key={question} question={question} open={index === 0}>
+          {questions.map(({ topic, question, answer }, index) => (
+            <FaqItem
+              key={topic}
+              topic={topic}
+              question={question}
+              open={index === 0}
+            >
               {answer}
             </FaqItem>
           ))}

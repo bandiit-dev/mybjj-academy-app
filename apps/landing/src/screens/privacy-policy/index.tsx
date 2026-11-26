@@ -173,14 +173,27 @@ const sections: LegalSection[] = [
   },
   {
     id: "cookies",
-    title: "Cookies e tecnologias de sessão",
+    title: "Cookies de sessão e de análise",
     content: (
-      <p>
-        O portal usa cookies e tecnologias de sessão para manter o login e
-        proteger o acesso à conta. Você pode gerenciar cookies pelo navegador.
-        Bloquear cookies necessários pode impedir o login ou interromper a
-        sessão.
-      </p>
+      <>
+        <p>
+          O portal usa cookies e tecnologias de sessão para manter o login e
+          proteger o acesso à conta. Bloquear esses cookies pelo navegador pode
+          impedir o login ou interromper a sessão.
+        </p>
+        <p>
+          No site público, com sua permissão, usamos o Google Tag Manager para
+          carregar o Google Analytics. Medimos visitas, origem do tráfego e
+          interações com recursos, planos e canais de contato. O Google
+          Analytics pode usar cookies para reconhecer visitas do mesmo
+          navegador. A medição não inclui dados da conta ou da academia no
+          portal.
+        </p>
+        <p>
+          Você pode recusar ou retirar seu consentimento em Preferências de
+          cookies, no rodapé do site. Sua escolha é salva no navegador.
+        </p>
+      </>
     ),
   },
   {

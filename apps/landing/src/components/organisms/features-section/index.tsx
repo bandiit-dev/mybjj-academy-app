@@ -3,11 +3,21 @@
 import { useId, useState, type KeyboardEvent } from "react";
 import { DesignImage } from "@/components/atoms/design-image";
 import { FeatureList } from "@/components/molecules/feature-list";
+import { trackLandingEvent } from "@/lib/analytics";
 import { audiences } from "./audiences";
 
 export function FeaturesSection() {
   const id = useId();
   const [active, setActive] = useState(0);
+
+  function selectAudience(next: number) {
+    if (next === active) return;
+    setActive(next);
+    trackLandingEvent({
+      event: "feature_tab_select",
+      audience: audiences[next].id,
+    });
+  }
 
   function handleTabKeys(event: KeyboardEvent<HTMLDivElement>) {
     const last = audiences.length - 1;
@@ -29,7 +39,7 @@ export function FeaturesSection() {
         return;
     }
     event.preventDefault();
-    setActive(next);
+    selectAudience(next);
     event.currentTarget.querySelectorAll("button")[next]?.focus();
   }
 
@@ -72,7 +82,7 @@ export function FeaturesSection() {
                 aria-selected={selected}
                 aria-controls={`${id}-panel-${audience}`}
                 tabIndex={selected ? 0 : -1}
-                onClick={() => setActive(index)}
+                onClick={() => selectAudience(index)}
                 className={`flex min-h-16 w-full cursor-pointer items-center justify-between gap-3 rounded-2xl px-5 py-3 text-left text-xl leading-6 font-semibold motion-safe:transition-colors sm:px-6 ${selected ? "bg-black text-white focus-visible:outline-black" : "bg-[#f5f5f5] text-[#9d9d9d] hover:text-[#525252] focus-visible:text-[#525252]"}`}
               >
                 {tabLabel}

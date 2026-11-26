@@ -19,10 +19,19 @@ export function SiteHeader({ home = false }: { home?: boolean }) {
         <Link href={`${homePath}#faq`}>FAQ</Link>
       </nav>
       <div className="flex gap-3.5">
-        <ActionLink subtle radius={radius} className="min-w-[100px]">
+        <ActionLink
+          subtle
+          radius={radius}
+          className="min-w-[100px]"
+          tracking={{ event: "login_click", cta_location: "header" }}
+        >
           Entrar
         </ActionLink>
-        <ActionLink radius={radius} className="min-w-[156px]">
+        <ActionLink
+          radius={radius}
+          className="min-w-[156px]"
+          tracking={{ event: "signup_click", cta_location: "header" }}
+        >
           Começar agora
         </ActionLink>
       </div>

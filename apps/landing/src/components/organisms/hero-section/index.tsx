@@ -28,7 +28,11 @@ export function HeroSection() {
           <br className="hidden sm:block" /> turmas, aulas e mensalidades em um
           só lugar.
         </p>
-        <ActionLink tone="white" className="mt-[36px] w-[190px]">
+        <ActionLink
+          tone="white"
+          className="mt-[36px] w-[190px]"
+          tracking={{ event: "signup_click", cta_location: "hero" }}
+        >
           Começar agora
         </ActionLink>
       </div>

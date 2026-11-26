@@ -3,6 +3,7 @@ import { PlanCard, type Plan } from "@/components/molecules/plan-card";
 
 const plans: Plan[] = [
   {
+    id: "trial",
     name: "Teste por 7 dias",
     benefits: [
       "7 dias no plano Starter",
@@ -13,6 +14,7 @@ const plans: Plan[] = [
     href: `${adminUrl}/?plano=trial`,
   },
   {
+    id: "starter",
     name: "Plano Starter",
     monthlyPrice: "39,90",
     benefits: [
@@ -26,6 +28,7 @@ const plans: Plan[] = [
     href: `${adminUrl}/?plano=starter`,
   },
   {
+    id: "full",
     name: "Plano Full",
     monthlyPrice: "99,90",
     benefits: [

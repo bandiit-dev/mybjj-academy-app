@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { AnalyticsLink } from "@/components/atoms/analytics-link";
+import { AnalyticsPreferencesButton } from "@/components/organisms/analytics-consent";
 import { BrandLogo } from "@/components/atoms/brand-logo";
 import { DesignImage } from "@/components/atoms/design-image";
 import { instagramUrl, siteName } from "@/lib/site-metadata";
@@ -26,7 +28,16 @@ export function SiteFooter({ home = false }: { home?: boolean }) {
             <Link href={`${homePath}#recursos`}>Recursos</Link>
             <Link href={`${homePath}#planos`}>Planos</Link>
             <Link href={`${homePath}#sobre`}>Sobre</Link>
-            <a href={contactUrl}>Contato</a>
+            <AnalyticsLink
+              href={contactUrl}
+              tracking={{
+                event: "contact_click",
+                contact_method: "email",
+                cta_location: "footer",
+              }}
+            >
+              Contato
+            </AnalyticsLink>
           </nav>
         </div>
         <div className="mt-10 flex lg:mt-[47px]">
@@ -39,17 +50,26 @@ export function SiteFooter({ home = false }: { home?: boolean }) {
           className="mt-10 max-w-full lg:mt-[53px]"
         />
         <div className="mt-[35px] grid items-center gap-5 text-[#f0f0f0] sm:grid-cols-[1fr_auto_1fr]">
-          <a href={instagramUrl} className="justify-self-start">
+          <AnalyticsLink
+            href={instagramUrl}
+            className="justify-self-start"
+            tracking={{
+              event: "contact_click",
+              contact_method: "instagram",
+              cta_location: "footer",
+            }}
+          >
             <DesignImage
               asset="09216.svg"
               width={30}
               height={30}
               alt="Instagram"
             />
-          </a>
+          </AnalyticsLink>
           <div className="flex flex-wrap gap-x-7 gap-y-2 text-sm">
             <Link href="/politica-de-privacidade">Política de Privacidade</Link>
             <Link href="/termos-de-uso">Termos de Uso</Link>
+            <AnalyticsPreferencesButton />
           </div>
           <p className="text-xs sm:text-right">
             © 2026 {siteName}. Todos os direitos reservados.

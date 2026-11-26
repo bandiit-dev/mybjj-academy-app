@@ -2,6 +2,7 @@ import { ActionLink } from "@/components/atoms/action-link";
 import { DesignImage } from "@/components/atoms/design-image";
 
 export type Plan = {
+  id: "trial" | "starter" | "full";
   name: string;
   monthlyPrice?: string;
   benefits: readonly string[];
@@ -54,6 +55,7 @@ export function PlanCard({ plan }: { plan: Plan }) {
       </ul>
       <ActionLink
         href={plan.href}
+        tracking={{ event: "plan_select", plan: plan.id }}
         subtle={!plan.featured}
         className="mt-auto w-full font-semibold"
       >
