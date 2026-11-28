@@ -25,7 +25,9 @@ const navItems = [
   { label: "Professores", icon: "graduation-cap.svg", href: "/professores" },
   { label: "Unidades", icon: "map-pin.svg", href: "/unidades" },
   { label: "Academia", icon: "shield.svg", href: "/academia" },
+  { label: "Privacidade", icon: "shield.svg", href: "/privacidade" },
 ];
+const privacyNavItems = navItems.filter((item) => item.href === "/privacidade");
 type StudentSidebarProfile = {
   name: string;
   picture: string;
@@ -56,19 +58,23 @@ function Sidebar({
   close,
   student,
   teacher = false,
+  privacyOnly = false,
 }: {
   open: boolean;
   close: () => void;
   student?: StudentSidebarProfile;
   teacher?: boolean;
+  privacyOnly?: boolean;
 }) {
   const pathname = usePathname();
   const { user } = useUser();
-  const items = student
-    ? studentNavItems
-    : teacher
-      ? teacherNavItems
-      : navItems;
+  const items = privacyOnly
+    ? privacyNavItems
+    : student
+      ? studentNavItems
+      : teacher
+        ? teacherNavItems
+        : navItems;
   return (
     <>
       {open && (
@@ -80,7 +86,7 @@ function Sidebar({
       )}
       <aside className={`sidebar ${open ? "sidebar-open" : ""}`}>
         <BrandLogo className="sidebar-brand-logo" />
-        <AcademySwitcher />
+        {!privacyOnly && <AcademySwitcher />}
         <nav className="nav-list" aria-label="Menu principal">
           {items.map((item) => (
             <Link
@@ -138,9 +144,9 @@ function Sidebar({
               <strong>
                 {user?.fullName ??
                   user?.primaryEmailAddress?.emailAddress ??
-                  (teacher ? "Professor" : "Admin")}
+                  (privacyOnly ? "Privacidade" : teacher ? "Professor" : "Admin")}
               </strong>
-              <small>{teacher ? "Professor" : "Administrador"}</small>
+              <small>{privacyOnly ? "Privacidade" : teacher ? "Professor" : "Administrador"}</small>
             </span>
             <SignOutButton redirectUrl="/">
               <button
@@ -179,6 +185,7 @@ export function AdminShell({
   showActions = false,
   student,
   teacher = false,
+  privacyOnly = false,
 }: {
   title: string;
   breadcrumb?: string;
@@ -187,6 +194,7 @@ export function AdminShell({
   showActions?: boolean;
   student?: StudentSidebarProfile;
   teacher?: boolean;
+  privacyOnly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -196,6 +204,7 @@ export function AdminShell({
         close={() => setOpen(false)}
         student={student}
         teacher={teacher}
+        privacyOnly={privacyOnly}
       />
       <div className="main-column">
         <header className="topbar">

@@ -29,6 +29,7 @@ for (const path of [
   "/professores",
   "/professores/example-teacher",
   "/professores/meu-historico",
+  "/privacidade",
   "/sign-in",
   "/sign-up",
 ]) {

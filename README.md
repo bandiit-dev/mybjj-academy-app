@@ -247,6 +247,12 @@ The migration copies existing Convex uploads into private storage references and
 
 No required env variables yet.
 
+## Solicitações de privacidade e retenção
+
+Em `/privacidade`, administradores podem registrar pedidos recebidos pelo canal de privacidade, verificar a identidade, assumir o atendimento e registrar a decisão. Cada administrador acessa apenas suas academias. Para abrir o espaço **My BJJ Academy · Plataforma**, configure no Convex `PRIVACY_OPERATOR_CLERK_USER_IDS` com os IDs Clerk autorizados, separados por vírgulas. O acesso à área de privacidade independe da assinatura.
+
+Em **Tabela de retenção**, crie e aprove versões das regras por categoria. Para testar a limpeza de lembretes de uma academia, aprove uma regra de **Remover conteúdo excedente** com prazo em dias. A prévia lê os lembretes no Convex e exibe datas e situação de envio. Exceções documentadas exigem revisão manual. O fluxo de solicitação registra o atendimento, e a prévia não executa alterações ou exclusões.
+
 ## Resend Base Integration
 
 A minimal Resend utility exists at:

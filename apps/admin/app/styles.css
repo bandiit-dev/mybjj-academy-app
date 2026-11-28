@@ -2922,3 +2922,112 @@ select:not([multiple]):is(:not([size]), [size="1"]) {
 .monthly-teaching-list strong {
   flex: none;
 }
+.privacy-workspace {
+  display: grid;
+  gap: 20px;
+}
+
+.privacy-panel,
+.privacy-subsection {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.privacy-panel h2,
+.privacy-panel h3,
+.privacy-panel p {
+  margin: 0;
+}
+
+.privacy-navigation,
+.privacy-heading,
+.privacy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.privacy-navigation,
+.privacy-heading {
+  justify-content: space-between;
+}
+
+.privacy-navigation .management-field {
+  flex: 1 1 220px;
+  max-width: 420px;
+}
+
+.privacy-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 215px), 1fr));
+  gap: 14px;
+}
+
+.privacy-facts,
+.privacy-facts dd {
+  margin: 0;
+}
+
+.privacy-facts dt {
+  font-size: 0.85em;
+  font-weight: 600;
+}
+
+.privacy-facts dd,
+.privacy-protocol,
+.privacy-text {
+  overflow-wrap: anywhere;
+}
+
+.privacy-text {
+  white-space: pre-wrap;
+}
+
+.privacy-subsection {
+  border-top: 1px solid var(--border, #ddd);
+  padding-top: 14px;
+}
+
+.privacy-error {
+  color: #a11a15;
+}
+
+.privacy-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.privacy-table-wrap {
+  overflow-x: auto;
+}
+
+.privacy-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.privacy-table th,
+.privacy-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border, #ddd);
+}
+
+.privacy-version summary {
+  cursor: pointer;
+  padding-block: 8px;
+}
+
+.privacy-version .privacy-facts {
+  padding-block: 8px;
+}
+
+.privacy-events {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 20px;
+}

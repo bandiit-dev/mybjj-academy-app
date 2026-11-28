@@ -2,6 +2,7 @@ import { defineSchema, defineTable } from "convex/server";
 import { beltValidator, teacherClassTypeValidator, unityAddressValidator } from "./lib/validators";
 import { planTypeValidator, studentPlanValidator } from "./lib/studentPlans";
 import { v } from "convex/values";
+import { privacyRequestKind, privacyRequestStatus, privacyRequestOutcome, retentionCategory, retentionDisposition, retentionRuleStatus } from "./lib/privacy";
 
 const userTypeValidator = v.union(v.literal("Normal"), v.literal("Admin"));
 
@@ -28,6 +29,53 @@ const enrollmentStatusValidator = v.union(v.literal("Confirmed"), v.literal("Can
 const attendanceStatusValidator = v.union(v.literal("Present"), v.literal("Absent"));
 
 export default defineSchema({
+  privacyRequests: defineTable({
+    gymId: v.optional(v.id("gyms")),
+    kind: privacyRequestKind,
+    status: privacyRequestStatus,
+    requesterName: v.string(),
+    requesterEmail: v.string(),
+    representation: v.union(v.literal("self"), v.literal("representative")),
+    subjectName: v.optional(v.string()),
+    description: v.string(),
+    receivedOn: v.string(),
+    dueOn: v.optional(v.string()),
+    assignedTo: v.string(),
+    assignedToName: v.string(),
+    identityVerifiedAt: v.optional(v.number()),
+    outcome: v.optional(privacyRequestOutcome),
+    resolution: v.optional(v.string()),
+    revision: v.number(),
+    updatedAt: v.number(),
+  }).index("by_gymId", ["gymId"]).index("by_gym_status", ["gymId", "status"]),
+
+  privacyRequestEvents: defineTable({
+    requestId: v.id("privacyRequests"),
+    actorId: v.string(),
+    actorName: v.string(),
+    status: privacyRequestStatus,
+    kind: v.union(v.literal("registered"), v.literal("assigned"), v.literal("statusChanged")),
+  }).index("by_request", ["requestId"]),
+
+  retentionRules: defineTable({
+    gymId: v.optional(v.id("gyms")),
+    category: retentionCategory,
+    version: v.number(),
+    status: retentionRuleStatus,
+    purpose: v.string(),
+    storageLocation: v.string(),
+    startEvent: v.string(),
+    retentionDays: v.optional(v.number()),
+    disposition: retentionDisposition,
+    exceptions: v.string(),
+    authoredBy: v.string(),
+    authoredByName: v.string(),
+    approvedBy: v.optional(v.string()),
+    approvedByName: v.optional(v.string()),
+    approvedAt: v.optional(v.number()),
+  }).index("by_gym_category_version", ["gymId", "category", "version"])
+    .index("by_gym_category_status_version", ["gymId", "category", "status", "version"]),
+
   academySelections: defineTable({
     clerkUserId: v.string(),
     gymId: v.id("gyms"),
@@ -184,7 +232,8 @@ export default defineSchema({
     providerId: v.optional(v.string()),
     sentAt: v.optional(v.number()),
     failedAt: v.optional(v.number()),
-  }).index("by_student_gym_month", ["studentId", "gymId", "month"]),
+  }).index("by_student_gym_month", ["studentId", "gymId", "month"])
+    .index("by_gym_dueDate", ["gymId", "dueDate"]),
 
   classes: defineTable({
     teacherIds: v.array(v.id("teachers")),

@@ -13,10 +13,11 @@ import { assertInvitationEmail } from "./lib/validators";
 const retryDelayMs = 5 * 60_000;
 const maxAttempts = 3;
 const sendSpacingMs = 1_100;
+export const reminderLeadDays = 3;
 
 function targetDate(day: string) {
   const date = new Date(`${day}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + 3);
+  date.setUTCDate(date.getUTCDate() + reminderLeadDays);
   return date.toISOString().slice(0, 10);
 }
 

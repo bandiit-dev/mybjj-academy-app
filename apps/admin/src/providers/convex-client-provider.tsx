@@ -415,6 +415,16 @@ function PortalAccessGate({ children }: { children: React.ReactNode }) {
   return scopedChildren;
 }
 
+function PortalRouteGate({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  // Privacy access is validated independently of the academy's subscription.
+  return pathname === "/privacidade" ? (
+    children
+  ) : (
+    <PortalAccessGate>{children}</PortalAccessGate>
+  );
+}
+
 export function ConvexClientProvider({
   children,
 }: {
@@ -438,7 +448,7 @@ export function ConvexClientProvider({
           </main>
         }
       >
-        <PortalAccessGate>{children}</PortalAccessGate>
+        <PortalRouteGate>{children}</PortalRouteGate>
       </Suspense>
     </ConvexProviderWithClerk>
   );
